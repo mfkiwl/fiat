@@ -33,7 +33,7 @@ def triangular_number(n):
     return int((n+1)*n/2)
 
 
-class TrimmedSerendipityCube(FiniteElement):
+class TrimmedSerendipity(FiniteElement):
     def __init__(self, ref_el, degree, mapping):
         if degree < 1:
             raise Exception("Trimmed serendipity elements only valid for k >= 1")
@@ -69,7 +69,7 @@ class TrimmedSerendipityCube(FiniteElement):
 
         entity_closure_ids = make_entity_closure_ids(flat_el, entity_ids)
 
-        super(SerendipityCube, self).__init__(ref_el=ref_el, dual=None, order=degree, formdegree=formdegree,
+        super(TrimmedSerendipity, self).__init__(ref_el=ref_el, dual=None, order=degree, formdegree=formdegree,
                                                       mapping=mapping)
 
         topology = ref_el.get_topology()
@@ -239,7 +239,7 @@ def trimmed_f_lambda(deg, dx, dy, x_mid, y_mid):
 
 
 
-class TrimmedSerendipityCubeEdge(TrimmedSerendipityCube):
+class TrimmedSerendipityEdge(TrimmedSerendipity):
     def __init__(self, ref_el, degree):
         if degree < 1:
             raise Exception("Trimmed Serendipity_k edge elements only valid for k >= 1")
@@ -264,10 +264,10 @@ class TrimmedSerendipityCubeEdge(TrimmedSerendipityCube):
         
         bdmce_list = EL + FL
         self.basis = {(0, 0): Array(bdmce_list)}
-        super(TrimmedSerendipityCubeEdge, self).__init__(ref_el=ref_el, degree=degree, mapping="covariant piola")
+        super(TrimmedSerendipityEdge, self).__init__(ref_el=ref_el, degree=degree, mapping="covariant piola")
 
 
-class TrimmedSerendipityCubeFace(TrimmedSerendipityCube):
+class TrimmedSerendipityFace(TrimmedSerendipity):
     def __init__(self, ref_el, degree):
         if degree < 1:
             raise Exception("Trimmed serendipity face elements only valid for k >= 1")
@@ -292,5 +292,5 @@ class TrimmedSerendipityCubeFace(TrimmedSerendipityCube):
         bdmcf_list = EL + FL
         bdmcf_list = [[-a[1], a[0]] for a in bdmcf_list]
         self.basis = {(0, 0): Array(bdmcf_list)}
-        super(TrimmedSerendipityCubeFace, self).__init__(ref_el=ref_el, degree=degree, mapping="contravariant piola")
+        super(TrimmedSerendipityFace, self).__init__(ref_el=ref_el, degree=degree, mapping="contravariant piola")
 
