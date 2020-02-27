@@ -56,14 +56,9 @@ class TrimmedSerendipity(FiniteElement):
             cur = cur + degree
 
         if(degree >= 2):
-            entity_ids[2][0] = list(range(cur, cur + 2*triangular_number(degree - 2) + degree)) #Assigns an entity IDs to the face.  I need to figure out the pattern here for trimmed serendipity.
-        #else:
-        #    entity_ids[2][0] = list(range(cur, cur + 2*triangular_number(degree - 2) + degree)) #Assigns an entity IDs to the face.  I need to figure out the pattern here for trimmed serendipity.
-
-        #print(entity_ids)
+            entity_ids[2][0] = list(range(cur, cur + 2*triangular_number(degree - 2) + degree))
+            
         cur += 2*triangular_number(degree - 2) + degree
-        #print("cur is equal to")
-        #print(cur)
 
         formdegree = 1
 
@@ -161,10 +156,12 @@ class TrimmedSerendipity(FiniteElement):
 #Still not sure why we use for loops in only the EL tuple but not the ELTilde tuple.
 
 def e_lambda_1_2d_part_one(deg, dx, dy, x_mid, y_mid):
-    EL = tuple([(-leg(j, x_mid)*dy[0], 0) for j in range(deg)]+
-               [(-leg(j, x_mid)*dy[1], 0) for j in range(deg)]+
-               [(0, -leg(j, y_mid) * dx[0]) for j in range(deg)]+
-               [(0, -leg(j, y_mid) * dx[1]) for j in range(deg)])
+    EL = tuple(
+        [(0, -leg(j, y_mid) * dx[0]) for j in range(deg)]+
+        [(0, -leg(j, y_mid) * dx[1]) for j in range(deg)]+
+        [(-leg(j, x_mid)*dy[0], 0) for j in range(deg)]+
+        [(-leg(j, x_mid)*dy[1], 0) for j in range(deg)]) 
+
     return EL
 
 def e_lambda_tilde_1_2d_part_two(deg, dx, dy, x_mid, y_mid):
@@ -261,7 +258,7 @@ class TrimmedSerendipityEdge(TrimmedSerendipity):
             FL = trimmed_f_lambda(degree, dx, dy, x_mid, y_mid)
         else:
             FL = ()
-        
+
         bdmce_list = EL + FL
         self.basis = {(0, 0): Array(bdmce_list)}
         super(TrimmedSerendipityEdge, self).__init__(ref_el=ref_el, degree=degree, mapping="covariant piola")
