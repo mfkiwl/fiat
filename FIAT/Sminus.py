@@ -33,15 +33,15 @@ def triangular_number(n):
     return int((n+1)*n/2)
 
 
-class TrimmedBrezziDouglasMariniCube(FiniteElement):
+class TrimmedSerendipityCube(FiniteElement):
     def __init__(self, ref_el, degree, mapping):
         if degree < 1:
-            raise Exception("Trimmed BDMce_k elements only valid for k >= 1")
+            raise Exception("Trimmed serendipity elements only valid for k >= 1")
 
         flat_el = flatten_reference_cube(ref_el)
         dim = flat_el.get_spatial_dimension()
         if dim != 2:
-            raise Exception("Trimmed BDMce_k elements only valid for dimension 2")
+            raise Exception("Trimmed serendipity elements only valid for dimension 2")
 
         flat_topology = flat_el.get_topology()
         entity_ids = {}
@@ -69,7 +69,7 @@ class TrimmedBrezziDouglasMariniCube(FiniteElement):
 
         entity_closure_ids = make_entity_closure_ids(flat_el, entity_ids)
 
-        super(BrezziDouglasMariniCube, self).__init__(ref_el=ref_el, dual=None, order=degree, formdegree=formdegree,
+        super(SerendipityCube, self).__init__(ref_el=ref_el, dual=None, order=degree, formdegree=formdegree,
                                                       mapping=mapping)
 
         topology = ref_el.get_topology()
@@ -94,13 +94,13 @@ class TrimmedBrezziDouglasMariniCube(FiniteElement):
         return self._degree
 
     def get_nodal_basis(self):
-        raise NotImplementedError("get_nodal_basis not implemented for bdmce")
+        raise NotImplementedError("get_nodal_basis not implemented for trimmed serendipity")
 
     def get_dual_set(self):
-        raise NotImplementedError("get_dual_set is not implemented for bdmce")
+        raise NotImplementedError("get_dual_set is not implemented for trimmed serendipity")
 
     def get_coeffs(self):
-        raise NotImplementedError("get_coeffs not implemented for bdmce")
+        raise NotImplementedError("get_coeffs not implemented for trimmed serendipity")
 
     def tabulate(self, order, points, entity=None):
 
@@ -239,15 +239,15 @@ def trimmed_f_lambda(deg, dx, dy, x_mid, y_mid):
 
 
 
-class TrimmedBrezziDouglasMariniCubeEdge(TrimmedBrezziDouglasMariniCube):
+class TrimmedSerendipityCubeEdge(TrimmedSerendipityCube):
     def __init__(self, ref_el, degree):
         if degree < 1:
-            raise Exception("Trimmed BDMce_k elements only valid for k >= 1")
+            raise Exception("Trimmed Serendipity_k edge elements only valid for k >= 1")
 
         flat_el = flatten_reference_cube(ref_el)
         dim = flat_el.get_spatial_dimension()
         if dim != 2:
-            raise Exception("Trimmed BDMce_k elements only valid for dimension 2")
+            raise Exception("Trimmed Serendipity_k edge elements only valid for dimension 2")
 
         verts = flat_el.get_vertices()
 
@@ -264,18 +264,18 @@ class TrimmedBrezziDouglasMariniCubeEdge(TrimmedBrezziDouglasMariniCube):
         
         bdmce_list = EL + FL
         self.basis = {(0, 0): Array(bdmce_list)}
-        super(TrimmedBrezziDouglasMariniCubeEdge, self).__init__(ref_el=ref_el, degree=degree, mapping="covariant piola")
+        super(TrimmedSerendipityCubeEdge, self).__init__(ref_el=ref_el, degree=degree, mapping="covariant piola")
 
 
-class TrimmedBrezziDouglasMariniCubeFace(TrimmedBrezziDouglasMariniCube):
+class TrimmedSerendipityCubeFace(TrimmedSerendipityCube):
     def __init__(self, ref_el, degree):
         if degree < 1:
-            raise Exception("Trimmed BDMcf_k elements only valid for k >= 1")
+            raise Exception("Trimmed serendipity face elements only valid for k >= 1")
 
         flat_el = flatten_reference_cube(ref_el)
         dim = flat_el.get_spatial_dimension()
         if dim != 2:
-            raise Exception("Trimmed BDMcf_k elements only valid for dimension 2")
+            raise Exception("Trimmed serendipity face elements only valid for dimension 2")
 
         verts = flat_el.get_vertices()
 
@@ -292,5 +292,5 @@ class TrimmedBrezziDouglasMariniCubeFace(TrimmedBrezziDouglasMariniCube):
         bdmcf_list = EL + FL
         bdmcf_list = [[-a[1], a[0]] for a in bdmcf_list]
         self.basis = {(0, 0): Array(bdmcf_list)}
-        super(TrimmedBrezziDouglasMariniCubeFace, self).__init__(ref_el=ref_el, degree=degree, mapping="contravariant piola")
+        super(TrimmedSerendipityCubeFace, self).__init__(ref_el=ref_el, degree=degree, mapping="contravariant piola")
 
