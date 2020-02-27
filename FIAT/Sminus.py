@@ -52,20 +52,23 @@ class TrimmedSerendipity(FiniteElement):
             for entity in entities:
                 entity_ids[top_dim][entity] = []
         for j in sorted(flat_topology[1]):
-            entity_ids[1][j] = list(range(cur, cur + degree)) #assign entity ids to everything in the first dimension.
+            entity_ids[1][j] = list(range(cur, cur + degree))  # assign entity ids to everything in the first dimension.
             cur = cur + degree
 
         if(degree >= 2):
             entity_ids[2][0] = list(range(cur, cur + 2*triangular_number(degree - 2) + degree))
-            
+
         cur += 2*triangular_number(degree - 2) + degree
 
         formdegree = 1
 
         entity_closure_ids = make_entity_closure_ids(flat_el, entity_ids)
 
-        super(TrimmedSerendipity, self).__init__(ref_el=ref_el, dual=None, order=degree, formdegree=formdegree,
-                                                      mapping=mapping)
+        super(TrimmedSerendipity, self).__init__(ref_el=ref_el,
+                                                 dual=None,
+                                                 order=degree,
+                                                 formdegree=formdegree,
+                                                 mapping=mapping)
 
         topology = ref_el.get_topology()
         unflattening_map = compute_unflattening_map(topology)
@@ -150,33 +153,40 @@ class TrimmedSerendipity(FiniteElement):
         return int(len(self.basis[(0, 0)])/2)
 
 
-#Splitting the E Lambda function into two seperate functions for E Lambda and E tilde Lambda.
-#Correlating with Andrew's paper, leg(j, x_mid) should be a polynomial x^i, leg(j, y_mid) should be y^i,
-#dy[0] should represent y-1, dy[1] should represent y+1 (and similar for the dx and x+/- 1).  
-#Still not sure why we use for loops in only the EL tuple but not the ELTilde tuple.
+# Splitting the E Lambda function into two seperate functions for E Lambda and E tilde Lambda.
+# Correlating with Andrew's paper, leg(j, x_mid) should be a polynomial x^i, leg(j, y_mid) should be y^i,
+# dy[0] should represent y-1, dy[1] should represent y+1 (and similar for the dx and x+/- 1).
+# Still not sure why we use for loops in only the EL tuple but not the ELTilde tuple.
 
 def e_lambda_1_2d_part_one(deg, dx, dy, x_mid, y_mid):
     EL = tuple(
-        [(0, -leg(j, y_mid) * dx[0]) for j in range(deg)]+
-        [(0, -leg(j, y_mid) * dx[1]) for j in range(deg)]+
-        [(-leg(j, x_mid)*dy[0], 0) for j in range(deg)]+
-        [(-leg(j, x_mid)*dy[1], 0) for j in range(deg)]) 
+        [(0, -leg(j, y_mid) * dx[0]) for j in range(deg)] +
+        [(0, -leg(j, y_mid) * dx[1]) for j in range(deg)] +
+        [(-leg(j, x_mid)*dy[0], 0) for j in range(deg)] +
+        [(-leg(j, x_mid)*dy[1], 0) for j in range(deg)])
 
     return EL
 
+
 def e_lambda_tilde_1_2d_part_two(deg, dx, dy, x_mid, y_mid):
-    ELTilde = tuple([(-leg(deg, x_mid)*dy[0], -leg(deg-1, x_mid)*dx[0]*dx[1]/(deg+1))]+
-               [(-leg(deg, x_mid)*dy[1], leg(deg-1, x_mid)*dx[0]*dx[1]/(deg+1))]+
-               [(-leg(deg-1, y_mid)*dy[0]*dy[1]/(deg+1), -leg(deg, y_mid)*dx[0])]+
-               [(leg(deg-1, y_mid)*dy[0]*dy[1]/(deg+1), -leg(deg, y_mid)*dx[1])])
+    ELTilde = tuple([(-leg(deg, x_mid) * dy[0],
+                      -leg(deg-1, x_mid) * dx[0] * dx[1] / (deg+1))] +
+                    [(-leg(deg, x_mid) * dy[1],
+                      leg(deg-1, x_mid) * dx[0] * dx[1] / (deg+1))] +
+                    [(-leg(deg-1, y_mid) * dy[0] * dy[1] / (deg+1),
+                      -leg(deg, y_mid) * dx[0])] +
+                    [(leg(deg-1, y_mid) * dy[0] * dy[1] / (deg+1),
+                      -leg(deg, y_mid) * dx[1])])
     return ELTilde
+
 
 def e_lambda_1_2d(deg, dx, dy, x_mid, y_mid):
     EL = e_lambda_1_2d_part_one(deg, dx, dy, x_mid, y_mid)
     ELTilde = e_lambda_tilde_1_2d_part_two(deg, dx, dy, x_mid, y_mid)
-    
+
     result = EL + ELTilde
     return result
+
 
 def determine_f_lambda_portions_2d(deg):
     if (deg < 2):
@@ -185,13 +195,14 @@ def determine_f_lambda_portions_2d(deg):
         DegsOfIteration = []
         for i in range(2, deg):
             DegsOfIteration += [i]
-        
+
     return DegsOfIteration
+
 
 def f_lambda_1_2d_pieces(current_deg, dx, dy, x_mid, y_mid):
     if (current_deg == 2):
-       FLpiece = [(leg(0, x_mid) * leg(0, y_mid) * dy[0] * dy[1], 0)]
-       FLpiece += [(0, leg(0, x_mid) * leg(0, y_mid) * dx[0] * dx[1])]
+        FLpiece = [(leg(0, x_mid) * leg(0, y_mid) * dy[0] * dy[1], 0)]
+        FLpiece += [(0, leg(0, x_mid) * leg(0, y_mid) * dx[0] * dx[1])]
     else:
         target_power = current_deg - 2
         FLpiece = tuple([])
@@ -201,13 +212,13 @@ def f_lambda_1_2d_pieces(current_deg, dx, dy, x_mid, y_mid):
             FLpiece += tuple([(0, leg(j, x_mid) * leg(k, y_mid) * dx[0] * dx[1])])
     return FLpiece
 
+
 def f_lambda_1_2d_trim(deg, dx, dy, x_mid, y_mid):
     DegsOfIteration = determine_f_lambda_portions_2d(deg)
     FL = []
     for i in DegsOfIteration:
         FL += f_lambda_1_2d_pieces(i, dx, dy, x_mid, y_mid)
     return tuple(FL)
-
 
 
 def f_lambda_1_2d(deg, dx, dy, x_mid, y_mid):
@@ -218,14 +229,16 @@ def f_lambda_1_2d(deg, dx, dy, x_mid, y_mid):
             FL += [(leg(k-2-j, x_mid)*leg(j, y_mid)*dy[0]*dy[1], 0)]
     return tuple(FL)
 
+
 def f_lambda_1_2d_tilde(deg, dx, dy, x_mid, y_mid):
     FLTilde = tuple([])
     FLTilde += tuple([(leg(deg - 2, y_mid)*dy[0]*dy[1], 0)])
     FLTilde += tuple([(0, leg(deg - 2, x_mid)*dx[0]*dx[1])])
-    for k in range (1, deg - 1):
+    for k in range(1, deg - 1):
         FLTilde += tuple([(leg(k, x_mid) * leg(deg - k - 2, y_mid) * dy[0] * dy[1], -leg(k - 1, x_mid) * leg(deg - k - 1, y_mid) * dx[0] * dx[1])])
 
     return tuple(FLTilde)
+
 
 def trimmed_f_lambda(deg, dx, dy, x_mid, y_mid):
     FL = f_lambda_1_2d_trim(deg, dx, dy, x_mid, y_mid)
@@ -233,7 +246,6 @@ def trimmed_f_lambda(deg, dx, dy, x_mid, y_mid):
     result = FL + FLT
 
     return result
-
 
 
 class TrimmedSerendipityEdge(TrimmedSerendipity):
@@ -290,4 +302,3 @@ class TrimmedSerendipityFace(TrimmedSerendipity):
         bdmcf_list = [[-a[1], a[0]] for a in bdmcf_list]
         self.basis = {(0, 0): Array(bdmcf_list)}
         super(TrimmedSerendipityFace, self).__init__(ref_el=ref_el, degree=degree, mapping="contravariant piola")
-
