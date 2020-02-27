@@ -11,7 +11,7 @@ from FIAT.bernstein import Bernstein
 from FIAT.bell import Bell
 from FIAT.argyris import QuinticArgyris
 from FIAT.brezzi_douglas_marini import BrezziDouglasMarini
-from FIAT.Sminus import TrimmedSerendipityCubeEdge, TrimmedSerendipityCubeFace
+from FIAT.Sminus import TrimmedSerendipityEdge, TrimmedSerendipityFace
 from FIAT.brezzi_douglas_fortin_marini import BrezziDouglasFortinMarini
 from FIAT.discontinuous_lagrange import DiscontinuousLagrange
 from FIAT.discontinuous_taylor import DiscontinuousTaylor
