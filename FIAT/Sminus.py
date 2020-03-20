@@ -41,7 +41,8 @@ class TrimmedSerendipity(FiniteElement):
         flat_el = flatten_reference_cube(ref_el)
         dim = flat_el.get_spatial_dimension()
         if dim != 2:
-            raise Exception("Trimmed serendipity elements only valid for dimension 2")
+            if dim != 3:
+                raise Exception("Trimmed serendipity elements only valid for dimensions 2 and 3")
 
         flat_topology = flat_el.get_topology()
         entity_ids = {}
@@ -51,14 +52,32 @@ class TrimmedSerendipity(FiniteElement):
             entity_ids[top_dim] = {}
             for entity in entities:
                 entity_ids[top_dim][entity] = []
-        for j in sorted(flat_topology[1]):
-            entity_ids[1][j] = list(range(cur, cur + degree))  # assign entity ids to everything in the first dimension.
-            cur = cur + degree
+        if dim == 2:
+            for j in sorted(flat_topology[1]):
+                entity_ids[1][j] = list(range(cur, cur + degree))
+                cur = cur + degree
 
-        if(degree >= 2):
-            entity_ids[2][0] = list(range(cur, cur + 2*triangular_number(degree - 2) + degree))
-
-        cur += 2*triangular_number(degree - 2) + degree
+            if(degree >= 2):
+                entity_ids[2][0] = list(range(cur, cur + 2*triangular_number(degree - 2) + degree))
+        
+            cur += 2*triangular_number(degree - 2) + degree
+        else:
+            #3-d case.
+            for j in sorted(flat_topology[1]):
+                entity_ids[1][j] = list(range(cur, cur + degree))
+                cur = cur + degree
+            
+            if (degree >= 2):
+                for j in sorted(flat_topology[2]):
+                    entity_ids[2][j] = list(range(cur, cur + 2*triangular_number(degree - 2) + degree))
+            
+            if (degree >= 4):
+                if (degree == 4):
+                    entity_ids[3][0] = list(range(cur, cur + 6))
+                elif (degree == 5):
+                    entity_ids[3][0] = list(range(cur, cur + 8))
+                else:
+                    entity_ids[3][0] = list(range(cur, cur + 6 + (degree - 4) * 3))
 
         formdegree = 1
 
@@ -239,9 +258,9 @@ def trimmed_f_lambda_2d(deg, dx, dy, x_mid, y_mid):
     return result
 
 
-def e_lambda_3d_piece(current_deg, dx, dy, dz, x_mid, y_mid, z_mid):
+def e_lambda_1_3d_piece(current_deg, dx, dy, dz, x_mid, y_mid, z_mid):
     ELpiece = tuple([(leg(current_deg, x_mid) * dy[0] * dz[0], 0, 0)] +
-              [(leg(current_deg, x_mid)) * dy[1] * dz[0], 0, 0)] +
+              [(leg(current_deg, x_mid) * dy[1] * dz[0], 0, 0)] +
               [(leg(current_deg, x_mid) * dy[1] * dz[1], 0, 0)] +
               [(leg(current_deg, x_mid) * dy[0] * dz[1], 0, 0)] +
               [(0, leg(current_deg, y_mid) * dx[0] * dz[1], 0)] +
@@ -254,14 +273,14 @@ def e_lambda_3d_piece(current_deg, dx, dy, dz, x_mid, y_mid, z_mid):
               [(0, 0, leg(current_deg, z_mid) * dx[0] * dy[0])])
     return ELpiece
 
-def e_lambda_3d_trimmed(max_deg, dx, dy, dz, x_mid, y_mid, z_mid):
+def e_lambda_1_3d_trimmed(max_deg, dx, dy, dz, x_mid, y_mid, z_mid):
     EL = []
     for i in range(max_deg):
-        Elpiece = e_lambda_3d_piece(i, dx, dy, dz, x_mid, y_mid, z_mid)
+        Elpiece = e_lambda_1_3d_piece(i, dx, dy, dz, x_mid, y_mid, z_mid)
         EL += Elpiece
     return EL
 
-def determine_f_lambda_portions_3d(deg):
+def determine_f_lambda_1_portions_3d(deg):
     if (deg < 2):
         DegsOfIteration = []
     else:
@@ -403,7 +422,8 @@ class TrimmedSerendipityEdge(TrimmedSerendipity):
         flat_el = flatten_reference_cube(ref_el)
         dim = flat_el.get_spatial_dimension()
         if dim != 2:
-            raise Exception("Trimmed Serendipity_k edge elements only valid for dimension 2")
+            if dim != 3:
+                raise Exception("Trimmed Serendipity_k edge elements only valid for dimensions 2 and 3")
 
         verts = flat_el.get_vertices()
 
@@ -411,14 +431,33 @@ class TrimmedSerendipityEdge(TrimmedSerendipity):
         dy = ((verts[-1][1] - y)/(verts[-1][1] - verts[0][1]), (y - verts[0][1])/(verts[-1][1] - verts[0][1]))
         x_mid = 2*x-(verts[-1][0] + verts[0][0])
         y_mid = 2*y-(verts[-1][1] + verts[0][1])
+        try:
+            dz = ((verts[-1][2] - z)/(verts[-1][2] - verts[0][2]), (z - verts[0][2])/(verts[-1][2] - verts[0][2]))
+            z_mid = 2*z-(verts[-1][2] + verts[0][2])
+        except IndexError:
+            dz = None
+            z_mid = None
 
-        EL = e_lambda_1_2d_part_one(degree, dx, dy, x_mid, y_mid)
+        if dim == 2:
+            EL = e_lambda_1_2d_part_one(degree, dx, dy, x_mid, y_mid)
+        else:
+            EL = e_lambda_1_3d_trimmed(degree, dx, dy, dz, x_mid, y_mid, z_mid)
         if degree >= 2:
-            FL = trimmed_f_lambda_2d(degree, dx, dy, x_mid, y_mid)
+            if dim == 2:
+                FL = trimmed_f_lambda_2d(degree, dx, dy, x_mid, y_mid)
+            else:
+                FL = trimmed_f_lambda_3d(degree, dx, dy, dz, x_mid, y_mid, z_mid)
         else:
             FL = ()
+        if dim == 3:
+            if degree >= 4:
+                IL = I_lambda_1_3d(degree, dx, dy, dz, x_mid, y_mid, z_mid) + I_lambda_1_tilde_3d(degree, dx, dy,
+                                                                                                  dz, x_mid,
+                                                                                                  y_mid, z_mid)
+        else:
+            IL = ()
 
-        bdmce_list = EL + FL
+        bdmce_list = EL + FL + IL
         self.basis = {(0, 0): Array(bdmce_list)}
         super(TrimmedSerendipityEdge, self).__init__(ref_el=ref_el, degree=degree, mapping="covariant piola")
 
@@ -431,7 +470,8 @@ class TrimmedSerendipityFace(TrimmedSerendipity):
         flat_el = flatten_reference_cube(ref_el)
         dim = flat_el.get_spatial_dimension()
         if dim != 2:
-            raise Exception("Trimmed serendipity face elements only valid for dimension 2")
+            if dim != 3:
+                raise Exception("Trimmed serendipity face elements only valid for dimensions 2 and 3")
 
         verts = flat_el.get_vertices()
 
@@ -439,13 +479,33 @@ class TrimmedSerendipityFace(TrimmedSerendipity):
         dy = ((verts[-1][1] - y)/(verts[-1][1] - verts[0][1]), (y - verts[0][1])/(verts[-1][1] - verts[0][1]))
         x_mid = 2*x-(verts[-1][0] + verts[0][0])
         y_mid = 2*y-(verts[-1][1] + verts[0][1])
-
-        EL = e_lambda_1_2d_part_one(degree, dx, dy, x_mid, y_mid)
+        try:
+            dz = ((verts[-1][2] - z)/(verts[-1][2] - verts[0][2]), (z - verts[0][2])/(verts[-1][2] - verts[0][2]))
+            z_mid = 2*z-(verts[-1][2] + verts[0][2])
+        except IndexError:
+            dz = None
+            z_mid = None
+        
+        if (dim == 2):
+            EL = e_lambda_1_2d_part_one(degree, dx, dy, x_mid, y_mid)
+        else:
+            EL = e_lambda_1_3d_trimmed(degree, dx, dy, dz, x_mid, y_mid, z_mid)
         if degree >= 2:
-            FL = trimmed_f_lambda_2d(degree, dx, dy, x_mid, y_mid)
+            if dim == 2:
+                FL = trimmed_f_lambda_2d(degree, dx, dy, x_mid, y_mid)
+            else:
+                FL = trimmed_f_lambda_3d(degree, dx, dy, dz, x_mid, y_mid, z_mid)
         else:
             FL = ()
-        bdmcf_list = EL + FL
+        if dim == 3:
+            if degree >= 4:
+                IL = I_lambda_1_3d(degree, dx, dy, dz, x_mid, y_mid, z_mid) + I_lambda_1_tilde_3d(degree, dx, dy, 
+                                                                                                  dz, x_mid,
+                                                                                                  y_mid, z_mid)
+        else:
+            IL = ()
+
+        bdmcf_list = EL + FL + IL
         bdmcf_list = [[-a[1], a[0]] for a in bdmcf_list]
         self.basis = {(0, 0): Array(bdmcf_list)}
         super(TrimmedSerendipityFace, self).__init__(ref_el=ref_el, degree=degree, mapping="contravariant piola")
