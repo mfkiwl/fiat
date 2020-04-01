@@ -274,7 +274,7 @@ def e_lambda_1_3d_piece(current_deg, dx, dy, dz, x_mid, y_mid, z_mid):
     return ELpiece
 
 def e_lambda_1_3d_trimmed(max_deg, dx, dy, dz, x_mid, y_mid, z_mid):
-    EL = []
+    EL = tuple([])
     for i in range(max_deg):
         Elpiece = e_lambda_1_3d_piece(i, dx, dy, dz, x_mid, y_mid, z_mid)
         EL += Elpiece
@@ -352,7 +352,7 @@ def f_lambda_1_3d_tilde(max_deg, dx, dy, dz, x_mid, y_mid, z_mid):
 
 
 def f_lambda_1_3d_trim(deg, dx, dy, dz, x_mid, y_mid, z_mid):
-    DegsOfIteration = determine_f_lambda_portions_3d(deg)
+    DegsOfIteration = determine_f_lambda_1_portions_3d(deg)
     FL = []
     for i in DegsOfIteration:
         FL += f_lambda_1_3d_pieces(i, dx, dy, dz, x_mid, y_mid, z_mid)
@@ -371,7 +371,7 @@ def determine_I_lambda_1_portions_3d(deg):
     if (deg < 4):
         DegsOfIteration = []
     else:
-        Degs
+        Degs = tuple([])
         DegsOfIteration = tuple([])
         for x in range(0, deg - 3):
             for y in range(0, deg - 3 - x):
@@ -393,6 +393,7 @@ def I_lambda_1_3d(deg, dx, dy, dz, x_mid, y_mid, z_mid):
                     dx[0] * dx[1] * dz[0] * dz[1], 0)])
         IL += tuple([(0, 0, leg(Degs[0], x_mid) * leg(Degs[1], y_mid) * leg(Degs[2], z_mid) * 
                     dy[0] * dy[1] * dy[0] * dy[1])])
+    return IL
 
 
 def I_lambda_1_tilde_3d(deg, dx, dy, dz, x_mid, y_mid, z_mid):
@@ -456,7 +457,6 @@ class TrimmedSerendipityEdge(TrimmedSerendipity):
                                                                                                   y_mid, z_mid)
         else:
             IL = ()
-
         bdmce_list = EL + FL + IL
         self.basis = {(0, 0): Array(bdmce_list)}
         super(TrimmedSerendipityEdge, self).__init__(ref_el=ref_el, degree=degree, mapping="covariant piola")
@@ -505,6 +505,9 @@ class TrimmedSerendipityFace(TrimmedSerendipity):
         else:
             IL = ()
 
+        print(len(EL))
+        print(len(FL))
+        print(len(IL))
         bdmcf_list = EL + FL + IL
         bdmcf_list = [[-a[1], a[0]] for a in bdmcf_list]
         self.basis = {(0, 0): Array(bdmcf_list)}
