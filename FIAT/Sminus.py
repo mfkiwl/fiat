@@ -32,6 +32,15 @@ leg = legendre
 def triangular_number(n):
     return int((n+1)*n/2)
 
+def choose_ijk_total(degree):
+    top = 1
+    for i in range(1, 2 + degree + 1):
+        top = i * top
+    bottom = 1
+    for i in range(1, degree + 1):
+        bottom = i * bottom
+    return int(top /(2 * bottom))
+
 
 class TrimmedSerendipity(FiniteElement):
     def __init__(self, ref_el, degree, mapping):
@@ -61,23 +70,37 @@ class TrimmedSerendipity(FiniteElement):
                 entity_ids[2][0] = list(range(cur, cur + 2*triangular_number(degree - 2) + degree))
         
             cur += 2*triangular_number(degree - 2) + degree
+
         else:
             #3-d case.
+            entity_ids[3] = {}
             for j in sorted(flat_topology[1]):
                 entity_ids[1][j] = list(range(cur, cur + degree))
                 cur = cur + degree
             
-            if (degree >= 2):
-                for j in sorted(flat_topology[2]):
-                    entity_ids[2][j] = list(range(cur, cur + 2*triangular_number(degree - 2) + degree))
+            if (degree >= 2 ):
+                if (degree < 4):
+                    for j in sorted(flat_topology[2]):
+                        entity_ids[2][j] = list(range(cur, cur + 2*triangular_number(degree - 2) + degree))
+                        cur = cur + 2*triangular_number(degree - 2) + degree
+                else:
+                    for j in sorted(flat_topology[2]):
+                        entity_ids[2][j] = list(range(cur, cur + 3 * degree - 4))
+                        cur = cur + 3*degree - 4
+            
             
             if (degree >= 4):
                 if (degree == 4):
                     entity_ids[3][0] = list(range(cur, cur + 6))
                 elif (degree == 5):
-                    entity_ids[3][0] = list(range(cur, cur + 8))
+                    entity_ids[3][0] = list(range(cur, cur + 11))
                 else:
-                    entity_ids[3][0] = list(range(cur, cur + 6 + (degree - 4) * 3))
+                    interior_ids = 0
+                    for i in range(0, degree - 4):
+                        interior_ids += 3 * choose_ijk_total(i)
+                    entity_ids[3][0] = list(range(cur, cur + 6 + (degree - 4) * 3 + interior_ids))
+            else:
+                entity_ids[3][0] = list(range(cur, cur))
 
         formdegree = 1
 
@@ -258,19 +281,29 @@ def trimmed_f_lambda_2d(deg, dx, dy, x_mid, y_mid):
     return result
 
 
+""" def e_lambda_1_3d_part_one(deg, dx, dy, dz, x_mid, y_mid, z_mid):
+    EL = tuple(
+        [(0, -leg(j, y_mid) * dx[0]) for j in range(deg)] +
+        [(0, -leg(j, y_mid) * dx[1]) for j in range(deg)] +
+        [(-leg(j, x_mid)*dy[0], 0) for j in range(deg)] +
+        [(-leg(j, x_mid)*dy[1], 0) for j in range(deg)])
+
+    return EL """
+
+
 def e_lambda_1_3d_piece(current_deg, dx, dy, dz, x_mid, y_mid, z_mid):
-    ELpiece = tuple([(leg(current_deg, x_mid) * dy[0] * dz[0], 0, 0)] +
-              [(leg(current_deg, x_mid) * dy[1] * dz[0], 0, 0)] +
-              [(leg(current_deg, x_mid) * dy[1] * dz[1], 0, 0)] +
-              [(leg(current_deg, x_mid) * dy[0] * dz[1], 0, 0)] +
+    ELpiece = tuple([(0, 0, leg(current_deg, z_mid) * dx[0] * dy[1])] +
+              [(0, 0, leg(current_deg, z_mid) * dx[1] * dy[1])] +
+              [(0, 0, leg(current_deg, z_mid) * dx[1] * dy[0])] +
+              [(0, 0, leg(current_deg, z_mid) * dx[0] * dy[0])] +
               [(0, leg(current_deg, y_mid) * dx[0] * dz[1], 0)] +
               [(0, leg(current_deg, y_mid) * dx[1] * dz[1], 0)] +
               [(0, leg(current_deg, y_mid) * dx[1] * dz[0], 0)] +
               [(0, leg(current_deg, y_mid) * dx[0] * dz[0], 0)] +
-              [(0, 0, leg(current_deg, z_mid) * dx[0] * dy[1])] +
-              [(0, 0, leg(current_deg, z_mid) * dx[1] * dy[1])] +
-              [(0, 0, leg(current_deg, z_mid) * dx[1] * dy[0])] +
-              [(0, 0, leg(current_deg, z_mid) * dx[0] * dy[0])])
+              [(leg(current_deg, x_mid) * dy[0] * dz[0], 0, 0)] +
+              [(leg(current_deg, x_mid) * dy[1] * dz[0], 0, 0)] +
+              [(leg(current_deg, x_mid) * dy[1] * dz[1], 0, 0)] +
+              [(leg(current_deg, x_mid) * dy[0] * dz[1], 0, 0)])
     return ELpiece
 
 def e_lambda_1_3d_trimmed(max_deg, dx, dy, dz, x_mid, y_mid, z_mid):
@@ -415,6 +448,7 @@ def I_lambda_1_tilde_3d(deg, dx, dy, dz, x_mid, y_mid, z_mid):
     return ILtilde       
 
 
+#This is always 1-forms regardless of 2 or 3 dimensions.
 class TrimmedSerendipityEdge(TrimmedSerendipity):
     def __init__(self, ref_el, degree):
         if degree < 1:
@@ -455,13 +489,18 @@ class TrimmedSerendipityEdge(TrimmedSerendipity):
                 IL = I_lambda_1_3d(degree, dx, dy, dz, x_mid, y_mid, z_mid) + I_lambda_1_tilde_3d(degree, dx, dy,
                                                                                                   dz, x_mid,
                                                                                                   y_mid, z_mid)
-        else:
-            IL = ()
-        bdmce_list = EL + FL + IL
-        self.basis = {(0, 0): Array(bdmce_list)}
+            else:
+                IL = ()
+        
+        Sminus_list = EL + FL
+        if dim == 3:
+            Sminus_list = Sminus_list + IL
+        
+        self.basis = {(0, 0): Array(Sminus_list)}
         super(TrimmedSerendipityEdge, self).__init__(ref_el=ref_el, degree=degree, mapping="covariant piola")
 
 
+#This is 1 forms in 2d (rotated) and 2 forms in 3d (not just a rotation)
 class TrimmedSerendipityFace(TrimmedSerendipity):
     def __init__(self, ref_el, degree):
         if degree < 1:
@@ -502,12 +541,9 @@ class TrimmedSerendipityFace(TrimmedSerendipity):
                 IL = I_lambda_1_3d(degree, dx, dy, dz, x_mid, y_mid, z_mid) + I_lambda_1_tilde_3d(degree, dx, dy, 
                                                                                                   dz, x_mid,
                                                                                                   y_mid, z_mid)
-        else:
-            IL = ()
+            else:
+                IL = ()
 
-        print(len(EL))
-        print(len(FL))
-        print(len(IL))
         bdmcf_list = EL + FL + IL
         bdmcf_list = [[-a[1], a[0]] for a in bdmcf_list]
         self.basis = {(0, 0): Array(bdmcf_list)}
