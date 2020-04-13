@@ -525,26 +525,13 @@ class TrimmedSerendipityFace(TrimmedSerendipity):
             dz = None
             z_mid = None
         
-        if (dim == 2):
-            EL = e_lambda_1_2d_part_one(degree, dx, dy, x_mid, y_mid)
-        else:
-            EL = e_lambda_1_3d_trimmed(degree, dx, dy, dz, x_mid, y_mid, z_mid)
+        EL = e_lambda_1_2d_part_one(degree, dx, dy, x_mid, y_mid)
         if degree >= 2:
-            if dim == 2:
-                FL = trimmed_f_lambda_2d(degree, dx, dy, x_mid, y_mid)
-            else:
-                FL = trimmed_f_lambda_3d(degree, dx, dy, dz, x_mid, y_mid, z_mid)
+            FL = trimmed_f_lambda_2d(degree, dx, dy, x_mid, y_mid)
         else:
             FL = ()
-        if dim == 3:
-            if degree >= 4:
-                IL = I_lambda_1_3d(degree, dx, dy, dz, x_mid, y_mid, z_mid) + I_lambda_1_tilde_3d(degree, dx, dy, 
-                                                                                                  dz, x_mid,
-                                                                                                  y_mid, z_mid)
-            else:
-                IL = ()
 
-        bdmcf_list = EL + FL + IL
-        bdmcf_list = [[-a[1], a[0]] for a in bdmcf_list]
-        self.basis = {(0, 0): Array(bdmcf_list)}
+        Sminus_list = EL + FL
+        Sminus_list = [[-a[1], a[0]] for a in Sminus_list]
+        self.basis = {(0, 0): Array(Sminus_list)}
         super(TrimmedSerendipityFace, self).__init__(ref_el=ref_el, degree=degree, mapping="contravariant piola")
