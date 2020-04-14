@@ -496,11 +496,12 @@ class TrimmedSerendipityEdge(TrimmedSerendipity):
         if dim == 3:
             Sminus_list = Sminus_list + IL
         
+        print(dim)
+        
         self.basis = {(0, 0): Array(Sminus_list)}
         super(TrimmedSerendipityEdge, self).__init__(ref_el=ref_el, degree=degree, mapping="covariant piola")
 
 
-#This is 1 forms in 2d (rotated) and 2 forms in 3d (not just a rotation)
 class TrimmedSerendipityFace(TrimmedSerendipity):
     def __init__(self, ref_el, degree):
         if degree < 1:
@@ -509,8 +510,7 @@ class TrimmedSerendipityFace(TrimmedSerendipity):
         flat_el = flatten_reference_cube(ref_el)
         dim = flat_el.get_spatial_dimension()
         if dim != 2:
-            if dim != 3:
-                raise Exception("Trimmed serendipity face elements only valid for dimensions 2 and 3")
+            raise Exception("Trimmed serendipity face elements only valid for dimensions 2")
 
         verts = flat_el.get_vertices()
 
@@ -518,12 +518,6 @@ class TrimmedSerendipityFace(TrimmedSerendipity):
         dy = ((verts[-1][1] - y)/(verts[-1][1] - verts[0][1]), (y - verts[0][1])/(verts[-1][1] - verts[0][1]))
         x_mid = 2*x-(verts[-1][0] + verts[0][0])
         y_mid = 2*y-(verts[-1][1] + verts[0][1])
-        try:
-            dz = ((verts[-1][2] - z)/(verts[-1][2] - verts[0][2]), (z - verts[0][2])/(verts[-1][2] - verts[0][2]))
-            z_mid = 2*z-(verts[-1][2] + verts[0][2])
-        except IndexError:
-            dz = None
-            z_mid = None
         
         EL = e_lambda_1_2d_part_one(degree, dx, dy, x_mid, y_mid)
         if degree >= 2:
