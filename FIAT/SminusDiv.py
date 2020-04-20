@@ -140,8 +140,6 @@ class TrimmedSerendipity(FiniteElement):
                     subs = {v: points[i][k] for k, v in enumerate(variables[:self.fdim])}
                     for ell in range(self.fdim):
                         for j, f in enumerate(polynomials[:, ell]):
-                            print(subs)
-                            print(f.subs(subs))
                             T[j, ell, i] = f.evalf(subs=subs)
                 phivals[alpha] = T
 
@@ -158,7 +156,7 @@ class TrimmedSerendipity(FiniteElement):
         return self.entity_closure_ids
 
     def value_shape(self):
-        return (2,)
+        return (self.fdim,)
 
     def dmats(self):
         raise NotImplementedError
@@ -167,7 +165,7 @@ class TrimmedSerendipity(FiniteElement):
         raise NotImplementedError
 
     def space_dimension(self):
-        return int(len(self.basis[tuple([0] * self.fdim)])/2)
+        return int(len(self.basis[tuple([0] * self.fdim)])/self.fdim)
 
 
 class TrimmedSerendipityDiv(TrimmedSerendipity):
@@ -203,6 +201,7 @@ class TrimmedSerendipityDiv(TrimmedSerendipity):
         
             Sminus_list = FL + IL
             self.basis = {(0, 0, 0): Array(Sminus_list)}
+            print(len(Array(Sminus_list)))
             super(TrimmedSerendipityDiv, self).__init__(ref_el=ref_el, degree=degree, mapping="contravariant piola")
     
         else:
