@@ -125,8 +125,10 @@ class TrimmedSerendipity(FiniteElement):
 
         phivals = {}
 
+        print(entity_dim)
+
         for o in range(order+1):
-            alphas = mis(2, o)
+            alphas = mis(self.fdim, o)
             for alpha in alphas:
                 try:
                     polynomials = self.basis[alpha]
