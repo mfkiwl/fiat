@@ -31,6 +31,7 @@ class TrimmedSerendipity(FiniteElement):
 
         flat_el = flatten_reference_cube(ref_el)
         dim = flat_el.get_spatial_dimension()
+        self.fdim = dim
         if dim != 3:
             if dim !=2:
                 raise Exception("Trimmed serendipity elements only valid for dimensions 2 and 3")
@@ -125,23 +126,23 @@ class TrimmedSerendipity(FiniteElement):
 
         phivals = {}
 
-        print(entity_dim)
-
         for o in range(order+1):
             alphas = mis(self.fdim, o)
             for alpha in alphas:
                 try:
                     polynomials = self.basis[alpha]
                 except KeyError:
-                    polynomials = diff(self.basis[(0, 0)], *zip(variables, alpha))
+                    zr = tuple([0] * self.fdim)
+                    polynomials = diff(self.basis[zr], *zip(variables, alpha))
                     self.basis[alpha] = polynomials
-                T = np.zeros((len(polynomials[:, 0]), 2, len(points)))
+                T = np.zeros((len(polynomials[:, 0]), self.fdim, len(points)))
                 for i in range(len(points)):
-                    subs = {v: points[i][k] for k, v in enumerate(variables[:2])}
-                    for j, f in enumerate(polynomials[:, 0]):
-                        T[j, 0, i] = f.evalf(subs=subs)
-                    for j, f in enumerate(polynomials[:, 1]):
-                        T[j, 1, i] = f.evalf(subs=subs)
+                    subs = {v: points[i][k] for k, v in enumerate(variables[:self.fdim])}
+                    for ell in range(self.fdim):
+                        for j, f in enumerate(polynomials[:, ell]):
+                            print(subs)
+                            print(f.subs(subs))
+                            T[j, ell, i] = f.evalf(subs=subs)
                 phivals[alpha] = T
 
         return phivals
@@ -166,7 +167,7 @@ class TrimmedSerendipity(FiniteElement):
         raise NotImplementedError
 
     def space_dimension(self):
-        return int(len(self.basis[(0, 0)])/2)
+        return int(len(self.basis[tuple([0] * self.fdim)])/2)
 
 
 class TrimmedSerendipityDiv(TrimmedSerendipity):
@@ -201,7 +202,7 @@ class TrimmedSerendipityDiv(TrimmedSerendipity):
                 IL = ()
         
             Sminus_list = FL + IL
-            self.basis = {(0, 0): Array(Sminus_list)}
+            self.basis = {(0, 0, 0): Array(Sminus_list)}
             super(TrimmedSerendipityDiv, self).__init__(ref_el=ref_el, degree=degree, mapping="contravariant piola")
     
         else:
