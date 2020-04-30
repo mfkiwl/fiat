@@ -77,7 +77,7 @@ class TrimmedSerendipity(FiniteElement):
         print("entity_ids = :", entity_ids)
         print("topology of mesh:", flat_topology)
         print("vertex locations:", flat_el.vertices)
-        
+
         formdegree = dim - 1
 
         entity_closure_ids = make_entity_closure_ids(flat_el, entity_ids)
