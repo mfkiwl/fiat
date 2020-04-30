@@ -74,9 +74,6 @@ class TrimmedSerendipity(FiniteElement):
                 entity_ids[2][0] = list(range(cur, cur + 2*triangular_number(degree - 2) + degree))
         
             cur += 2*triangular_number(degree - 2) + degree
-        print("entity_ids = :", entity_ids)
-        print("topology of mesh:", flat_topology)
-        print("vertex locations:", flat_el.vertices)
 
         formdegree = dim - 1
 
@@ -203,7 +200,6 @@ class TrimmedSerendipityDiv(TrimmedSerendipity):
                 IL = ()
         
             Sminus_list = FL + IL
-            print(Sminus_list)
             self.basis = {(0, 0, 0): Array(Sminus_list)}
             super(TrimmedSerendipityDiv, self).__init__(ref_el=ref_el, degree=degree, mapping="contravariant piola")
     

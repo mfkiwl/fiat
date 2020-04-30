@@ -104,9 +104,6 @@ class TrimmedSerendipity(FiniteElement):
                 entity_ids[3][0] = list(range(cur, cur))
 
         formdegree = 1
-        print("entities", entity_ids)
-        print("topology", flat_topology)
-        print("vertices", flat_el.vertices)
 
         entity_closure_ids = make_entity_closure_ids(flat_el, entity_ids)
 
@@ -496,8 +493,6 @@ class TrimmedSerendipityEdge(TrimmedSerendipity):
         Sminus_list = EL + FL
         if dim == 3:
             Sminus_list = Sminus_list + IL
-        print("EL", EL)
-        print("FL", FL)
         
         if dim == 2:
             self.basis = {(0, 0): Array(Sminus_list)}
