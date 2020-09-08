@@ -14,6 +14,7 @@ from FIAT.brezzi_douglas_marini import BrezziDouglasMarini
 from FIAT.Sminus import TrimmedSerendipityEdge  # noqa: F401
 from FIAT.Sminus import TrimmedSerendipityFace  # noqa: F401
 from FIAT.SminusDiv import TrimmedSerendipityDiv #noqa: F401
+from FIAT.SminusCurl import TrimmedSerendipityCurl #noqa: F401
 from FIAT.brezzi_douglas_fortin_marini import BrezziDouglasFortinMarini
 from FIAT.discontinuous_lagrange import DiscontinuousLagrange
 from FIAT.discontinuous_taylor import DiscontinuousTaylor
