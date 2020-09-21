@@ -10,7 +10,6 @@ x, y, z = symbols('x y z')
 variables = (x, y, z)
 leg = legendre
 
-
 def triangular_number(n):
     return int((n+1)*n/2)
 
