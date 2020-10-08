@@ -58,14 +58,15 @@ class TrimmedSerendipity(FiniteElement):
                 for k in range(1, degree - 1):
                     interior_tilde_ids = interior_tilde_ids + 3
             if (degree == 4):
-                interior_tilde_ids += choose_ijk_total(degree - 2) - (2 * degree - 2)
+                interior_tilde_ids += choose_ijk_total(degree - 2) - (degree - 1) - (degree - 1) + 1
             if (degree > 4):
-                interior_tilde_ids += choose_ijk_total(degree - 2) - (2 * degree - 1)
+                #interior_tilde_ids += choose_ijk_total(degree - 2) - (2 * degree - 1)
+                interior_tilde_ids += choose_ijk_total(degree - 2) - (degree - 1) - (degree - 1) + 1
             if degree == 1:
                 interior_tilde_ids = 0
-
             entity_ids[3][0] = list(range(cur, cur + interior_ids + interior_tilde_ids))
             cur = cur + interior_ids + interior_tilde_ids
+            print(cur)
         else:
             for j in sorted(flat_topology[1]):
                 entity_ids[1][j] = list(range(cur, cur + degree))
@@ -199,8 +200,6 @@ class TrimmedSerendipityDiv(TrimmedSerendipity):
             else:
                 IL = ()
             Sminus_list = FL + IL
-            #print(FL)
-            print(IL)
             self.basis = {(0, 0, 0): Array(Sminus_list)}
             super(TrimmedSerendipityDiv, self).__init__(ref_el=ref_el, degree=degree, mapping="contravariant piola")
     
@@ -217,7 +216,6 @@ class TrimmedSerendipityDiv(TrimmedSerendipity):
                 FL = trimmed_f_lambda_2d(degree, dx, dy, x_mid, y_mid)
             else:
                 FL = ()
-            
             Sminus_list = EL + FL
             Sminus_list = [[-a[1], a[0]] for a in Sminus_list]
             self.basis = {(0, 0): Array(Sminus_list)}
@@ -318,10 +316,10 @@ def I_lambda_2_3d_tilde(degree, dx, dy, dz, x_mid, y_mid, z_mid):
                       [(0, leg(degree - j - 2, y_mid) * leg(j, z_mid) * dy[0] * dy[1], leg(degree - j - 1, y_mid) *
                       leg(j - 1, z_mid) * dz[0] * dz[1]) for j in range(1, degree - 1)])
     for k in range(1, degree - 2):
-        for l in range(1, degree - 2 - k):
+        for l in range(1, degree - 1 - k):
             j = degree - 2 - k - l
             IL_tilde += tuple([(-leg(j, x_mid) * leg(k, y_mid) * leg(l, z_mid) * dx[0] * dx[1], 
-                                -leg(j + 1, x_mid) * leg(k - 1, y_mid) * leg(l, z_mid) * dy[0] * dy[1],
+                                leg(j + 1, x_mid) * leg(k - 1, y_mid) * leg(l, z_mid) * dy[0] * dy[1],
                                 -leg(j + 1, x_mid) * leg(k, y_mid) * leg(l - 1, z_mid) * dz[0] * dz[1])])
     return IL_tilde
 
