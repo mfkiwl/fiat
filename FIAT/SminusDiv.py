@@ -66,17 +66,16 @@ class TrimmedSerendipity(FiniteElement):
                 interior_tilde_ids = 0
             entity_ids[3][0] = list(range(cur, cur + interior_ids + interior_tilde_ids))
             cur = cur + interior_ids + interior_tilde_ids
-            print(cur)
         else:
             for j in sorted(flat_topology[1]):
                 entity_ids[1][j] = list(range(cur, cur + degree))
                 cur = cur + degree
 
             if(degree >= 2):
-                #entity_ids[2][0] = list(range(cur, cur + 2*triangular_number(degree - 2) + degree))
-                entity_ids[2][0] = list(range(cur, cur + 2*triangular_number(degree - 2)))
+                entity_ids[2][0] = list(range(cur, cur + 2*triangular_number(degree - 2) + degree))
+                #entity_ids[2][0] = list(range(cur, cur + 2*triangular_number(degree - 2)))
 
-            cur += 2*triangular_number(degree - 2)
+            cur += 2*triangular_number(degree - 2) + degree
         formdegree = dim - 1
 
         entity_closure_ids = make_entity_closure_ids(flat_el, entity_ids)
@@ -213,8 +212,8 @@ class TrimmedSerendipityDiv(TrimmedSerendipity):
         
             EL = e_lambda_1_2d_part_one(degree, dx, dy, x_mid, y_mid)
             if degree >= 2:
-                #FL = trimmed_f_lambda_2d(degree, dx, dy, x_mid, y_mid)
-                FL = F_lambda_1_2d(degree, dx, dy, x_mid, y_mid)
+                FL = trimmed_f_lambda_2d(degree, dx, dy, x_mid, y_mid)
+                #FL = F_lambda_1_2d(degree, dx, dy, x_mid, y_mid)
             else:
                 FL = ()
             Sminus_list = EL + FL
@@ -399,14 +398,10 @@ def f_lambda_1_2d_trim(deg, dx, dy, x_mid, y_mid):
 
 def f_lambda_1_2d_tilde(deg, dx, dy, x_mid, y_mid):
     FLTilde = tuple([])
-    #FLTilde += tuple([(leg(deg - 2, y_mid)*dy[0]*dy[1], 0)])
-    #FLTilde += tuple([(0, leg(deg - 2, x_mid)*dx[0]*dx[1])])
-    FLTilde += tuple([(x_mid, 0)])
-    FLTilde += tuple([(0, x_mid)])
+    FLTilde += tuple([(leg(deg - 2, y_mid)*dy[0]*dy[1], 0)])
+    FLTilde += tuple([(0, leg(deg - 2, x_mid)*dx[0]*dx[1])])
     for k in range(1, deg - 1):
-        #FLTilde += tuple([(leg(k, x_mid) * leg(deg - k - 2, y_mid) * dy[0] * dy[1], -leg(k - 1, x_mid) * leg(deg - k - 1, y_mid) * dx[0] * dx[1])])
-        FLTilde += tuple([(x_mid, x_mid)])
-
+        FLTilde += tuple([(leg(k, x_mid) * leg(deg - k - 2, y_mid) * dy[0] * dy[1], -leg(k - 1, x_mid) * leg(deg - k - 1, y_mid) * dx[0] * dx[1])])
 
     return tuple(FLTilde)
 
@@ -422,9 +417,10 @@ def F_lambda_1_2d(deg, dx, dy, x_mid, y_mid):
 
 
 def trimmed_f_lambda_2d(deg, dx, dy, x_mid, y_mid):
-    FL = f_lambda_1_2d_trim(deg, dx, dy, x_mid, y_mid)
+    #FL = f_lambda_1_2d_trim(deg, dx, dy, x_mid, y_mid)
+    FL = F_lambda_1_2d(deg, dx, dy, x_mid, y_mid)
     FLT = f_lambda_1_2d_tilde(deg, dx, dy, x_mid, y_mid)
     result = FL + FLT
-
-    return FL
-#    return result
+    print(FLT)
+ #   return FL
+    return result
