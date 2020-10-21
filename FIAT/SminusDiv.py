@@ -306,9 +306,9 @@ def I_lambda_2_3d_pieces(current_deg, dx, dy, dz, x_mid, y_mid, z_mid):
 
 def I_lambda_2_3d_tilde(degree, dx, dy, dz, x_mid, y_mid, z_mid):
     assert degree > 1, 'invalid for i = 1'
-    IL_tilde = tuple([(-leg(degree - 2, x_mid) * dx[0] * dx[1], 0, 0)] +
-                     [(0, -leg(degree - 2, y_mid) * dy[0] * dy[1], 0)] +
-                     [(0, 0, -leg(degree - 2, z_mid) * dz[0] * dz[1])])
+    IL_tilde = tuple([(0, 0, leg(degree - 2, z_mid) * dz[0] * dz[1])] +
+                     [(0, leg(degree - 2, y_mid) * dy[0] * dy[1], 0)] +
+                     [(leg(degree - 2, x_mid) * dx[0] * dx[1], 0, 0)])
     IL_tilde += tuple([(leg(degree - j - 2, x_mid) * leg(j, y_mid) * dx[0] * dx[1], leg(degree - j - 1, x_mid) *
                       leg(j - 1, y_mid) * dy[0] * dy[1], 0) for j in range(1, degree - 1)] +
                       [(leg(degree - j - 2, x_mid) * leg(j, z_mid) * dx[0] * dx[1], 0, leg(degree - j - 1, x_mid) *
@@ -421,6 +421,5 @@ def trimmed_f_lambda_2d(deg, dx, dy, x_mid, y_mid):
     FL = F_lambda_1_2d(deg, dx, dy, x_mid, y_mid)
     FLT = f_lambda_1_2d_tilde(deg, dx, dy, x_mid, y_mid)
     result = FL + FLT
-    print(FLT)
  #   return FL
     return result
