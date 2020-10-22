@@ -216,7 +216,7 @@ class TrimmedSerendipityCurl(TrimmedSerendipity):
                 IL = ()
 
             Sminus_list = EL + FL + IL
-            print(len(FL))
+            print(len(Sminus_list))
             self.basis = {(0, 0, 0): Array(Sminus_list)}
             super(TrimmedSerendipityCurl, self).__init__(ref_el=ref_el, degree=degree, mapping="contravariant piola")
     
@@ -325,7 +325,6 @@ def f_lambda_1_3d(deg, dx, dy, dz, x_mid, y_mid, z_mid):
             k = i - 2 - j
             FL += tuple([(0, leg(j, y_mid) * leg(k, z_mid) * dx[0] * dz[0] * dz[1], 0)])
             FL += tuple([(0, 0, leg(j, z_mid) * leg(k, y_mid) * dx[0] * dy[0] * dy[1])])
-    print(FL)
     #IDs associated to face 1.
     FL += tuple([(0, leg(deg - 2, z_mid) * dx[1] * dz[0] * dz[1], 0)])
     FL += tuple([(0, 0, leg(deg - 2, y_mid) * dx[1] * dy[0] * dy[1])])
