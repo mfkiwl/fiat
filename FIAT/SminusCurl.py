@@ -73,6 +73,8 @@ class TrimmedSerendipity(FiniteElement):
 
             entity_ids[3][0] = list(range(cur, cur + interior_ids + interior_tilde_ids))
             cur = cur + interior_ids + interior_tilde_ids
+            print("cur = ")
+            print(cur)
         else:
             for j in sorted(flat_topology[1]):
                 entity_ids[1][j] = list(range(cur, cur + degree))
@@ -214,6 +216,7 @@ class TrimmedSerendipityCurl(TrimmedSerendipity):
                 IL = ()
 
             Sminus_list = EL + FL + IL
+            print(len(FL))
             self.basis = {(0, 0, 0): Array(Sminus_list)}
             super(TrimmedSerendipityCurl, self).__init__(ref_el=ref_el, degree=degree, mapping="contravariant piola")
     
@@ -235,16 +238,6 @@ class TrimmedSerendipityCurl(TrimmedSerendipity):
             Sminus_list = EL + FL
             self.basis = {(0, 0): Array(Sminus_list)}
             super(TrimmedSerendipityCurl, self).__init__(ref_el=ref_el, degree=degree, mapping="contravariant piola")
-
-#def e_lambda_1_3d(deg, dx, dy, dz, x_mid, y_mid, z_mid):
-#    EL = ()
-#    for j in range(0, deg):
-#        for k in range(0, 2):
-#            for l in range(0, 2):
-#                EL += tuple([(leg(j, x_mid) * dy[k] * dz[l], 0, 0)] +
-#                            [(0, leg(j, y_mid) * dx[k] * dz[l], 0)] +
-#                            [(0, 0, leg(j, z_mid) * dx[k] * dy[l])])
-#    return EL
 
 
 def e_lambda_1_3d(deg, dx, dy, dz, x_mid, y_mid, z_mid):
@@ -324,7 +317,7 @@ def f_lambda_1_3d(deg, dx, dy, dz, x_mid, y_mid, z_mid):
     #FTilde first.
     FL += tuple([(0, leg(deg - 2, z_mid) * dx[0] * dz[0] * dz[1], 0)])
     FL += tuple([(0, 0, leg(deg - 2, y_mid) * dx[0] * dy[0] * dy[1])])
-    for j in range(1, deg - 2):
+    for j in range(1, deg - 1):
         FL += tuple([(0, leg(j, y_mid) * leg(deg - j - 2, z_mid) * dx[0] * dz[0] * dz[1], -leg(j - 1, y_mid) * leg(deg - j - 1, z_mid) * dx[0] * dy[0] * dy[1])])
     #F next
     for i in range(2, deg):
@@ -332,10 +325,11 @@ def f_lambda_1_3d(deg, dx, dy, dz, x_mid, y_mid, z_mid):
             k = i - 2 - j
             FL += tuple([(0, leg(j, y_mid) * leg(k, z_mid) * dx[0] * dz[0] * dz[1], 0)])
             FL += tuple([(0, 0, leg(j, z_mid) * leg(k, y_mid) * dx[0] * dy[0] * dy[1])])
+    print(FL)
     #IDs associated to face 1.
     FL += tuple([(0, leg(deg - 2, z_mid) * dx[1] * dz[0] * dz[1], 0)])
     FL += tuple([(0, 0, leg(deg - 2, y_mid) * dx[1] * dy[0] * dy[1])])
-    for j in range(1, deg - 2):
+    for j in range(1, deg - 1):
         FL += tuple([(0, leg(j, y_mid) * leg(deg - j - 2, z_mid) * dx[1] * dz[0] * dz[1], -leg(j - 1, y_mid) * leg(deg - j - 1, z_mid) * dx[1] * dy[0] * dy[1])])
     #F next.
     for i in range(2, deg):
@@ -347,7 +341,7 @@ def f_lambda_1_3d(deg, dx, dy, dz, x_mid, y_mid, z_mid):
     #FTilde first.
     FL += tuple([(leg(deg - 2, z_mid) * dy[0] * dz[0] * dz[1], 0, 0)])
     FL += tuple([(0, 0, leg(deg - 2, x_mid) * dy[0] * dx[0] * dx[1])])
-    for j in range(1, deg - 2):
+    for j in range(1, deg - 1):
         FL += tuple([(leg(j, x_mid) * leg(deg - j - 2, z_mid) * dy[0] * dz[0] * dz[1], 0, -leg(j - 1, x_mid) * leg(deg - j - 1, z_mid) * dy[0] * dx[0] * dx[1])])
     #F next.
     for i in range(2, deg):
@@ -358,7 +352,7 @@ def f_lambda_1_3d(deg, dx, dy, dz, x_mid, y_mid, z_mid):
     #IDs associated to face 3.
     FL += tuple([(leg(deg - 2, z_mid) * dy[1] * dz[0] * dz[1], 0, 0)])
     FL += tuple([(0, 0, leg(deg - 2, x_mid) * dy[1] * dx[0] * dx[1])])
-    for j in range(1, deg - 2):
+    for j in range(1, deg - 1):
         FL += tuple([(leg(j, x_mid) * leg(deg - j - 2, z_mid) * dy[1] * dz[0] * dz[1], 0, -leg(j - 1, x_mid) * leg(deg - j - 1, z_mid) * dy[1] * dx[0] * dx[1])])
     #F next.
     for i in range(2, deg):
@@ -369,7 +363,7 @@ def f_lambda_1_3d(deg, dx, dy, dz, x_mid, y_mid, z_mid):
     #IDs associated to face 4.
     FL += tuple([(leg(deg - 2, y_mid) * dz[0] * dy[0] * dy[1], 0, 0)])
     FL += tuple([(0, leg(deg - 2, x_mid) * dz[0] * dx[0] * dx[1], 0)])
-    for j in range(1, deg - 2):
+    for j in range(1, deg - 1):
         FL += tuple([(leg(j, x_mid) * leg(deg - j - 2, y_mid) * dz[0] * dy[0] * dy[1], -leg(j - 1, x_mid) * leg(deg - j - 1, y_mid) * dz[0] * dx[0] * dx[1], 0)])
     for i in range(2, deg):
         for j in range(0, i - 1):
@@ -379,7 +373,7 @@ def f_lambda_1_3d(deg, dx, dy, dz, x_mid, y_mid, z_mid):
     #IDs associated to face 5.
     FL += tuple([(leg(deg - 2, y_mid) * dz[1] * dy[0] * dy[1], 0, 0)])
     FL += tuple([(0, leg(deg - 2, x_mid) * dz[1] * dx[0] * dx[1], 0)])
-    for j in range(1, deg - 2):
+    for j in range(1, deg - 1):
         FL += tuple([(leg(j, x_mid) * leg(deg - j - 2, y_mid) * dz[1] * dy[0] * dy[1], -leg(j - 1, x_mid) * leg(deg -j - 1, y_mid) * dz[1] * dx[0] * dx[1], 0)])
     for i in range(2, deg):
         for j in range(0, i - 1):
@@ -432,78 +426,6 @@ def I_lambda_1_3d(deg, dx, dy, dz, x_mid, y_mid, z_mid):
     I += I_lambda_tilde_1_3d(deg, dx, dy, dz, x_mid, y_mid, z_mid)
     return I
 
-
-""" 
-def f_lambda_2_3d_pieces(deg, dx, dy, dz, x_mid, y_mid, z_mid):
-    FLpiece = tuple([])
-    #Dx's first.
-    for k in range(0, 2):
-        for i in range(0, deg):
-            for j in range(0, i + 1):
-                FLpiece += tuple([(leg(j, y_mid) * leg(i - j, z_mid) * dx[k], 0, 0)])
-    for k in range(0, 2):
-        for i in range(0, deg):
-            for j in range(0, i + 1):
-                FLpiece += tuple([(0, leg(j, x_mid) * leg(i - j, z_mid) * dy[k], 0)])
-    for k in range(0, 2):
-        for i in range(0, deg):
-            for j in range(0, i + 1):
-                FLpiece += tuple([(0, 0, leg(j, x_mid) * leg(i - j, y_mid) * dz[k])])
-    return FLpiece
-
-
-def f_lambda_2_3d(degree, dx, dy, dz, x_mid, y_mid, z_mid):
-    FL = tuple([])
-    #for j in range(0, degree):
-    #    FL += f_lambda_2_3d_pieces(j, dx, dy, dz, x_mid, y_mid, z_mid)
-    FL += f_lambda_2_3d_pieces(degree, dx, dy, dz, x_mid, y_mid, z_mid)
-    return FL
-
-
-def I_lambda_2_3d_pieces(current_deg, dx, dy, dz, x_mid, y_mid, z_mid):
-    assert current_deg > 1, invalid for i = 1
-    ILpiece = tuple([])
-    for j in range(0, current_deg -1):
-        for k in range(0, current_deg - 1 - j):
-            ILpiece += tuple([(0, 0, leg(j, x_mid) * leg(k, y_mid) * leg(current_deg - 2 - j - k, z_mid) *
-                            dz[0] * dz[1])]+
-                            [(0, leg(j, x_mid) * leg(k, y_mid) * leg(current_deg - 2 - j - k, z_mid) *
-                            dy[0] * dy[1] ,0)] +
-                            [(leg(j, x_mid) * leg(k, y_mid) * leg(current_deg - 2 - j - k, z_mid) * dx[0] *
-                            dx[1], 0, 0)])
-    return ILpiece
-
-
-
-
-def I_lambda_2_3d_tilde(degree, dx, dy, dz, x_mid, y_mid, z_mid):
-    assert degree > 1, invalid for i = 1
-    IL_tilde = tuple([(leg(degree - 2, x_mid) * dx[0] * dx[1], 0, 0)] +
-                     [(0, leg(degree - 2, y_mid) * dy[0] * dy[1], 0)] +
-                     [(0, 0, leg(degree - 2, z_mid) * dz[0] * dz[1])])
-    IL_tilde += tuple([(leg(degree - j - 2, x_mid) * leg(j, y_mid) * dx[0] * dx[1], leg(degree - j - 1, x_mid) *
-                      leg(j - 1, y_mid) * dy[0] * dy[1], 0) for j in range(1, degree - 1)] +
-                      [(leg(degree - j - 2, x_mid) * leg(j, z_mid) * dx[0] * dx[1], 0, leg(degree - j - 1, x_mid) *
-                      leg(j - 1, z_mid) * dz[0] * dz[1]) for j in range(1, degree - 1)] +
-                      [(0, leg(degree - j - 2, y_mid) * leg(j, z_mid) * dy[0] * dy[1], leg(degree - j - 1, y_mid) *
-                      leg(j - 1, z_mid) * dz[0] * dz[1]) for j in range(1, degree - 1)])
-    for k in range(1, degree - 2):
-        for l in range(1, degree - 2 - k):
-            j = degree - 2 - k - l
-            IL_tilde += tuple([(leg(j, x_mid) * leg(k, y_mid) * leg(l, z_mid) * dx[0] * dx[1], 
-                                leg(j + 1, x_mid) * leg(k - 1, y_mid) * leg(l, z_mid) * dy[0] * dy[1],
-                                leg(j + 1, x_mid) * leg(k, y_mid) * leg(l - 1, z_mid) * dz[0] * dz[1])])
-    return IL_tilde
-
-
-def I_lambda_2_3d(degree, dx, dy, dz, x_mid, y_mid, z_mid):
-    IL = tuple([])
-    for j in range(2, degree):
-        IL += I_lambda_2_3d_pieces(j, dx, dy, dz, x_mid, y_mid, z_mid)
-    IL += I_lambda_2_3d_tilde(degree, dx, dy, dz, x_mid, y_mid, z_mid)
-    return IL
-
-"""
 
 #Everything for 2-d should work already.
 def e_lambda_1_2d_part_one(deg, dx, dy, x_mid, y_mid):
