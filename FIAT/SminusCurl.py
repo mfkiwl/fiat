@@ -57,7 +57,6 @@ class TrimmedSerendipity(FiniteElement):
                 for j in sorted(flat_topology[2]):
                     entity_ids[2][j] = list(range(cur, cur + face_ids))
                     cur += face_ids
-                    
             interior_ids = 0
             for k in range(4, degree):
                 interior_ids = interior_ids + 3 * choose_ijk_total(k - 4)
@@ -73,8 +72,8 @@ class TrimmedSerendipity(FiniteElement):
 
             entity_ids[3][0] = list(range(cur, cur + interior_ids + interior_tilde_ids))
             cur = cur + interior_ids + interior_tilde_ids
-            print("cur = ")
-            print(cur)
+            print("InteriorIDs =", interior_ids +interior_tilde_ids)
+            print("Cur =", cur)
         else:
             for j in sorted(flat_topology[1]):
                 entity_ids[1][j] = list(range(cur, cur + degree))
@@ -216,7 +215,7 @@ class TrimmedSerendipityCurl(TrimmedSerendipity):
                 IL = ()
 
             Sminus_list = EL + FL + IL
-            print(len(Sminus_list))
+            print(len(IL))
             self.basis = {(0, 0, 0): Array(Sminus_list)}
             super(TrimmedSerendipityCurl, self).__init__(ref_el=ref_el, degree=degree, mapping="contravariant piola")
     
@@ -393,9 +392,10 @@ def f_lambda_1_3d(deg, dx, dy, dz, x_mid, y_mid, z_mid):
 
 def I_lambda_1_3d_pieces(deg, dx, dy, dz, x_mid, y_mid, z_mid):
     I = ()
-    for j in range(0, deg - 3):
-        for k in range(0, deg - 3 - j):
-            l = deg - 4 - j - k
+    D = deg - 1
+    for j in range(0, D - 3):
+        for k in range(0, D - 3 - j):
+            l = D - 4 - j - k
             I += tuple([(leg(j, x_mid) * leg(k, y_mid) * leg(l, z_mid) * dy[0] * dy[1] * dz[0] * dz[1], 0, 0)] +
                        [(0, leg(j, x_mid) * leg(k, y_mid) * leg(l, z_mid) * dx[0] * dx[1] * dz[0] * dz[1], 0)] +
                        [(0, 0, leg(j, x_mid) * leg(k, y_mid) * leg(l, z_mid) * dx[0] * dx[1] * dy[0] * dy[1])])
