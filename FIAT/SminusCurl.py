@@ -62,7 +62,7 @@ class TrimmedSerendipity(FiniteElement):
                 interior_ids = interior_ids + 3 * choose_ijk_total(k - 4)
             if (degree > 3):
                 if (degree == 4):
-                    interior_tilde_ids = 6
+                    interior_tilde_ids = 3
                 elif (degree == 5):
                     interior_tilde_ids = 8
                 else:
@@ -215,7 +215,8 @@ class TrimmedSerendipityCurl(TrimmedSerendipity):
                 IL = ()
 
             Sminus_list = EL + FL + IL
-            print(len(IL))
+            print("Interior IDs = ", len(IL))
+            print("IDs =", len(Sminus_list))
             self.basis = {(0, 0, 0): Array(Sminus_list)}
             super(TrimmedSerendipityCurl, self).__init__(ref_el=ref_el, degree=degree, mapping="contravariant piola")
     
@@ -404,12 +405,17 @@ def I_lambda_1_3d_pieces(deg, dx, dy, dz, x_mid, y_mid, z_mid):
 
 def I_lambda_tilde_1_3d(deg, dx, dy, dz, x_mid, y_mid, z_mid):
     ITilde = ()
-    ITilde += tuple([(leg(deg - 4, y_mid) * dy[0] * dy[1] * dz[0] * dz[1], 0, 0)] +
-                    [(leg(deg - 4, z_mid) * dy[0] * dy[1] * dz[0] * dz[1], 0, 0)] + 
-                    [(0, leg(deg - 4, x_mid) * dx[0] * dx[1] * dz[0] * dz[1], 0)] +
-                    [(0, leg(deg - 4, z_mid) * dx[0] * dx[1] * dz[0] * dz[1], 0)] +
-                    [(0, 0, leg(deg - 4, x_mid) * dx[0] * dx[1] * dy[0] * dy[1])] +
-                    [(0, 0, leg(deg - 4, y_mid) * dx[0] * dx[1] * dy[0] * dy[1])])
+    if(deg==4):
+        ITilde += tuple([(leg(deg - 4, y_mid) * dy[0] * dy[1] * dz[0] * dz[1], 0, 0)] +
+                        [(0, leg(deg - 4, x_mid) * dx[0] * dx[1] * dz[0] * dz[1], 0)] +
+                        [(0, 0, leg(deg - 4, y_mid) * dx[0] * dx[1] * dy[0] * dy[1])])        
+    if(deg > 4):
+        ITilde += tuple([(leg(deg - 4, y_mid) * dy[0] * dy[1] * dz[0] * dz[1], 0, 0)] +
+                        [(leg(deg - 4, z_mid) * dy[0] * dy[1] * dz[0] * dz[1], 0, 0)] + 
+                        [(0, leg(deg - 4, x_mid) * dx[0] * dx[1] * dz[0] * dz[1], 0)] +
+                        [(0, leg(deg - 4, z_mid) * dx[0] * dx[1] * dz[0] * dz[1], 0)] +
+                        [(0, 0, leg(deg - 4, x_mid) * dx[0] * dx[1] * dy[0] * dy[1])] +
+                        [(0, 0, leg(deg - 4, y_mid) * dx[0] * dx[1] * dy[0] * dy[1])])
     for j in range(1, deg - 3):
         ITilde += tuple([(leg(j, x_mid) * leg(deg - j - 4, y_mid) * dy[0] * dy[1] * dz[0] * dz[1], -leg(j - 1, x_mid) * leg(deg - j - 3, y_mid) * dx[0] * dx[1] * dz[0] * dz[1], 0)] +
                         [(leg(j, x_mid) * leg(deg - j - 4, z_mid) * dy[0] * dy[1] * dz[0] * dz[1], 0, -leg(j - 1, x_mid) * leg(deg - j - 3, z_mid) * dx[0] * dx[1] * dy[0] * dy[1])])
@@ -422,7 +428,9 @@ def I_lambda_1_3d(deg, dx, dy, dz, x_mid, y_mid, z_mid):
     I = ()
     for i in range(4, deg):
         I += I_lambda_1_3d_pieces(deg, dx, dy, dz, x_mid, y_mid, z_mid)
+    print("Len of I normal", len(I))
     I += I_lambda_tilde_1_3d(deg, dx, dy, dz, x_mid, y_mid, z_mid)
+    print("Len of total I", len(I))
     return I
 
 
