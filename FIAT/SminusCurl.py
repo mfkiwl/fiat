@@ -72,8 +72,6 @@ class TrimmedSerendipity(FiniteElement):
 
             entity_ids[3][0] = list(range(cur, cur + interior_ids + interior_tilde_ids))
             cur = cur + interior_ids + interior_tilde_ids
-            print("InteriorIDs =", interior_ids +interior_tilde_ids)
-            print("Cur =", cur)
         else:
             for j in sorted(flat_topology[1]):
                 entity_ids[1][j] = list(range(cur, cur + degree))
@@ -215,8 +213,6 @@ class TrimmedSerendipityCurl(TrimmedSerendipity):
                 IL = ()
 
             Sminus_list = EL + FL + IL
-            print("Interior IDs = ", len(IL))
-            print("IDs =", len(Sminus_list))
             self.basis = {(0, 0, 0): Array(Sminus_list)}
             super(TrimmedSerendipityCurl, self).__init__(ref_el=ref_el, degree=degree, mapping="contravariant piola")
     
@@ -428,9 +424,7 @@ def I_lambda_1_3d(deg, dx, dy, dz, x_mid, y_mid, z_mid):
     I = ()
     for i in range(4, deg):
         I += I_lambda_1_3d_pieces(deg, dx, dy, dz, x_mid, y_mid, z_mid)
-    print("Len of I normal", len(I))
     I += I_lambda_tilde_1_3d(deg, dx, dy, dz, x_mid, y_mid, z_mid)
-    print("Len of total I", len(I))
     return I
 
 
