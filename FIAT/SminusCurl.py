@@ -50,6 +50,7 @@ class TrimmedSerendipity(FiniteElement):
             for l in sorted(flat_topology[1]):
                 entity_ids[1][l] = list(range(cur, cur + degree))
                 cur = cur + degree
+            print("Total number of edge IDs available", cur)
             if (degree > 1):
                 face_ids = degree
                 for k in range(2, degree):
@@ -72,6 +73,10 @@ class TrimmedSerendipity(FiniteElement):
 
             entity_ids[3][0] = list(range(cur, cur + interior_ids + interior_tilde_ids))
             cur = cur + interior_ids + interior_tilde_ids
+            print("Total spots for basis functions", cur)
+            print("The spots for interior basis functions", interior_ids)
+            print("The spots for interior tilde basis functions", interior_tilde_ids)
+            print("The total spots for interior functions", interior_ids + interior_tilde_ids)
         else:
             for j in sorted(flat_topology[1]):
                 entity_ids[1][j] = list(range(cur, cur + degree))
@@ -213,6 +218,8 @@ class TrimmedSerendipityCurl(TrimmedSerendipity):
                 IL = ()
 
             Sminus_list = EL + FL + IL
+            print("The total number of edge functions", len(EL))
+            print("The number of interior basis functions", len(IL))
             self.basis = {(0, 0, 0): Array(Sminus_list)}
             super(TrimmedSerendipityCurl, self).__init__(ref_el=ref_el, degree=degree, mapping="contravariant piola")
     
@@ -389,10 +396,9 @@ def f_lambda_1_3d(deg, dx, dy, dz, x_mid, y_mid, z_mid):
 
 def I_lambda_1_3d_pieces(deg, dx, dy, dz, x_mid, y_mid, z_mid):
     I = ()
-    D = deg - 1
-    for j in range(0, D - 3):
-        for k in range(0, D - 3 - j):
-            l = D - 4 - j - k
+    for j in range(0, deg - 3):
+        for k in range(0, deg - 3 - j):
+            l = deg - 4 - j - k
             I += tuple([(leg(j, x_mid) * leg(k, y_mid) * leg(l, z_mid) * dy[0] * dy[1] * dz[0] * dz[1], 0, 0)] +
                        [(0, leg(j, x_mid) * leg(k, y_mid) * leg(l, z_mid) * dx[0] * dx[1] * dz[0] * dz[1], 0)] +
                        [(0, 0, leg(j, x_mid) * leg(k, y_mid) * leg(l, z_mid) * dx[0] * dx[1] * dy[0] * dy[1])])
@@ -402,9 +408,9 @@ def I_lambda_1_3d_pieces(deg, dx, dy, dz, x_mid, y_mid, z_mid):
 def I_lambda_tilde_1_3d(deg, dx, dy, dz, x_mid, y_mid, z_mid):
     ITilde = ()
     if(deg==4):
-        ITilde += tuple([(leg(deg - 4, y_mid) * dy[0] * dy[1] * dz[0] * dz[1], 0, 0)] +
+        ITilde += tuple([(leg(deg - 4, z_mid) * dy[0] * dy[1] * dz[0] * dz[1], 0, 0)] +
                         [(0, leg(deg - 4, x_mid) * dx[0] * dx[1] * dz[0] * dz[1], 0)] +
-                        [(0, 0, leg(deg - 4, y_mid) * dx[0] * dx[1] * dy[0] * dy[1])])        
+                        [(0, 0, leg(deg - 4, y_mid) * dx[0] * dx[1] * dy[0] * dy[1])])       
     if(deg > 4):
         ITilde += tuple([(leg(deg - 4, y_mid) * dy[0] * dy[1] * dz[0] * dz[1], 0, 0)] +
                         [(leg(deg - 4, z_mid) * dy[0] * dy[1] * dz[0] * dz[1], 0, 0)] + 
@@ -416,15 +422,16 @@ def I_lambda_tilde_1_3d(deg, dx, dy, dz, x_mid, y_mid, z_mid):
         ITilde += tuple([(leg(j, x_mid) * leg(deg - j - 4, y_mid) * dy[0] * dy[1] * dz[0] * dz[1], -leg(j - 1, x_mid) * leg(deg - j - 3, y_mid) * dx[0] * dx[1] * dz[0] * dz[1], 0)] +
                         [(leg(j, x_mid) * leg(deg - j - 4, z_mid) * dy[0] * dy[1] * dz[0] * dz[1], 0, -leg(j - 1, x_mid) * leg(deg - j - 3, z_mid) * dx[0] * dx[1] * dy[0] * dy[1])])
         if deg > 5:
-            ITilde += [(0, leg(j, y_mid) * leg(deg - j - 4, z_mid) * dx[0] * dx[1] * dz[0] * dz[1], -leg(j - 1, y_mid) * leg(deg - j - 3, y_mid) * dx[0] * dx[1] * dz[0] * dz[1])]
+            ITilde += tuple([(0, leg(j, y_mid) * leg(deg - j - 4, z_mid) * dx[0] * dx[1] * dz[0] * dz[1], -leg(j - 1, y_mid) * leg(deg - j - 3, y_mid) * dx[0] * dx[1] * dz[0] * dz[1])])
     return ITilde
 
 
 def I_lambda_1_3d(deg, dx, dy, dz, x_mid, y_mid, z_mid):
     I = ()
     for i in range(4, deg):
-        I += I_lambda_1_3d_pieces(deg, dx, dy, dz, x_mid, y_mid, z_mid)
+        I += I_lambda_1_3d_pieces(i, dx, dy, dz, x_mid, y_mid, z_mid)
     I += I_lambda_tilde_1_3d(deg, dx, dy, dz, x_mid, y_mid, z_mid)
+    print("Total interior functions", len(I))
     return I
 
 
