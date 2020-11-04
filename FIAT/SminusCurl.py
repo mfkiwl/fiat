@@ -58,6 +58,7 @@ class TrimmedSerendipity(FiniteElement):
                 for j in sorted(flat_topology[2]):
                     entity_ids[2][j] = list(range(cur, cur + face_ids))
                     cur += face_ids
+            print("Total number of edge + face IDs available", cur)
             interior_ids = 0
             for k in range(4, degree):
                 interior_ids = interior_ids + 3 * choose_ijk_total(k - 4)
@@ -408,9 +409,9 @@ def I_lambda_1_3d_pieces(deg, dx, dy, dz, x_mid, y_mid, z_mid):
 def I_lambda_tilde_1_3d(deg, dx, dy, dz, x_mid, y_mid, z_mid):
     ITilde = ()
     if(deg==4):
-        ITilde += tuple([(leg(deg - 4, z_mid) * dy[0] * dy[1] * dz[0] * dz[1], 0, 0)] +
-                        [(0, leg(deg - 4, x_mid) * dx[0] * dx[1] * dz[0] * dz[1], 0)] +
-                        [(0, 0, leg(deg - 4, y_mid) * dx[0] * dx[1] * dy[0] * dy[1])])       
+        ITilde += tuple([(dy[0] * dy[1] * dz[0] * dz[1], 0, 0)] +
+                        [(0, dx[0] * dx[1] * dz[0] * dz[1], 0)] +
+                        [(0, 0, dx[0] * dx[1] * dy[0] * dy[1])])       
     if(deg > 4):
         ITilde += tuple([(leg(deg - 4, y_mid) * dy[0] * dy[1] * dz[0] * dz[1], 0, 0)] +
                         [(leg(deg - 4, z_mid) * dy[0] * dy[1] * dz[0] * dz[1], 0, 0)] + 
