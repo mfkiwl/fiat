@@ -74,7 +74,6 @@ class TrimmedSerendipity(FiniteElement):
 
             entity_ids[3][0] = list(range(cur, cur + interior_ids + interior_tilde_ids))
             cur = cur + interior_ids + interior_tilde_ids
-            #print("cur =", cur)
         else:
             for j in sorted(flat_topology[1]):
                 entity_ids[1][j] = list(range(cur, cur + degree))
@@ -190,6 +189,7 @@ class TrimmedSerendipityCurl(TrimmedSerendipity):
                 raise Exception("Trimmed serendipity face elements only valid for dimensions 2 and 3")
 
         verts = flat_el.get_vertices()
+        
 
         dx = ((verts[-1][0] - x)/(verts[-1][0] - verts[0][0]), (x - verts[0][0])/(verts[-1][0] - verts[0][0]))
         dy = ((verts[-1][1] - y)/(verts[-1][1] - verts[0][1]), (y - verts[0][1])/(verts[-1][1] - verts[0][1]))
@@ -216,7 +216,6 @@ class TrimmedSerendipityCurl(TrimmedSerendipity):
                 IL = ()
 
             Sminus_list = EL + FL + IL
-            #print("Number of basis functions", len(Sminus_list))
             self.basis = {(0, 0, 0): Array(Sminus_list)}
             super(TrimmedSerendipityCurl, self).__init__(ref_el=ref_el, degree=degree, mapping="contravariant piola")
     
