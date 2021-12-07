@@ -17,7 +17,7 @@ from FIAT.gauss_lobatto_legendre import GaussLobattoLegendre
 
 def sym_eig(A, B):
     """
-    numpy version of `scipy.linalg.eigh`
+    A numpy-only implementation of `scipy.linalg.eigh`
     """
     L = numpy.linalg.cholesky(B)
     Linv = numpy.linalg.inv(L)
