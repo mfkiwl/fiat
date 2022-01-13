@@ -54,25 +54,25 @@ def semhat(elem, rule):
 class FDMDualSet(dual_set.DualSet):
     """The dual basis for 1D (dis)continuous elements with FDM shape functions."""
     def __init__(self, ref_el, degree, formdegree):
-
         elem = GaussLobattoLegendre(ref_el, degree)
         rule = quadrature.GaussLegendreQuadratureLineRule(ref_el, degree+1)
         Ahat, Bhat, Jhat, _, xhat = semhat(elem, rule)
 
-        Sfdm = numpy.eye(Ahat.shape[0])
-        if Sfdm.shape[0] > 2:
-            bdof = (0, -1)
-            idof = slice(1, -1)
-            _, Sfdm[idof, idof] = sym_eig(Ahat[idof, idof], Bhat[idof, idof])
-            Sii = Sfdm[idof, idof]
-            Sbb = Sfdm[numpy.ix_(bdof, bdof)]
-            Sfdm[idof, bdof] = numpy.dot(Sii, numpy.dot(Sii.T, numpy.dot(Bhat[idof, bdof], -Sbb)))
+        bnodes = [[functional.PointEvaluation(ref_el, x)] for x in ref_el.get_vertices()]
+        k = len(bnodes[0])
+        idof = slice(k, -k)
+        bdof = tuple(range(-k, k))
+        S = numpy.eye(Ahat.shape[0])
+        if S.shape[0] > len(bdof):
+            _, S[idof, idof] = sym_eig(Ahat[idof, idof], Bhat[idof, idof])
+            Sii = S[idof, idof]
+            Sbb = S[numpy.ix_(bdof, bdof)]
+            S[idof, bdof] = numpy.dot(Sii, numpy.dot(Sii.T, numpy.dot(Bhat[idof, bdof], -Sbb)))
 
         self.gll_points = xhat
-        self.gll_tabulation = Sfdm
-        basis = numpy.dot(Sfdm.T, Jhat)
-        nodes = [functional.IntegralMoment(ref_el, rule, phi) for phi in basis]
-        nodes[:degree+1:degree] = [functional.PointEvaluation(ref_el, x) for x in ref_el.get_vertices()]
+        self.gll_tabulation = S
+        basis = numpy.dot(S.T, Jhat)
+        nodes = bnodes[0] + [functional.IntegralMoment(ref_el, rule, phi) for phi in basis[idof]] + bnodes[1]
 
         entity_ids = {}
         entity_permutations = {}
