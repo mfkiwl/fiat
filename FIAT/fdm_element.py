@@ -27,48 +27,50 @@ def sym_eig(A, B):
     return Z, V
 
 
-def semhat(ref_el, degree):
+def semhat(elem, rule):
     """
-    Setup for the GLL finite element method on the reference interval
+    Construct Laplacian stiffness and mass matrices
 
-    :arg degree: polynomial degree of the GLL element
+    :arg elem: the element
+    :arg rule: quadrature rule
 
-    :returns: 6-tuple of
-        Ahat: GLL(N) stiffness matrix
-        Bhat: GLL(N) mass matrix
-        Jhat: tabulation of the GLL(N) basis on the GL quadrature nodes
-        Dhat: tabulation of the first derivative of the GLL(N) basis on the GL quadrature nodes
-        xhat: GLL(N) nodes
-        rule: GL quadrature rule
+    :returns: 5-tuple of
+        Ahat: reference stiffness matrix
+        Bhat: reference mass matrix
+        Jhat: tabulation of the shape functions on the quadrature nodes
+        Dhat: tabulation of the first derivative of the shape functions on the quadrature nodes
+        xhat: nodes of the element
     """
-    rule = quadrature.GaussLegendreQuadratureLineRule(ref_el, degree+1)
-    elem = GaussLobattoLegendre(ref_el, degree)
     basis = elem.tabulate(1, rule.get_points())
     Jhat = basis[(0,)]
     Dhat = basis[(1,)]
     what = rule.get_weights()
-    Ahat = numpy.matmul(Dhat, numpy.matmul(numpy.diag(what), Dhat.T))
-    Bhat = numpy.matmul(Jhat, numpy.matmul(numpy.diag(what), Jhat.T))
+    Ahat = numpy.dot(numpy.multiply(Dhat, what), Dhat.T)
+    Bhat = numpy.dot(numpy.multiply(Jhat, what), Jhat.T)
     xhat = numpy.array([list(x.get_point_dict().keys())[0][0] for x in elem.dual_basis()])
-    return Ahat, Bhat, Jhat, Dhat, xhat, rule
+    return Ahat, Bhat, Jhat, Dhat, xhat
 
 
 class FDMDualSet(dual_set.DualSet):
     """The dual basis for 1D (dis)continuous elements with FDM shape functions."""
-    def __init__(self, ref_el, degree, formdegree=0):
-        Ahat, Bhat, Jhat, _, xhat, rule = semhat(ref_el, degree)
+    def __init__(self, ref_el, degree, formdegree):
+
+        elem = GaussLobattoLegendre(ref_el, degree)
+        rule = quadrature.GaussLegendreQuadratureLineRule(ref_el, degree+1)
+        Ahat, Bhat, Jhat, _, xhat = semhat(elem, rule)
+
         Sfdm = numpy.eye(Ahat.shape[0])
         if Sfdm.shape[0] > 2:
-            rd = (0, -1)
-            kd = slice(1, -1)
-            _, Sfdm[kd, kd] = sym_eig(Ahat[kd, kd], Bhat[kd, kd])
-            Skk = Sfdm[kd, kd]
-            Srr = Sfdm[numpy.ix_(rd, rd)]
-            Sfdm[kd, rd] = numpy.matmul(Skk, numpy.matmul(numpy.matmul(Skk.T, Bhat[kd, rd]), -Srr))
+            bdof = (0, -1)
+            idof = slice(1, -1)
+            _, Sfdm[idof, idof] = sym_eig(Ahat[idof, idof], Bhat[idof, idof])
+            Sii = Sfdm[idof, idof]
+            Sbb = Sfdm[numpy.ix_(bdof, bdof)]
+            Sfdm[idof, bdof] = numpy.dot(Sii, numpy.dot(Sii.T, numpy.dot(Bhat[idof, bdof], -Sbb)))
 
-        self.gll_nodes = xhat
-        self.fdm_gll = Sfdm
-        basis = numpy.matmul(Sfdm.T, Jhat)
+        self.gll_points = xhat
+        self.gll_tabulation = Sfdm
+        basis = numpy.dot(Sfdm.T, Jhat)
         nodes = [functional.IntegralMoment(ref_el, rule, phi) for phi in basis]
         nodes[:degree+1:degree] = [functional.PointEvaluation(ref_el, x) for x in ref_el.get_vertices()]
 
@@ -105,9 +107,9 @@ class FDMElement(finite_element.CiarletElement):
 
         entity_dim, entity_id = entity
         transform = self.ref_el.get_entity_transform(entity_dim, entity_id)
-        xsrc = self.dual.gll_nodes
+        xsrc = self.dual.gll_points
         xdst = numpy.array(list(map(transform, points))).flatten()
         tabulation = barycentric_interpolation(xsrc, xdst, order=order)
         for key in tabulation:
-            tabulation[key] = numpy.matmul(self.dual.fdm_gll.T, tabulation[key])
+            tabulation[key] = numpy.dot(self.dual.gll_tabulation.T, tabulation[key])
         return tabulation
