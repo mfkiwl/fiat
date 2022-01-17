@@ -51,6 +51,7 @@ class FDMDual(dual_set.DualSet):
         perm = list(range(len(bdof)))
         perm = perm[::2] + perm[-1::-2]
         C = C[:, perm].T
+
         # Tabulate the basis that splits the DOFs into interior and bcs
         E = numpy.eye(degree+1)
         E[bdof, idof] = -C[:, idof]
@@ -59,8 +60,8 @@ class FDMDual(dual_set.DualSet):
         # Assemble the constrained Galerkin matrices on the reference cell
         rule = quadrature.GaussLegendreQuadratureLineRule(ref_el, degree+1)
         phi = gll.tabulate(order, rule.get_points())
-        E0 = numpy.dot(E, phi[(0, )].T)
-        Ek = numpy.dot(E, phi[(order, )].T)
+        E0 = numpy.dot(phi[(0, )].T, E)
+        Ek = numpy.dot(phi[(order, )].T, E)
         B = numpy.dot(numpy.multiply(E0.T, rule.get_weights()), E0)
         A = numpy.dot(numpy.multiply(Ek.T, rule.get_weights()), Ek)
 
@@ -75,6 +76,7 @@ class FDMDual(dual_set.DualSet):
         S = numpy.dot(E, S)
         self.gll_points = xhat
         self.gll_tabulation = S.T
+
         # Interpolate eigenfunctions onto the quadrature points
         basis = numpy.dot(S.T, phi[(0, )])
         nodes = bc_nodes[0] + [functional.IntegralMoment(ref_el, rule, phi) for phi in basis[idof]] + bc_nodes[1]
