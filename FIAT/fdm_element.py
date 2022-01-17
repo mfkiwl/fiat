@@ -13,6 +13,7 @@ from FIAT.reference_element import LINE
 from FIAT.barycentric_interpolation import barycentric_interpolation
 from FIAT.lagrange import make_entity_permutations
 from FIAT.gauss_lobatto_legendre import GaussLobattoLegendre
+from FIAT.P0 import P0Dual
 
 
 def sym_eig(A, B):
@@ -27,89 +28,98 @@ def sym_eig(A, B):
     return Z, V
 
 
-def semhat(elem, rule):
-    """
-    Construct Laplacian stiffness and mass matrices
-
-    :arg elem: the element
-    :arg rule: quadrature rule
-
-    :returns: 5-tuple of
-        Ahat: reference stiffness matrix
-        Bhat: reference mass matrix
-        Jhat: tabulation of the shape functions on the quadrature nodes
-        Dhat: tabulation of the first derivative of the shape functions on the quadrature nodes
-        xhat: nodes of the element
-    """
-    basis = elem.tabulate(1, rule.get_points())
-    Jhat = basis[(0,)]
-    Dhat = basis[(1,)]
-    what = rule.get_weights()
-    Ahat = numpy.dot(numpy.multiply(Dhat, what), Dhat.T)
-    Bhat = numpy.dot(numpy.multiply(Jhat, what), Jhat.T)
-    xhat = numpy.array([list(x.get_point_dict().keys())[0][0] for x in elem.dual_basis()])
-    return Ahat, Bhat, Jhat, Dhat, xhat
-
-
-class FDMDualSet(dual_set.DualSet):
-    """The dual basis for 1D (dis)continuous elements with FDM shape functions."""
-    def __init__(self, ref_el, degree, formdegree):
-        elem = GaussLobattoLegendre(ref_el, degree)
-        rule = quadrature.GaussLegendreQuadratureLineRule(ref_el, degree+1)
-        Ahat, Bhat, Jhat, _, xhat = semhat(elem, rule)
-
-        bnodes = [[functional.PointEvaluation(ref_el, x)] for x in ref_el.get_vertices()]
-        k = len(bnodes[0])
+class FDMDual(dual_set.DualSet):
+    """The dual basis for 1D CG elements with FDM shape functions."""
+    def __init__(self, ref_el, degree, order=1):
+        bc_nodes = []
+        for x in ref_el.get_vertices():
+            bc_nodes.append([functional.PointEvaluation(ref_el, x),
+                             *[functional.PointDerivative(ref_el, x, [alpha]) for alpha in range(1, order)]])
+        bc_nodes[1].reverse()
+        k = len(bc_nodes[0])
         idof = slice(k, -k)
-        bdof = tuple(range(-k, k))
-        S = numpy.eye(Ahat.shape[0])
+        bdof = list(range(-k, k))
+        bdof = bdof[k:] + bdof[:k]
+
+        # Define the generalized eigenproblem on a GLL element
+        gll = GaussLobattoLegendre(ref_el, degree)
+        xhat = numpy.array([list(x.get_point_dict().keys())[0][0] for x in gll.dual_basis()])
+
+        # Tabulate the BC nodes
+        constraints = gll.tabulate(order-1, ref_el.get_vertices())
+        C = numpy.column_stack(list(constraints.values()))
+        perm = list(range(len(bdof)))
+        perm = perm[::2] + perm[-1::-2]
+        C = C[:, perm].T
+        # Tabulate the basis that splits the DOFs into interior and bcs
+        E = numpy.eye(degree+1)
+        E[bdof, idof] = -C[:, idof]
+        E[bdof, :] = numpy.dot(numpy.linalg.inv(C[:, bdof]), E[bdof, :])
+
+        # Assemble the constrained Galerkin matrices on the reference cell
+        rule = quadrature.GaussLegendreQuadratureLineRule(ref_el, degree+1)
+        phi = gll.tabulate(order, rule.get_points())
+        E0 = numpy.dot(E, phi[(0, )].T)
+        Ek = numpy.dot(E, phi[(order, )].T)
+        B = numpy.dot(numpy.multiply(E0.T, rule.get_weights()), E0)
+        A = numpy.dot(numpy.multiply(Ek.T, rule.get_weights()), Ek)
+
+        # Eigenfunctions in the constrained basis
+        S = numpy.eye(A.shape[0])
         if S.shape[0] > len(bdof):
-            _, S[idof, idof] = sym_eig(Ahat[idof, idof], Bhat[idof, idof])
-            Sii = S[idof, idof]
-            Sbb = S[numpy.ix_(bdof, bdof)]
-            S[idof, bdof] = numpy.dot(Sii, numpy.dot(Sii.T, numpy.dot(Bhat[idof, bdof], -Sbb)))
+            _, Sii = sym_eig(A[idof, idof], B[idof, idof])
+            S[idof, idof] = Sii
+            S[idof, bdof] = numpy.dot(Sii, numpy.dot(Sii.T, -B[idof, bdof]))
 
+        # Eigenfunctions in the Lagrange basis
+        S = numpy.dot(E, S)
         self.gll_points = xhat
-        self.gll_tabulation = S
-        basis = numpy.dot(S.T, Jhat)
-        nodes = bnodes[0] + [functional.IntegralMoment(ref_el, rule, phi) for phi in basis[idof]] + bnodes[1]
+        self.gll_tabulation = S.T
+        # Interpolate eigenfunctions onto the quadrature points
+        basis = numpy.dot(S.T, phi[(0, )])
+        nodes = bc_nodes[0] + [functional.IntegralMoment(ref_el, rule, phi) for phi in basis[idof]] + bc_nodes[1]
 
-        entity_ids = {}
+        entity_ids = {0: {0: [0], 1: [degree]},
+                      1: {0: list(range(1, degree))}}
         entity_permutations = {}
-        if formdegree == 0:
-            entity_ids[0] = {0: [0], 1: [degree]}
-            entity_ids[1] = {0: list(range(1, degree))}
-            entity_permutations[0] = {0: {0: [0]}, 1: {0: [0]}}
-            entity_permutations[1] = {0: make_entity_permutations(1, degree - 1)}
-        else:
-            entity_ids[0] = {0: [], 1: []}
-            entity_ids[1] = {0: list(range(0, degree+1))}
-            entity_permutations[0] = {0: {0: []}, 1: {0: []}}
-            entity_permutations[1] = {0: make_entity_permutations(1, degree + 1)}
-
-        super(FDMDualSet, self).__init__(nodes, ref_el, entity_ids, entity_permutations)
+        entity_permutations[0] = {0: {0: [0]}, 1: {0: [0]}}
+        entity_permutations[1] = {0: make_entity_permutations(1, degree - 1)}
+        super(FDMDual, self).__init__(nodes, ref_el, entity_ids, entity_permutations)
 
 
-class FDMElement(finite_element.CiarletElement):
-    """1D (dis)continuous element with FDM shape functions."""
-    def __init__(self, ref_el, degree, formdegree=0):
+class FDMLagrange(finite_element.CiarletElement):
+    """1D CG element with interior shape functions that diagonalize the Laplacian."""
+    _order = 1
+
+    def __init__(self, ref_el, degree):
         if ref_el.shape != LINE:
             raise ValueError("FDM elements are only defined in one dimension.")
         poly_set = polynomial_set.ONPolynomialSet(ref_el, degree)
-        dual = FDMDualSet(ref_el, degree, formdegree)
-        super(FDMElement, self).__init__(poly_set, dual, degree, formdegree)
+        if degree == 0:
+            dual = P0Dual(ref_el)
+        else:
+            dual = FDMDual(ref_el, degree, order=self._order)
+        formdegree = 0
+        super(FDMLagrange, self).__init__(poly_set, dual, degree, formdegree)
 
     def tabulate(self, order, points, entity=None):
         # This overrides the default with a more numerically stable algorithm
+        if hasattr(self.dual, "gll_points"):
+            if entity is None:
+                entity = (self.ref_el.get_dimension(), 0)
 
-        if entity is None:
-            entity = (self.ref_el.get_dimension(), 0)
+            entity_dim, entity_id = entity
+            transform = self.ref_el.get_entity_transform(entity_dim, entity_id)
+            xsrc = self.dual.gll_points
+            xdst = numpy.array(list(map(transform, points))).flatten()
+            tabulation = barycentric_interpolation(xsrc, xdst, order=order)
+            for key in tabulation:
+                tabulation[key] = numpy.dot(self.dual.gll_tabulation, tabulation[key])
+            return tabulation
+        else:
+            return super(FDMLagrange, self).tabulate(order, points, entity)
 
-        entity_dim, entity_id = entity
-        transform = self.ref_el.get_entity_transform(entity_dim, entity_id)
-        xsrc = self.dual.gll_points
-        xdst = numpy.array(list(map(transform, points))).flatten()
-        tabulation = barycentric_interpolation(xsrc, xdst, order=order)
-        for key in tabulation:
-            tabulation[key] = numpy.dot(self.dual.gll_tabulation.T, tabulation[key])
-        return tabulation
+
+class FDMHermite(FDMLagrange):
+    """1D CG element with interior shape functions that diagonalize the biharmonic operator."""
+    _order = 2

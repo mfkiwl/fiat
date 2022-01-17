@@ -26,16 +26,16 @@ import numpy as np
 @pytest.mark.parametrize("degree", range(1, 7))
 def test_fdm_basis_values(degree):
     """Ensure that integrating a simple monomial produces the expected results."""
-    from FIAT import ufc_simplex, FDMElement, make_quadrature
+    from FIAT import ufc_simplex, FDMLagrange, make_quadrature
 
     s = ufc_simplex(1)
     q = make_quadrature(s, degree + 1)
 
-    fe = FDMElement(s, degree)
+    fe = FDMLagrange(s, degree)
     tab = fe.tabulate(0, q.pts)[(0,)]
 
     for test_degree in range(degree + 1):
-        coefs = [n(lambda x: x[0]**test_degree) for n in fe.dual.nodes]
+        coefs = [float(n(lambda x: x[0]**test_degree)) for n in fe.dual.nodes]
         integral = np.dot(coefs, np.dot(tab, q.wts))
         reference = np.dot([x[0]**test_degree
                             for x in q.pts], q.wts)
@@ -44,9 +44,9 @@ def test_fdm_basis_values(degree):
 
 @pytest.mark.parametrize("degree", range(1, 7))
 def test_sparsity(degree):
-    from FIAT import ufc_simplex, FDMElement, make_quadrature
+    from FIAT import ufc_simplex, FDMLagrange, make_quadrature
     cell = ufc_simplex(1)
-    fe = FDMElement(cell, degree)
+    fe = FDMLagrange(cell, degree)
 
     rule = make_quadrature(cell, degree+1)
     basis = fe.tabulate(1, rule.get_points())
@@ -55,7 +55,6 @@ def test_sparsity(degree):
     what = rule.get_weights()
     Ahat = np.dot(np.multiply(Dhat, what), Dhat.T)
     Bhat = np.dot(np.multiply(Jhat, what), Jhat.T)
-
     nnz = lambda A: A.size - np.sum(np.isclose(A, 0.0E0, rtol=1E-14))
     ndof = fe.space_dimension()
     assert nnz(Ahat) == 5*ndof-6
