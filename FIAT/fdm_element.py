@@ -53,7 +53,7 @@ class FDMDual(dual_set.DualSet):
         C = C[:, perm].T
 
         # Tabulate the basis that splits the DOFs into interior and bcs
-        E = numpy.eye(degree+1)
+        E = numpy.eye(gll.space_dimension())
         E[bdof, idof] = -C[:, idof]
         E[bdof, :] = numpy.dot(numpy.linalg.inv(C[:, bdof]), E[bdof, :])
 
@@ -79,7 +79,7 @@ class FDMDual(dual_set.DualSet):
 
         # Interpolate eigenfunctions onto the quadrature points
         basis = numpy.dot(S.T, phi[(0, )])
-        nodes = bc_nodes[0] + [functional.IntegralMoment(ref_el, rule, phi) for phi in basis[idof]] + bc_nodes[1]
+        nodes = bc_nodes[0] + [functional.IntegralMoment(ref_el, rule, f) for f in basis[idof]] + bc_nodes[1]
 
         entity_ids = {0: {0: [0], 1: [degree]},
                       1: {0: list(range(1, degree))}}
