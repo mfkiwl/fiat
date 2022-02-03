@@ -31,7 +31,7 @@ def barycentric_interpolation(xsrc, xdst, order=0):
     numpy.fill_diagonal(D, numpy.diag(D) - numpy.sum(D, axis=0))
 
     I = numpy.add.outer(-xsrc, xdst)
-    idx = numpy.argwhere(numpy.isclose(I, 0.0E0, 1E-14))
+    idx = numpy.argwhere(numpy.isclose(I, 0.0E0, 0.0E0))
     I[idx[:, 0], idx[:, 1]] = 1.0E0
     I = 1.0E0 / I
     I *= w[:, None]
@@ -39,8 +39,7 @@ def barycentric_interpolation(xsrc, xdst, order=0):
     I[idx[:, 0], idx[:, 1]] = 1.0E0
     I = (1.0E0 / numpy.sum(I, axis=0)) * I
 
-    derivs = {(0,): I}
-    for k in range(0, order):
-        derivs[(k+1,)] = numpy.matmul(D, derivs[(k,)])
-
-    return derivs
+    tabulation = {(0,): I}
+    for k in range(order):
+        tabulation[(k+1,)] = numpy.dot(D, tabulation[(k,)])
+    return tabulation
