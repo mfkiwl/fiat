@@ -5,9 +5,15 @@
 # SPDX-License-Identifier:    LGPL-3.0-or-later
 #
 # Written by David A. Ham (david.ham@imperial.ac.uk), 2015
+#
+# Modified by Pablo D. Brubeck (brubeck@protonmail.com), 2021
+
+import numpy
 
 from FIAT import finite_element, polynomial_set, dual_set, functional, quadrature
 from FIAT.reference_element import LINE
+from FIAT.barycentric_interpolation import barycentric_interpolation
+from FIAT.lagrange import make_entity_permutations
 
 
 class GaussLegendreDualSet(dual_set.DualSet):
@@ -18,8 +24,11 @@ class GaussLegendreDualSet(dual_set.DualSet):
                       1: {0: list(range(0, degree+1))}}
         lr = quadrature.GaussLegendreQuadratureLineRule(ref_el, degree+1)
         nodes = [functional.PointEvaluation(ref_el, x) for x in lr.pts]
+        entity_permutations = {}
+        entity_permutations[0] = {0: {0: []}, 1: {0: []}}
+        entity_permutations[1] = {0: make_entity_permutations(1, degree + 1)}
 
-        super(GaussLegendreDualSet, self).__init__(nodes, ref_el, entity_ids)
+        super(GaussLegendreDualSet, self).__init__(nodes, ref_el, entity_ids, entity_permutations)
 
 
 class GaussLegendre(finite_element.CiarletElement):
@@ -31,3 +40,21 @@ class GaussLegendre(finite_element.CiarletElement):
         dual = GaussLegendreDualSet(ref_el, degree)
         formdegree = ref_el.get_spatial_dimension()  # n-form
         super(GaussLegendre, self).__init__(poly_set, dual, degree, formdegree)
+
+    def tabulate(self, order, points, entity=None):
+        # This overrides the default with a more numerically stable algorithm
+
+        if entity is None:
+            entity = (self.ref_el.get_dimension(), 0)
+
+        entity_dim, entity_id = entity
+        transform = self.ref_el.get_entity_transform(entity_dim, entity_id)
+
+        xsrc = []
+        for node in self.dual.nodes:
+            # Assert singleton point for each node.
+            (pt,), = node.get_point_dict().keys()
+            xsrc.append(pt)
+        xsrc = numpy.asarray(xsrc)
+        xdst = numpy.array(list(map(transform, points))).flatten()
+        return barycentric_interpolation(xsrc, xdst, order=order)

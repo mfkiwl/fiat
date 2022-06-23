@@ -25,6 +25,7 @@ from FIAT.hermite import CubicHermite
 from FIAT.lagrange import Lagrange
 from FIAT.gauss_lobatto_legendre import GaussLobattoLegendre
 from FIAT.gauss_legendre import GaussLegendre
+from FIAT.gauss_radau import GaussRadau
 from FIAT.morley import Morley
 from FIAT.nedelec import Nedelec
 from FIAT.nedelec_second_kind import NedelecSecondKind
@@ -33,6 +34,9 @@ from FIAT.raviart_thomas import RaviartThomas
 from FIAT.crouzeix_raviart import CrouzeixRaviart
 from FIAT.regge import Regge
 from FIAT.hellan_herrmann_johnson import HellanHerrmannJohnson
+from FIAT.arnold_winther import ArnoldWinther
+from FIAT.arnold_winther import ArnoldWintherNC
+from FIAT.mardal_tai_winther import MardalTaiWinther
 from FIAT.bubble import Bubble, FacetBubble
 from FIAT.tensor_product import TensorProductElement
 from FIAT.enriched import EnrichedElement
@@ -42,6 +46,8 @@ from FIAT.hdiv_trace import HDivTrace
 from FIAT.mixed import MixedElement                       # noqa: F401
 from FIAT.restricted import RestrictedElement             # noqa: F401
 from FIAT.quadrature_element import QuadratureElement     # noqa: F401
+from FIAT.kong_mulder_veldhuizen import KongMulderVeldhuizen  # noqa: F401
+from FIAT.fdm_element import FDMLagrange, FDMHermite  # noqa: F401
 
 # Important functionality
 from FIAT.quadrature import make_quadrature               # noqa: F401
@@ -67,8 +73,10 @@ supported_elements = {"Argyris": Argyris,
                       "Discontinuous Raviart-Thomas": DiscontinuousRaviartThomas,
                       "Hermite": CubicHermite,
                       "Lagrange": Lagrange,
+                      "Kong-Mulder-Veldhuizen": KongMulderVeldhuizen,
                       "Gauss-Lobatto-Legendre": GaussLobattoLegendre,
                       "Gauss-Legendre": GaussLegendre,
+                      "Gauss-Radau": GaussRadau,
                       "Morley": Morley,
                       "Nedelec 1st kind H(curl)": Nedelec,
                       "Nedelec 2nd kind H(curl)": NedelecSecondKind,
@@ -79,7 +87,10 @@ supported_elements = {"Argyris": Argyris,
                       "TensorProductElement": TensorProductElement,
                       "BrokenElement": DiscontinuousElement,
                       "HDiv Trace": HDivTrace,
-                      "Hellan-Herrmann-Johnson": HellanHerrmannJohnson}
+                      "Hellan-Herrmann-Johnson": HellanHerrmannJohnson,
+                      "Conforming Arnold-Winther": ArnoldWinther,
+                      "Nonconforming Arnold-Winther": ArnoldWintherNC,
+                      "Mardal-Tai-Winther": MardalTaiWinther}
 
 # List of extra elements
 extra_elements = {"P0": P0,
