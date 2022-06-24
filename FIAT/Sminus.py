@@ -1,3 +1,4 @@
+
 # Copyright (C) 2019 Cyrus Cheng (Imperial College London)
 #
 # This file is part of FIAT.
@@ -32,6 +33,7 @@ leg = legendre
 def triangular_number(n):
     return int((n+1)*n/2)
 
+
 def choose_ijk_total(degree):
     top = 1
     for i in range(1, 2 + degree + 1):
@@ -39,7 +41,7 @@ def choose_ijk_total(degree):
     bottom = 1
     for i in range(1, degree + 1):
         bottom = i * bottom
-    return int(top /(2 * bottom))
+    return int(top / (2 * bottom))
 
 
 class TrimmedSerendipity(FiniteElement):
@@ -69,17 +71,17 @@ class TrimmedSerendipity(FiniteElement):
 
             if(degree >= 2):
                 entity_ids[2][0] = list(range(cur, cur + 2*triangular_number(degree - 2) + degree))
-        
+
             cur += 2*triangular_number(degree - 2) + degree
 
         else:
-            #3-d case.
+            # 3-d case.
             entity_ids[3] = {}
             for j in sorted(flat_topology[1]):
                 entity_ids[1][j] = list(range(cur, cur + degree))
                 cur = cur + degree
-            
-            if (degree >= 2 ):
+
+            if (degree >= 2):
                 if (degree < 4):
                     for j in sorted(flat_topology[2]):
                         entity_ids[2][j] = list(range(cur, cur + 2*triangular_number(degree - 2) + degree))
@@ -88,8 +90,6 @@ class TrimmedSerendipity(FiniteElement):
                     for j in sorted(flat_topology[2]):
                         entity_ids[2][j] = list(range(cur, cur + 3 * degree - 4))
                         cur = cur + 3*degree - 4
-            
-            
             if (degree >= 4):
                 if (degree == 4):
                     entity_ids[3][0] = list(range(cur, cur + 6))
@@ -171,7 +171,6 @@ class TrimmedSerendipity(FiniteElement):
                             T[j, ell, i] = f.evalf(subs=subs)
                 phivals[alpha] = T
         return phivals
-
 
     def entity_dofs(self):
         """Return the map of topological entities to degrees of
@@ -284,40 +283,40 @@ def trimmed_f_lambda_2d(deg, dx, dy, x_mid, y_mid):
 
 def e_lambda_1_3d_trimmed(max_deg, dx, dy, dz, x_mid, y_mid, z_mid):
     EL = tuple([])
-    ##assignment to edge x=y=0
-    for i in range (0, max_deg):
+    # assignment to edge x=y=0
+    for i in range(0, max_deg):
         EL += tuple([(0, 0, leg(i, z_mid) * dx[0] * dy[0])])
-    ##assignment to edge x=0, y=1
+    # assignment to edge x=0, y=1
     for i in range(0, max_deg):
         EL += tuple([(0, 0, leg(i, z_mid) * dy[1] * dx[0])])
-    ##assignment to edge x = 1, y = 0
+    # assignment to edge x = 1, y = 0
     for i in range(0, max_deg):
         EL += tuple([(0, 0, leg(i, z_mid) * dx[1] * dy[0])])
-    ##assignment to edge x = 1, y = 1
+    # assignment to edge x = 1, y = 1
     for i in range(0, max_deg):
         EL += tuple([(0, 0, leg(i, z_mid) * dx[1] * dy[1])])
-    ##assignment to edge x = 0, z = 0
+    # assignment to edge x = 0, z = 0
     for i in range(0, max_deg):
         EL += tuple([(0, leg(i, y_mid) * dx[0] * dz[0], 0)])
-    ##assignment to edge x = 0, z = 1
+    # assignment to edge x = 0, z = 1
     for i in range(0, max_deg):
         EL += tuple([(0, leg(i, y_mid) * dx[0] * dz[1], 0)])
-    ##assignment to edge x = 1, z = 0
+    # assignment to edge x = 1, z = 0
     for i in range(0, max_deg):
         EL += tuple([(0, leg(i, y_mid) * dx[1] * dz[0], 0)])
-    ##assignment to edge x = 1, z = 1
+    # assignment to edge x = 1, z = 1
     for i in range(0, max_deg):
         EL += tuple([(0, leg(i, y_mid) * dx[1] * dz[1], 0)])
-    ##assignment to edge y = 0, z = 0
+    # assignment to edge y = 0, z = 0
     for i in range(0, max_deg):
         EL += tuple([(leg(i, x_mid) * dy[0] * dz[0], 0, 0)])
-    ##assignment to edge y = 0, z = 1
+    # assignment to edge y = 0, z = 1
     for i in range(0, max_deg):
         EL += tuple([(leg(i, x_mid) * dy[0] * dz[1], 0, 0)])
-    ##assignment to edge y = 1, z = 0
+    # assignment to edge y = 1, z = 0
     for i in range(0, max_deg):
         EL += tuple([(leg(i, x_mid) * dy[1] * dz[0], 0, 0)])
-    ##assignment to edge y = 1, z = 1
+    # assignment to edge y = 1, z = 1
     for i in range(0, max_deg):
         EL += tuple([(leg(i, x_mid) * dy[1] * dz[1], 0, 0)])
     return EL
@@ -325,72 +324,72 @@ def e_lambda_1_3d_trimmed(max_deg, dx, dy, dz, x_mid, y_mid, z_mid):
 
 def f_lambda_1_3d_trimmed(max_deg, dx, dy, dz, x_mid, y_mid, z_mid):
     FL = tuple([])
-    ##Assignment to face x = 0, Ftilde
+    # Assignment to face x = 0, Ftilde
     FL += tuple([(0, leg(max_deg - 2, z_mid) * dx[0] * dz[0] * dz[1], 0)])
     FL += tuple([(0, 0, leg(max_deg - 2, y_mid) * dx[0] * dy[0] * dy[1])])
     for j in range(1, max_deg - 1):
-        FL += tuple([(0, leg(j, y_mid) * leg(max_deg - j - 2, z_mid) * dx[0] * dz[0] * dz[1], 
-                        -leg(j - 1, y_mid) * leg(max_deg - j - 1, z_mid) * dx[0] * dy[0] * dy[1])])
-    ##Assignment to face x = 0, F
+        FL += tuple([(0, leg(j, y_mid) * leg(max_deg - j - 2, z_mid) * dx[0] * dz[0] * dz[1],
+                      -leg(j - 1, y_mid) * leg(max_deg - j - 1, z_mid) * dx[0] * dy[0] * dy[1])])
+    # Assignment to face x = 0, F
     for j in range(1, max_deg - 1):
         k = max_deg - j - 2
         FL += tuple([(0, leg(j, y_mid) * leg(k, z_mid) * dx[0] * dz[0] * dz[1], 0)])
         FL += tuple([(0, 0, leg(j, z_mid) * leg(k, x_mid) * dx[0] * dy[0] * dy[1])])
-    ##Assignment to face x = 1, Ftilde
+    # Assignment to face x = 1, Ftilde
     FL += tuple([(0, leg(max_deg - 2, z_mid) * dx[1] * dz[0] * dz[1], 0)])
     FL += tuple([(0, 0, leg(max_deg - 2, y_mid) * dx[1] * dy[0] * dy[1])])
     for j in range(1, max_deg - 1):
-        FL += tuple([(0, leg(j, y_mid) * leg(max_deg - j - 2, z_mid) * dx[1] * dz[0] * dz[1], 
-                        -leg(j - 1, y_mid) * leg(max_deg - j - 1, z_mid) * dx[1] * dy[0] * dy[1])])
-    ##Assignment to face x = 1, F
+        FL += tuple([(0, leg(j, y_mid) * leg(max_deg - j - 2, z_mid) * dx[1] * dz[0] * dz[1],
+                      -leg(j - 1, y_mid) * leg(max_deg - j - 1, z_mid) * dx[1] * dy[0] * dy[1])])
+    # Assignment to face x = 1, F
     for j in range(1, max_deg - 1):
         k = max_deg - j - 2
         FL += tuple([(0, leg(j, y_mid) * leg(k, z_mid) * dx[1] * dz[0] * dz[1], 0)])
         FL += tuple([(0, 0, leg(j, z_mid) * leg(k, x_mid) * dx[1] * dy[0] * dy[1])])
 
-    ##Assignment to face y = 0, Ftilde
+    # Assignment to face y = 0, Ftilde
     FL += tuple([(leg(max_deg - 2, z_mid) * dy[0] * dz[0] * dz[1], 0, 0)])
     FL += tuple([(0, 0, leg(max_deg - 2, x_mid) * dy[0] * dx[0] * dx[1])])
     for j in range(1, max_deg - 1):
-        FL += tuple([(leg(j, x_mid) * leg(max_deg - j - 2, z_mid) * dy[0] * dz[0] * dz[1], 0, 
-                        -leg(j - 1, x_mid) * leg(max_deg - j - 1, z_mid) * dy[0] * dx[0] * dx[1])])
-    ##Assignment to face y = 0, F
+        FL += tuple([(leg(j, x_mid) * leg(max_deg - j - 2, z_mid) * dy[0] * dz[0] * dz[1], 0,
+                      -leg(j - 1, x_mid) * leg(max_deg - j - 1, z_mid) * dy[0] * dx[0] * dx[1])])
+    # Assignment to face y = 0, F
     for j in range(1, max_deg - 1):
         k = max_deg - j - 2
         FL += tuple([(leg(j, x_mid) * leg(k, z_mid) * dy[0] * dz[0] * dz[1], 0, 0)])
         FL += tuple([(0, 0, leg(j, z_mid) * leg(k, y_mid) * dy[0] * dx[0] * dx[1])])
 
-    ##Assignment to face y = 1, Ftilde
+    # Assignment to face y = 1, Ftilde
     FL += tuple([(leg(max_deg - 2, z_mid) * dy[1] * dz[0] * dz[1], 0, 0)])
     FL += tuple([(0, 0, leg(max_deg - 2, x_mid) * dy[1] * dx[0] * dx[1])])
     for j in range(1, max_deg - 1):
-        FL += tuple([(leg(j, x_mid) * leg(max_deg - j - 2, z_mid) * dy[1] * dz[0] * dz[1], 0, 
-                        -leg(j - 1, x_mid) * leg(max_deg - j - 1, z_mid) * dy[1] * dx[0] * dx[1])])
-    ##Assignment to face y = 1, F
+        FL += tuple([(leg(j, x_mid) * leg(max_deg - j - 2, z_mid) * dy[1] * dz[0] * dz[1], 0,
+                      -leg(j - 1, x_mid) * leg(max_deg - j - 1, z_mid) * dy[1] * dx[0] * dx[1])])
+    # Assignment to face y = 1, F
     for j in range(1, max_deg - 1):
         k = max_deg - j - 2
         FL += tuple([(leg(j, x_mid) * leg(k, z_mid) * dy[1] * dz[0] * dz[1], 0, 0)])
         FL += tuple([(0, 0, leg(j, z_mid) * leg(k, y_mid) * dy[1] * dx[0] * dx[1])])
 
-    ##Assignment to face z = 0, Ftilde
+    # Assignment to face z = 0, Ftilde
     FL += tuple([(leg(max_deg - 2, y_mid) * dz[0] * dy[0] * dy[1], 0, 0)])
     FL += tuple([(0, leg(max_deg - 2, x_mid) * dz[0] * dx[0] * dx[1], 0)])
     for j in range(1, max_deg - 1):
         FL += tuple([(leg(j, x_mid) * leg(max_deg - j - 2, y_mid) * dz[0] * dy[0] * dy[1],
-                        -leg(j - 1, x_mid) * leg(max_deg - j - 1, y_mid) * dz[0] * dx[0] * dx[1], 0)])
-    ##Assignment to face z = 0, F
+                      -leg(j - 1, x_mid) * leg(max_deg - j - 1, y_mid) * dz[0] * dx[0] * dx[1], 0)])
+    # Assignment to face z = 0, F
     for j in range(1, max_deg - 1):
         k = max_deg - j - 2
         FL += tuple([(leg(j, x_mid) * leg(k, y_mid) * dz[0] * dy[0] * dy[1], 0, 0)])
         FL += tuple([(0, leg(j, y_mid) * leg(k, x_mid) * dz[0] * dx[0] * dx[1], 0)])
 
-    ##Assignment to face z = 1, Ftilde
+    # Assignment to face z = 1, Ftilde
     FL += tuple([(leg(max_deg - 2, y_mid) * dz[1] * dy[0] * dy[1], 0, 0)])
     FL += tuple([(0, leg(max_deg - 2, x_mid) * dz[1] * dx[0] * dx[1], 0)])
     for j in range(1, max_deg - 1):
         FL += tuple([(leg(j, x_mid) * leg(max_deg - j - 2, y_mid) * dz[1] * dy[0] * dy[1],
-                        -leg(j - 1, x_mid) * leg(max_deg - j - 1, y_mid) * dz[1] * dx[0] * dx[1], 0)])
-    ##Assignment to face z = 1, F
+                      -leg(j - 1, x_mid) * leg(max_deg - j - 1, y_mid) * dz[1] * dx[0] * dx[1], 0)])
+    # Assignment to face z = 1, F
     for j in range(1, max_deg - 1):
         k = max_deg - j - 2
         FL += tuple([(leg(j, x_mid) * leg(k, y_mid) * dz[1] * dy[0] * dy[1], 0, 0)])
@@ -418,11 +417,11 @@ def I_lambda_1_3d(deg, dx, dy, dz, x_mid, y_mid, z_mid):
     DegsOfIteration = determine_I_lambda_1_portions_3d(deg)
     IL = tuple([])
     for Degs in DegsOfIteration:
-        IL += tuple([(leg(Degs[0], x_mid) * leg(Degs[1], y_mid) * leg(Degs[2], z_mid) * 
+        IL += tuple([(leg(Degs[0], x_mid) * leg(Degs[1], y_mid) * leg(Degs[2], z_mid) *
                     dy[0] * dy[1] * dz[0] * dz[1], 0, 0)])
-        IL += tuple([(0, leg(Degs[0], x_mid) * leg(Degs[1], y_mid) * leg(Degs[2], z_mid) * 
+        IL += tuple([(0, leg(Degs[0], x_mid) * leg(Degs[1], y_mid) * leg(Degs[2], z_mid) *
                     dx[0] * dx[1] * dz[0] * dz[1], 0)])
-        IL += tuple([(0, 0, leg(Degs[0], x_mid) * leg(Degs[1], y_mid) * leg(Degs[2], z_mid) * 
+        IL += tuple([(0, 0, leg(Degs[0], x_mid) * leg(Degs[1], y_mid) * leg(Degs[2], z_mid) *
                     dy[0] * dy[1] * dy[0] * dy[1])])
     return IL
 
@@ -443,10 +442,10 @@ def I_lambda_1_tilde_3d(deg, dx, dy, dz, x_mid, y_mid, z_mid):
         if(deg > 5):
             ILtilde += tuple([(0, leg(j, y_mid) * leg(deg - j - 4, z_mid) * dx[0] * dx[1] * dz[0] * dz[1],
                                -leg(j - 1, y_mid) * leg(deg - j - 3, z_mid) * dx[0] * dx[1] * dy[0] * dy[1])])
-    return ILtilde       
+    return ILtilde
 
 
-#This is always 1-forms regardless of 2 or 3 dimensions.
+# This is always 1-forms regardless of 2 or 3 dimensions.
 class TrimmedSerendipityEdge(TrimmedSerendipity):
     def __init__(self, ref_el, degree):
         if degree < 1:
@@ -489,11 +488,11 @@ class TrimmedSerendipityEdge(TrimmedSerendipity):
                                                                                                   y_mid, z_mid)
             else:
                 IL = ()
-        
+
         Sminus_list = EL + FL
         if dim == 3:
             Sminus_list = Sminus_list + IL
-        
+
         if dim == 2:
             self.basis = {(0, 0): Array(Sminus_list)}
         else:
@@ -517,7 +516,7 @@ class TrimmedSerendipityFace(TrimmedSerendipity):
         dy = ((verts[-1][1] - y)/(verts[-1][1] - verts[0][1]), (y - verts[0][1])/(verts[-1][1] - verts[0][1]))
         x_mid = 2*x-(verts[-1][0] + verts[0][0])
         y_mid = 2*y-(verts[-1][1] + verts[0][1])
-        
+
         EL = e_lambda_1_2d_part_one(degree, dx, dy, x_mid, y_mid)
         if degree >= 2:
             FL = trimmed_f_lambda_2d(degree, dx, dy, x_mid, y_mid)

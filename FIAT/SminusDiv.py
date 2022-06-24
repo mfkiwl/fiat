@@ -1,4 +1,3 @@
-#Working on 3d trimmed serendipity 2 forms now.
 from sympy import symbols, legendre, Array, diff
 import numpy as np
 from FIAT.finite_element import FiniteElement
@@ -14,6 +13,7 @@ leg = legendre
 def triangular_number(n):
     return int((n+1)*n/2)
 
+
 def choose_ijk_total(degree):
     top = 1
     for i in range(1, 2 + degree + 1):
@@ -21,7 +21,7 @@ def choose_ijk_total(degree):
     bottom = 1
     for i in range(1, degree + 1):
         bottom = i * bottom
-    return int(top /(2 * bottom))
+    return int(top / (2 * bottom))
 
 
 class TrimmedSerendipity(FiniteElement):
@@ -33,7 +33,7 @@ class TrimmedSerendipity(FiniteElement):
         dim = flat_el.get_spatial_dimension()
         self.fdim = dim
         if dim != 3:
-            if dim !=2:
+            if dim != 2:
                 raise Exception("Trimmed serendipity elements only valid for dimensions 2 and 3")
 
         flat_topology = flat_el.get_topology()
@@ -44,7 +44,7 @@ class TrimmedSerendipity(FiniteElement):
             for entity in entities:
                 entity_ids[top_dim][entity] = []
 
-        #3-d case.
+        # 3-d case.
         if dim == 3:
             entity_ids[3] = {}
             for j in sorted(flat_topology[2]):
@@ -60,7 +60,6 @@ class TrimmedSerendipity(FiniteElement):
             if (degree == 4):
                 interior_tilde_ids += choose_ijk_total(degree - 2) - (degree - 1) - (degree - 1) + 1
             if (degree > 4):
-                #interior_tilde_ids += choose_ijk_total(degree - 2) - (2 * degree - 1)
                 interior_tilde_ids += choose_ijk_total(degree - 2) - (degree - 1) - (degree - 1) + 1
             if degree == 1:
                 interior_tilde_ids = 0
@@ -73,7 +72,6 @@ class TrimmedSerendipity(FiniteElement):
 
             if(degree >= 2):
                 entity_ids[2][0] = list(range(cur, cur + 2*triangular_number(degree - 2) + degree))
-                #entity_ids[2][0] = list(range(cur, cur + 2*triangular_number(degree - 2)))
 
             cur += 2*triangular_number(degree - 2) + degree
         formdegree = dim - 1
@@ -177,7 +175,7 @@ class TrimmedSerendipityDiv(TrimmedSerendipity):
         flat_el = flatten_reference_cube(ref_el)
         dim = flat_el.get_spatial_dimension()
         if dim != 2:
-            if dim !=3:
+            if dim != 3:
                 raise Exception("Trimmed serendipity face elements only valid for dimensions 2 and 3")
 
         verts = flat_el.get_vertices()
@@ -201,19 +199,15 @@ class TrimmedSerendipityDiv(TrimmedSerendipity):
             Sminus_list = FL + IL
             self.basis = {(0, 0, 0): Array(Sminus_list)}
             super(TrimmedSerendipityDiv, self).__init__(ref_el=ref_el, degree=degree, mapping="contravariant piola")
-    
+
         else:
-            ##Put all 2 dimensional stuff here.
+            # Put all 2 dimensional stuff here.
             if degree < 1:
                 raise Exception("Trimmed serendipity face elements only valid for k >= 1")
 
-            #flat_el = flatten_reference_cube(ref_el)
-            #verts = flat_el.get_vertices()
-        
             EL = e_lambda_1_2d_part_one(degree, dx, dy, x_mid, y_mid)
             if degree >= 2:
                 FL = trimmed_f_lambda_2d(degree, dx, dy, x_mid, y_mid)
-                #FL = F_lambda_1_2d(degree, dx, dy, x_mid, y_mid)
             else:
                 FL = ()
             Sminus_list = EL + FL
@@ -222,54 +216,11 @@ class TrimmedSerendipityDiv(TrimmedSerendipity):
             super(TrimmedSerendipityDiv, self).__init__(ref_el=ref_el, degree=degree, mapping="contravariant piola")
 
 
-""" def f_lambda_2_3d_pieces(deg, dx, dy, dz, x_mid, y_mid, z_mid):
-    FLpiece = tuple([])
-    #Dx's first.
-    for k in range(0, 2):
-        for i in range(0, deg):
-            for j in range(0, i + 1):
-                FLpiece += tuple([(leg(j, y_mid) * leg(i - j, z_mid) * dx[k], 0, 0)])
-    for k in range(0, 2):
-        for i in range(0, deg):
-            for j in range(0, i + 1):
-                FLpiece += tuple([(0, leg(j, x_mid) * leg(i - j, z_mid) * dy[k], 0)])
-    for k in range(0, 2):
-        for i in range(0, deg):
-            for j in range(0, i + 1):
-                FLpiece += tuple([(0, 0, leg(j, x_mid) * leg(i - j, y_mid) * dz[k])])
-    return FLpiece """
-
-
-""" def f_lambda_2_3d_pieces(deg, dx, dy, dz, x_mid, y_mid, z_mid):
-    FLpiece = tuple([])
-    #Dx's first.
-    for k in range(0, 2):
-        for i in range(0, deg):
-            for j in range(0, i + 1):
-                FLpiece += tuple([(0, 0, leg(j, x_mid) * leg(i - j, y_mid) * dz[k])])
-    for k in range(0, 2):
-        for i in range(0, deg):
-            for j in range(0, i + 1):
-                FLpiece += tuple([(0, leg(j, x_mid) * leg(i - j, z_mid) * dy[k], 0)])
-    for k in range(0, 2):
-        for i in range(0, deg):
-            for j in range(0, i + 1):
-                FLpiece += tuple([(leg(j, y_mid) * leg(i - j, z_mid) * dx[k], 0, 0)])
-    return FLpiece
-
-
-def f_lambda_2_3d(degree, dx, dy, dz, x_mid, y_mid, z_mid):
-    FL = tuple([])
-    #for j in range(0, degree):
-    #    FL += f_lambda_2_3d_pieces(j, dx, dy, dz, x_mid, y_mid, z_mid)
-    FL += f_lambda_2_3d_pieces(degree, dx, dy, dz, x_mid, y_mid, z_mid)
-    return FL """
-
 def f_lambda_2_3d(degree, dx, dy, dz, x_mid, y_mid, z_mid):
 
     FL = tuple([(-leg(j, y_mid) * leg(k, z_mid) * a, 0, 0)
                 for a in dx for k in range(0, degree) for j in range(0, degree - k)] +
-               [(0, leg(j, x_mid) * leg(k, z_mid) * b, 0) 
+               [(0, leg(j, x_mid) * leg(k, z_mid) * b, 0)
                 for b in dy for k in range(0, degree) for j in range(0, degree - k)] +
                [(0, 0, -leg(j, x_mid) * leg(k, y_mid) * c)
                 for c in dz for k in range(0, degree) for j in range(0, degree - k)])
@@ -279,29 +230,15 @@ def f_lambda_2_3d(degree, dx, dy, dz, x_mid, y_mid, z_mid):
 def I_lambda_2_3d_pieces(current_deg, dx, dy, dz, x_mid, y_mid, z_mid):
     assert current_deg > 1, 'invalid for i = 1'
     ILpiece = tuple([])
-    for j in range(0, current_deg -1):
+    for j in range(0, current_deg - 1):
         for k in range(0, current_deg - 1 - j):
             ILpiece += tuple([(0, 0, -leg(j, x_mid) * leg(k, y_mid) * leg(current_deg - 2 - j - k, z_mid) *
-                            dz[0] * dz[1])]+
-                            [(0, -leg(j, x_mid) * leg(k, y_mid) * leg(current_deg - 2 - j - k, z_mid) *
-                            dy[0] * dy[1] ,0)] +
-                            [(-leg(j, x_mid) * leg(k, y_mid) * leg(current_deg - 2 - j - k, z_mid) * dx[0] *
-                            dx[1], 0, 0)])
+                               dz[0] * dz[1])] +
+                             [(0, -leg(j, x_mid) * leg(k, y_mid) * leg(current_deg - 2 - j - k, z_mid) *
+                               dy[0] * dy[1], 0)] +
+                             [(-leg(j, x_mid) * leg(k, y_mid) * leg(current_deg - 2 - j - k, z_mid) * dx[0] *
+                               dx[1], 0, 0)])
     return ILpiece
-
-""" def i_lambda_2_3d_normal(degree, dx, dy, dz, x_mid, y_mid, z_mid):
-
-    IL = tuple([(-leg(l-2-j, x_mid) * leg(j-k, y_mid) * leg(k, z_mid) *
-                dx[0] * dx[1], 0, 0)
-                for l in range(2, degree) for j in range(l-1) for k in range(j+1)] +
-               [(0,-leg(l-2-j, x_mid) * leg(j-k, y_mid) * leg(k, z_mid) *
-                dy[0] * dy[1], 0, 0)
-                for l in range(2, degree) for j in range(l-1) for k in range(j+1)] +
-               [(0, 0, -leg(l-2-j, x_mid) * leg(j-k, y_mid) * leg(k, z_mid) *
-                dz[0] * dz[1])
-                for l in range(2, degree) for j in range(l-1) for k in range(j+1)])
-
-    return IL   """ 
 
 
 def I_lambda_2_3d_tilde(degree, dx, dy, dz, x_mid, y_mid, z_mid):
@@ -310,15 +247,15 @@ def I_lambda_2_3d_tilde(degree, dx, dy, dz, x_mid, y_mid, z_mid):
                      [(0, leg(degree - 2, y_mid) * dy[0] * dy[1], 0)] +
                      [(leg(degree - 2, x_mid) * dx[0] * dx[1], 0, 0)])
     IL_tilde += tuple([(leg(degree - j - 2, x_mid) * leg(j, y_mid) * dx[0] * dx[1], leg(degree - j - 1, x_mid) *
-                      leg(j - 1, y_mid) * dy[0] * dy[1], 0) for j in range(1, degree - 1)] +
+                        leg(j - 1, y_mid) * dy[0] * dy[1], 0) for j in range(1, degree - 1)] +
                       [(leg(degree - j - 2, x_mid) * leg(j, z_mid) * dx[0] * dx[1], 0, leg(degree - j - 1, x_mid) *
-                      leg(j - 1, z_mid) * dz[0] * dz[1]) for j in range(1, degree - 1)] +
+                        leg(j - 1, z_mid) * dz[0] * dz[1]) for j in range(1, degree - 1)] +
                       [(0, leg(degree - j - 2, y_mid) * leg(j, z_mid) * dy[0] * dy[1], leg(degree - j - 1, y_mid) *
-                      leg(j - 1, z_mid) * dz[0] * dz[1]) for j in range(1, degree - 1)])
+                        leg(j - 1, z_mid) * dz[0] * dz[1]) for j in range(1, degree - 1)])
     for k in range(1, degree - 2):
         for l in range(1, degree - 1 - k):
             j = degree - 2 - k - l
-            IL_tilde += tuple([(-leg(j, x_mid) * leg(k, y_mid) * leg(l, z_mid) * dx[0] * dx[1], 
+            IL_tilde += tuple([(-leg(j, x_mid) * leg(k, y_mid) * leg(l, z_mid) * dx[0] * dx[1],
                                 leg(j + 1, x_mid) * leg(k - 1, y_mid) * leg(l, z_mid) * dy[0] * dy[1],
                                 -leg(j + 1, x_mid) * leg(k, y_mid) * leg(l - 1, z_mid) * dz[0] * dz[1])])
     return IL_tilde
@@ -328,11 +265,11 @@ def I_lambda_2_3d(degree, dx, dy, dz, x_mid, y_mid, z_mid):
     IL = tuple([])
     for j in range(2, degree):
         IL += I_lambda_2_3d_pieces(j, dx, dy, dz, x_mid, y_mid, z_mid)
-    #IL += i_lambda_2_3d_normal(degree, dx, dy, dz, x_mid, y_mid, z_mid)
     IL += I_lambda_2_3d_tilde(degree, dx, dy, dz, x_mid, y_mid, z_mid)
     return IL
 
-#Everything for 2-d should work already.
+
+# Everything for 2-d should work already.
 def e_lambda_1_2d_part_one(deg, dx, dy, x_mid, y_mid):
     EL = tuple(
         [(0, -leg(j, y_mid) * dx[0]) for j in range(deg)] +
@@ -417,9 +354,7 @@ def F_lambda_1_2d(deg, dx, dy, x_mid, y_mid):
 
 
 def trimmed_f_lambda_2d(deg, dx, dy, x_mid, y_mid):
-    #FL = f_lambda_1_2d_trim(deg, dx, dy, x_mid, y_mid)
     FL = F_lambda_1_2d(deg, dx, dy, x_mid, y_mid)
     FLT = f_lambda_1_2d_tilde(deg, dx, dy, x_mid, y_mid)
     result = FL + FLT
- #   return FL
     return result
