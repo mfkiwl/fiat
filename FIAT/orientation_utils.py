@@ -1,4 +1,5 @@
 import itertools
+from collections.abc import Sequence
 import numpy as np
 
 
@@ -62,6 +63,56 @@ def make_entity_permutations_simplex(dim, npoints):
     return perms
 
 
+def _make_axis_perms_tensorproduct(cells, dim):
+    """Return axis permutations for extrinsic orientations for the tensorproduct (sub)cell.
+
+    :arg cells: The cells composing the tensorproduct cell.
+    :arg dim: The (sub)dimensions of each component cell that makes up the tensorproduct (sub)cell.
+    :returns: The tuple of axis permutations for all possible extrinsic orientations.
+
+    Notes
+    -----
+    This is the single sources of extrinsic orientations and corresponding axis permutations.
+
+    """
+    from FIAT.reference_element import UFCInterval
+
+    # Handle extrinsic orientations.
+    # This is complex and we need to think to make this function more general.
+    # One interesting case is pyramid x pyramid. There are two types of facets
+    # in a pyramid cell, quad and triangle, and two types of intervals, ones
+    # attached to quad (Iq) and ones attached to triangles (It). When we take
+    # a tensor product of two pyramid cells, there are different kinds of tensor
+    # product of intervals, i.e., Iq x Iq, Iq x It, It x Iq, It x It, and we
+    # need a careful thought on how many possible extrinsic orientations we need
+    # to consider for each.
+    # For now we restrict ourselves to specific cases.
+    nprod = len(cells)
+    if len(set(cells)) == nprod:
+        # All components have different cells.
+        # Example: triangle x interval.
+        #          dim == (2, 1) ->
+        #          triangle x interval (1 possible extrinsic orientation).
+        axis_perms = (tuple(range(nprod)), )  # Identity: no permutations
+    elif len(set(cells)) == 1 and isinstance(cells[0], UFCInterval):
+        # Tensor product of intervals.
+        # Example: interval x interval x interval x interval
+        #          dim == (0, 1, 1, 1) ->
+        #          point x interval x interval x interval  (1! * 3! possible extrinsic orientations).
+        axis_perms = sorted(itertools.permutations(range(nprod)))
+        for idim, d in enumerate(dim):
+            if d == 0:
+                # idim-th component does not contribute to the extrinsic orientation.
+                axis_perms = [ap for ap in axis_perms if ap[idim] == idim]
+    else:
+        # More general tensor product cells.
+        # Example: triangle x quad x triangle x triangle x interval x interval
+        #          dim == (2, 2, 2, 2, 1, 1) ->
+        #          triangle x quad x triangle x triangle x interval x interval (3! * 1! * 2! possible extrinsic orientations).
+        raise NotImplementedError(f"Unable to compose permutations for {' x '.join([str(cell) for cell in cells])}")
+    return axis_perms
+
+
 def make_entity_permutations_tensorproduct(cells, dim, o_p_maps):
     """Make orientation-permutation map for an entity of a tensor product cell.
 
@@ -98,43 +149,10 @@ def make_entity_permutations_tensorproduct(cells, dim, o_p_maps):
         #  (1, 1, 1): [3, 1, 2, 0]}
 
     """
-    from FIAT.reference_element import UFCInterval
-
-    # Handle extrinsic orientations.
-    # This is complex and we need to think to make this function more general.
-    # One interesting case is pyramid x pyramid. There are two types of facets
-    # in a pyramid cell, quad and triangle, and two types of intervals, ones
-    # attached to quad (Iq) and ones attached to triangles (It). When we take
-    # a tensor product of two pyramid cells, there are different kinds of tensor
-    # product of intervals, i.e., Iq x Iq, Iq x It, It x Iq, It x It, and we
-    # need a careful thought on how many possible extrinsic orientations we need
-    # to consider for each.
-    # For now we restrict ourselves to specific cases.
     nprod = len(o_p_maps)
     assert len(cells) == nprod
     assert len(dim) == nprod
-    if len(set(cells)) == nprod:
-        # All components have different cells.
-        # Example: triangle x interval.
-        #          dim == (2, 1) ->
-        #          triangle x interval (1 possible extrinsic orientation).
-        axis_perms = (tuple(range(nprod)), )  # Identity: no permutations
-    elif len(set(cells)) == 1 and isinstance(cells[0], UFCInterval):
-        # Tensor product of intervals.
-        # Example: interval x interval x interval x interval
-        #          dim == (0, 1, 1, 1) ->
-        #          point x interval x interval x interval  (1! * 3! possible extrinsic orientations).
-        axis_perms = sorted(itertools.permutations(range(nprod)))
-        for idim, d in enumerate(dim):
-            if d == 0:
-                # idim-th component does not contribute to the extrinsic orientation.
-                axis_perms = [ap for ap in axis_perms if ap[idim] == idim]
-    else:
-        # More general tensor product cells.
-        # Example: triangle x quad x triangle x triangle x interval x interval
-        #          dim == (2, 2, 2, 2, 1, 1) ->
-        #          triangle x quad x triangle x triangle x interval x interval (3! * 1! * 2! possible extrinsic orientations).
-        raise NotImplementedError(f"Unable to compose permutations for {' x '.join([str(cell) for cell in cells])}")
+    axis_perms = _make_axis_perms_tensorproduct(cells, dim)
     o_tuple_perm_map = {}
     for eo, ap in enumerate(axis_perms):
         for o_tuple in itertools.product(*[o_p_map.keys() for o_p_map in o_p_maps]):
@@ -164,3 +182,48 @@ def make_entity_permutations_tensorproduct(cells, dim, o_p_maps):
                 a = np.moveaxis(a, range(nprod), apinv)
                 o_tuple_perm_map[(eo, ) + o_tuple] = a.reshape(-1).tolist()
     return o_tuple_perm_map
+
+
+def check_permutation_even_or_odd(_l):
+    """Check if the given permutation is even or odd relative to ``[0, 1, ...)``.
+
+    :arg _l: The permutation.
+    :returns: ``0`` if even and ``1`` if odd.
+
+    """
+    assert isinstance(_l, Sequence), "The permutation must be Sequence"
+    l = list(_l).copy()
+    count = 0
+    for i in range(len(l)):
+        if l[i] != i:
+            ii = l.index(i)
+            l[ii] = l[i]
+            l[i] = i
+            count += 1
+    assert l == sorted(list(_l))
+    return count % 2
+
+
+def make_cell_orientation_reflection_map_simplex(dim):
+    npoints = 2
+    o_p_map = make_entity_permutations_simplex(dim, npoints)
+    cell_orientation_reflection_map = {}
+    for o, p in o_p_map.items():
+        reflected = check_permutation_even_or_odd(p)
+        cell_orientation_reflection_map[o] = reflected
+    assert cell_orientation_reflection_map[0] == 0, "Orientation 0 is expected to have no reflection"
+    return cell_orientation_reflection_map
+
+
+def make_cell_orientation_reflection_map_tensorproduct(cells):
+    dim = [cell.get_dimension() for cell in cells]
+    axis_perms = _make_axis_perms_tensorproduct(cells, dim)
+    cell_orientation_reflection_map = {}
+    for eo, ap in enumerate(axis_perms):
+        # If ap has odd permutation, the associated extrinsic orientation (eo) introduces reflection.
+        reflected_eo = check_permutation_even_or_odd(ap)
+        for o_tuple in itertools.product(*[cell.cell_orientation_reflection_map().keys() for cell in cells]):
+            reflected_io_list = [cell.cell_orientation_reflection_map()[o] for cell, o in zip(cells, o_tuple)]
+            reflected = (reflected_eo + sum(reflected_io_list)) % 2
+            cell_orientation_reflection_map[(eo, ) + o_tuple] = reflected
+    return cell_orientation_reflection_map
