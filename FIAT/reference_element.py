@@ -160,7 +160,7 @@ class Cell(object):
         return None
 
     def __eq__(self, other):
-        return type(self) == type(other) and self._key() == other._key()
+        return type(self) is type(other) and self._key() == other._key()
 
     def __ne__(self, other):
         return not self.__eq__(other)
@@ -667,7 +667,9 @@ class UFCSimplex(Simplex):
         # sum(bary-abs(bary)) = -4.
         # - 0.5 * sum(bary-abs(bary)) = 2.0
         # which is the correct L1 distance from the cell to the point.
-        return - 0.5 * sum([b - abs(b) for b in bary])
+        l1_dist = - 0.5 * sum([b - abs(b) for b in bary])
+        # Take abs at the end to avoid negative zero.
+        return abs(l1_dist)
 
 
 class Point(Simplex):
