@@ -80,7 +80,7 @@ def recursive(alpha, family):
     if xn is None:
         return b
     if d == 2:
-        b[:] = xn[[alpha[0], alpha[1]]]
+        b[:] = xn[alpha]
         return b
     weight = 0.0
     for i in range(d):
