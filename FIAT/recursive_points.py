@@ -22,8 +22,40 @@ import numpy
 }
 """
 
+def multiindex_equal(d, k):
+    """A generator for :math:`d`-tuple multi-indices whose sum is :math:`k`.
+
+    Args:
+        d (int): The length of the tuples
+        k (int): The sum of the entries in the tuples
+
+    Yields:
+        tuple: tuples of length `d` whose entries sum to `k`, in lexicographic
+        order.
+
+    Example:
+        >>> for i in multiindex_equal(3, 2): print(i)
+        (0, 0, 2)
+        (0, 1, 1)
+        (0, 2, 0)
+        (1, 0, 1)
+        (1, 1, 0)
+        (2, 0, 0)
+    """
+    if d <= 0:
+        return
+    if k < 0:
+        return
+    for i in range(k):
+        for a in multiindex_equal(d-1, k-i):
+            yield (i,) + a
+    yield (k,) + (0,)*(d-1)
+
+
 class NodeFamily:
-    """ Family of nodes on the unit interval.  This class essentially is a lazy-evaluate-and-cache dictionary: the user passes a routine to evaluate entries for unknown keys """
+    """ Family of nodes on the unit interval.  This class essentially is a
+    lazy-evaluate-and-cache dictionary: the user passes a routine to evaluate
+    entries for unknown keys """
 
     def __init__(self, f):
         self._f = f
@@ -38,23 +70,24 @@ class NodeFamily:
             return value
 
 
-def recursive(d, n, alpha, family):
+def recursive(alpha, family):
     '''The barycentric d-simplex coordinates for a
     multiindex alpha with length n, based on a 1D node family.'''
-    b = numpy.zeros((d,), dtype="d")
-
+    d = len(alpha)
+    n = sum(alpha)
     xn = family[n]
+    b = numpy.zeros((d,), dtype="d")
     if xn is None:
         return b
     if d == 2:
-        b[:] = xn[[alpha[0],alpha[1]]]
+        b[:] = xn[[alpha[0], alpha[1]]]
         return b
     weight = 0.0
     for i in range(d):
-        alpha_noti = alpha[:i] + alpha[i+1:]
         n_noti = n - alpha[i]
+        alpha_noti = alpha[:i] + alpha[i+1:]
+        br = recursive(alpha_noti, family)
         w = xn[n_noti]
-        br = recursive(d-1, n_noti, alpha_noti, family)
         b[:i] += w * br[:i]
         b[i+1:] += w * br[i:]
         weight += w
@@ -76,27 +109,27 @@ def recursive_points(ref_el, order, rule="gll", interior=0):
     verts = ref_el.vertices
     tdim = len(verts) - 1
     vs = numpy.array(verts)
-    hs = vs[:-1, :] - vs[-1]
-
-    get_point = lambda alpha: tuple(numpy.dot(recursive(tdim, order, alpha, family), hs) + vs[-1])
-    alphas = reference_element.lattice_iter(interior, order + 1 - interior, tdim)
-    return list(map(get_point, alphas))
+    affine_map = lambda x: numpy.dot(x, vs)
+    get_point = lambda alpha: tuple(affine_map(recursive(alpha, family)))
+    return list(map(get_point, multiindex_equal(tdim+1, order)))
 
 
 if __name__ == "__main__":
+    from matplotlib import pyplot as plt
     ref_el = reference_element.ufc_simplex(2)
     h = 0.5 * numpy.sqrt(3)
-    #ref_el.vertices = [(0, h), (-1.0, -h), (1.0, -h)]
+    ref_el.vertices = [(0, h), (-1.0, -h), (1.0, -h)]
 
-    order = 7
+    order = 5
     rule = "gll"
     pts = recursive_points(ref_el, order, rule=rule)
-    from matplotlib import pyplot as plt
-
     x = []
     y = []
     for p in pts:
         x.append(p[0])
         y.append(p[1])
+
     plt.scatter(x, y)
+
+    plt.gca().set_aspect('equal', 'box')
     plt.show()
