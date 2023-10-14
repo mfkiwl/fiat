@@ -25,34 +25,17 @@ import numpy
 
 def multiindex_equal(d, k, interior=0):
     """A generator for :math:`d`-tuple multi-indices whose sum is :math:`k`.
-
-    Args:
-        d (int): The length of the tuples
-        k (int): The sum of the entries in the tuples
-
-    Yields:
-        tuple: tuples of length `d` whose entries sum to `k`, in lexicographic
-        order.
-
-    Example:
-        >>> for i in multiindex_equal(3, 2): print(i)
-        (0, 0, 2)
-        (0, 1, 1)
-        (0, 2, 0)
-        (1, 0, 1)
-        (1, 1, 0)
-        (2, 0, 0)
     """
     if d <= 0:
         return
-    kmin = interior
-    kmax = k - (d-1) * kmin
-    if kmax < kmin:
+    imin = interior
+    imax = k - (d-1) * imin
+    if imax < imin:
         return
-    for i in range(kmin, kmax):
-        for a in multiindex_equal(d-1, k-i, interior=kmin):
+    for i in range(imin, imax):
+        for a in multiindex_equal(d-1, k-i, interior=imin):
             yield (i,) + a
-    yield (kmax,) + (kmin,)*(d-1)
+    yield (imax,) + (imin,)*(d-1)
 
 
 class NodeFamily:

@@ -95,4 +95,4 @@ def get_expansion_set(ref_el, pts):
     if ref_el.get_shape() == reference_element.LINE:
         return LagrangeLineExpansionSet(ref_el, pts)
     else:
-        raise Exception("Unknown reference element type.")
+        raise ValueError("Invalid reference element type.")
