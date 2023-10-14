@@ -23,19 +23,21 @@ import pytest
 import numpy as np
 
 
-@pytest.mark.parametrize("degree", range(1, 7))
-def test_gl_basis_values(degree):
+@pytest.mark.parametrize("degree", range(1, 5))
+@pytest.mark.parametrize("dim", range(1, 4))
+def test_gl_basis_values(dim, degree):
     """Ensure that integrating a simple monomial produces the expected results."""
     from FIAT import ufc_simplex, GaussLegendre, make_quadrature
 
-    s = ufc_simplex(1)
+    s = ufc_simplex(dim)
     q = make_quadrature(s, degree + 1)
 
     fe = GaussLegendre(s, degree)
-    tab = fe.tabulate(0, q.pts)[(0,)]
+    tab = fe.tabulate(0, q.pts)[(0,)*dim]
 
     for test_degree in range(degree + 1):
-        coefs = [n(lambda x: x[0]**test_degree) for n in fe.dual.nodes]
+        v = lambda x: x[0]**test_degree
+        coefs = [n(v) for n in fe.dual.nodes]
         integral = np.dot(coefs, np.dot(tab, q.wts))
         reference = np.dot([x[0]**test_degree
                             for x in q.pts], q.wts)

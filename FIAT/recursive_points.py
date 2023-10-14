@@ -45,14 +45,14 @@ def multiindex_equal(d, k, interior=0):
     """
     if d <= 0:
         return
-    m = (d-1) * interior
-    if k <= m:
+    kmin = interior
+    kmax = k - (d-1) * kmin
+    if kmax < kmin:
         return
-    for i in range(interior, k - interior):
-        for a in multiindex_equal(d-1, k-i, interior=interior):
+    for i in range(kmin, kmax):
+        for a in multiindex_equal(d-1, k-i, interior=kmin):
             yield (i,) + a
-    if m < interior + 1:
-        yield (k - m,) + (interior,)*(d-1)
+    yield (kmax,) + (kmin,)*(d-1)
 
 
 class NodeFamily:
