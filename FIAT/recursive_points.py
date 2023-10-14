@@ -22,6 +22,7 @@ import numpy
 }
 """
 
+
 def multiindex_equal(d, k, interior=0):
     """A generator for :math:`d`-tuple multi-indices whose sum is :math:`k`.
 
