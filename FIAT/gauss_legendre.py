@@ -49,11 +49,12 @@ class GaussLegendre(finite_element.CiarletElement):
             raise ValueError("Gauss-Legendre elements are only defined on simplices.")
         dual = GaussLegendreDualSet(ref_el, degree)
         if ref_el.shape == LINE:
-            pts = []
-            for phi in dual.nodes:
-                pt, = phi.pt_dict.keys()
-                pts.append(pt)
-            poly_set = LagrangePolynomialSet(ref_el, pts)
+            points = []
+            for node in dual.nodes:
+                # Assert singleton point for each node.
+                pt, = node.get_point_dict().keys()
+                points.append(pt)
+            poly_set = LagrangePolynomialSet(ref_el, points)
         else:
             poly_set = polynomial_set.ONPolynomialSet(ref_el, degree)
         formdegree = ref_el.get_spatial_dimension()  # n-form

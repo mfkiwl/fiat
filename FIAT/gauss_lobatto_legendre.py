@@ -57,7 +57,7 @@ class GaussLobattoLegendre(finite_element.CiarletElement):
             points = []
             for node in dual.nodes:
                 # Assert singleton point for each node.
-                pt, = node.pt_dict.keys()
+                pt, = node.get_point_dict().keys()
                 points.append(pt)
             poly_set = LagrangePolynomialSet(ref_el, points)
         else:
