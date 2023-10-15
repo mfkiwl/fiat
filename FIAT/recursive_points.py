@@ -34,8 +34,8 @@ def multiindex_equal(d, k, interior=0):
         return
     for i in range(imin, imax):
         for a in multiindex_equal(d-1, k-i, interior=imin):
-            yield (i,) + a
-    yield (imax,) + (imin,)*(d-1)
+            yield a + (i,)
+    yield (imin,)*(d-1) + (imax,)
 
 
 class NodeFamily:
@@ -51,9 +51,13 @@ class NodeFamily:
         try:
             return self._cache[key]
         except KeyError:
-            value = self._f(key)
-            self._cache[key] = value
-            return value
+            x = self._f(key)
+            if x is None:
+                x_ro = x
+            else:
+                x_ro = numpy.array(x).flatten()
+                x_ro.setflags(write=False)
+            return self._cache.setdefault(key, x_ro)
 
 
 def make_node_family(family):
@@ -64,10 +68,10 @@ def make_node_family(family):
         f = lambda n: numpy.linspace(1.0/(n+2.0), (n+1.0)/(n+2.0), n + 1)
     elif family == "gl":
         lr = quadrature.GaussLegendreQuadratureLineRule
-        f = lambda n: numpy.array(lr(line, n + 1).pts).flatten()
+        f = lambda n: lr(line, n + 1).pts
     elif family == "gll":
         lr = quadrature.GaussLobattoLegendreQuadratureLineRule
-        f = lambda n: numpy.array(lr(line, n + 1).pts).flatten() if n else None
+        f = lambda n: lr(line, n + 1).pts if n else None
     else:
         raise ValueError("Invalid node family %s" % family)
     return NodeFamily(f)

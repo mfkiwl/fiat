@@ -17,12 +17,11 @@ from FIAT.recursive_points import make_node_family, recursive_points
 
 class GaussLegendreDualSet(dual_set.DualSet):
     """The dual basis for 1D discontinuous elements with nodes at the
-    Gauss-Legendre points."""
+    (recursive) Gauss-Legendre points."""
     node_family = make_node_family("gl")
 
     def __init__(self, ref_el, degree):
         entity_ids = {}
-        nodes = []
         entity_permutations = {}
 
         # make nodes by getting points
@@ -40,7 +39,6 @@ class GaussLegendreDualSet(dual_set.DualSet):
         pts = recursive_points(self.node_family, ref_el.vertices, degree)
         nodes = [functional.PointEvaluation(ref_el, x) for x in pts]
         entity_ids[dim][0] = list(range(len(nodes)))
-
         super(GaussLegendreDualSet, self).__init__(nodes, ref_el, entity_ids, entity_permutations)
 
 
@@ -51,7 +49,11 @@ class GaussLegendre(finite_element.CiarletElement):
             raise ValueError("Gauss-Legendre elements are only defined on simplices.")
         dual = GaussLegendreDualSet(ref_el, degree)
         if ref_el.shape == LINE:
-            poly_set = LagrangePolynomialSet(ref_el, dual.node_family[degree])
+            pts = []
+            for phi in dual.nodes:
+                pt, = phi.pt_dict.keys()
+                pts.append(pt)
+            poly_set = LagrangePolynomialSet(ref_el, pts)
         else:
             poly_set = polynomial_set.ONPolynomialSet(ref_el, degree)
         formdegree = ref_el.get_spatial_dimension()  # n-form

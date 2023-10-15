@@ -54,7 +54,12 @@ class GaussLobattoLegendre(finite_element.CiarletElement):
             raise ValueError("Gauss-Lobatto-Legendre elements are only defined on simplices.")
         dual = GaussLobattoLegendreDualSet(ref_el, degree)
         if ref_el.shape == LINE:
-            poly_set = LagrangePolynomialSet(ref_el, dual.node_family[degree])
+            points = []
+            for node in dual.nodes:
+                # Assert singleton point for each node.
+                pt, = node.pt_dict.keys()
+                points.append(pt)
+            poly_set = LagrangePolynomialSet(ref_el, points)
         else:
             poly_set = polynomial_set.ONPolynomialSet(ref_el, degree)
         formdegree = 0  # 0-form
