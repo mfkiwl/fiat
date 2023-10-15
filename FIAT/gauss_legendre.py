@@ -9,7 +9,7 @@
 # Modified by Pablo D. Brubeck (brubeck@protonmail.com), 2021
 
 from FIAT import finite_element, polynomial_set, dual_set, functional
-from FIAT.reference_element import LINE, TRIANGLE, TETRAHEDRON
+from FIAT.reference_element import POINT, LINE, TRIANGLE, TETRAHEDRON
 from FIAT.orientation_utils import make_entity_permutations_simplex
 from FIAT.barycentric_interpolation import LagrangePolynomialSet
 from FIAT.recursive_points import make_node_family, recursive_points
@@ -47,7 +47,7 @@ class GaussLegendreDualSet(dual_set.DualSet):
 class GaussLegendre(finite_element.CiarletElement):
     """Simplicial discontinuous element with nodes at the (recursive) Gauss-Legendre points."""
     def __init__(self, ref_el, degree):
-        if ref_el.shape not in {LINE, TRIANGLE, TETRAHEDRON}:
+        if ref_el.shape not in {POINT, LINE, TRIANGLE, TETRAHEDRON}:
             raise ValueError("Gauss-Legendre elements are only defined on simplices.")
         dual = GaussLegendreDualSet(ref_el, degree)
         if ref_el.shape == LINE:
