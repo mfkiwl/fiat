@@ -29,16 +29,23 @@ def test_gl_basis_values(dim, degree):
     from FIAT import ufc_simplex, GaussLegendre, make_quadrature
 
     s = ufc_simplex(dim)
-    q = make_quadrature(s, degree + 1)
+    r3 = 3.0 ** 0.5
+    r6 = 6.0 ** 0.5
+    if dim == 2:
+        s.vertices = [(0.0, 0.0), (-1.0, -r3), (1.0, -r3)]
+    elif dim == 3:
+        s.vertices = [(r3/3, 0.0, 0.0), (-r3/6, 0.5, 0.0),
+                      (-r3/6, -0.5, 0.0), (0.0, 0.0, r6/3)]
 
+    q = make_quadrature(s, degree + 1)
     fe = GaussLegendre(s, degree)
     tab = fe.tabulate(0, q.pts)[(0,)*dim]
 
     for test_degree in range(degree + 1):
-        v = lambda x: x[0]**test_degree
+        v = lambda x: sum(x)**test_degree
         coefs = [n(v) for n in fe.dual.nodes]
         integral = np.dot(coefs, np.dot(tab, q.wts))
-        reference = np.dot([x[0]**test_degree
+        reference = np.dot([sum(x)**test_degree
                             for x in q.pts], q.wts)
         assert np.allclose(integral, reference, rtol=1e-14)
 
