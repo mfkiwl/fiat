@@ -23,8 +23,7 @@ import pytest
 import numpy as np
 
 
-@pytest.mark.parametrize("degree", range(1, 5))
-@pytest.mark.parametrize("dim", range(1, 4))
+@pytest.mark.parametrize("dim, degree", sum(([pytest.param(d, k) for k in range(0, 8-d)] for d in range(1, 4)), []))
 def test_gl_basis_values(dim, degree):
     """Ensure that integrating a simple monomial produces the expected results."""
     from FIAT import ufc_simplex, GaussLegendre, make_quadrature
