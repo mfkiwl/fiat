@@ -37,15 +37,15 @@ class GaussLegendreDualSet(dual_set.DualSet):
         for dim in sorted(top):
             entity_ids[dim] = {}
             entity_permutations[dim] = {}
+            perms = make_entity_permutations_simplex(dim, degree + 1 if dim == len(top)-1 else -1)
             for entity in sorted(top[dim]):
                 entity_ids[dim][entity] = []
-                entity_permutations[dim][entity] = []
+                entity_permutations[dim][entity] = perms
 
         # make nodes by getting points
         pts = self.point_set.recursive_points(ref_el.get_vertices(), degree)
         nodes = [functional.PointEvaluation(ref_el, x) for x in pts]
         entity_ids[dim][0] = list(range(len(nodes)))
-        entity_permutations[dim][0] = make_entity_permutations_simplex(dim, degree + 1)
         super(GaussLegendreDualSet, self).__init__(nodes, ref_el, entity_ids, entity_permutations)
 
 

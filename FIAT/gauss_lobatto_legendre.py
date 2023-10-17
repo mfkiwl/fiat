@@ -16,7 +16,8 @@ from FIAT.barycentric_interpolation import LagrangePolynomialSet
 
 
 class GaussLobattoLegendrePointSet(recursive_points.RecursivePointSet):
-
+    """Recursive point set on simplices based on the Gauss-Lobatto points on
+    the interval"""
     def __init__(self):
         ref_el = UFCInterval()
         lr = quadrature.GaussLobattoLegendreQuadratureLineRule
