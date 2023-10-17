@@ -37,25 +37,26 @@ def multiindex_equal(d, isum, imin=0):
 
 
 class RecursivePointSet(object):
-    """Family of points on the unit interval.  This class essentially is a
+    """Class to construct recursive points on simplices based on a family of
+    points on the unit interval.  This class essentially is a
     lazy-evaluate-and-cache dictionary: the user passes a routine to evaluate
     entries for unknown keys """
 
-    def __init__(self, f):
-        self._f = f
+    def __init__(self, family):
+        self._family = family
         self._cache = {}
 
     def interval_points(self, degree):
         try:
             return self._cache[degree]
         except KeyError:
-            x = self._f(degree)
-            if x is None:
-                x_ro = x
-            else:
-                x_ro = numpy.array(x).flatten()
-                x_ro.setflags(write=False)
-            return self._cache.setdefault(degree, x_ro)
+            x = self._family(degree)
+            if x is not None:
+                if not isinstance(x, numpy.ndarray):
+                    x = numpy.array(x)
+                x = x.reshape((-1,))
+                x.setflags(write=False)
+            return self._cache.setdefault(degree, x)
 
     def _recursive(self, alpha):
         """The barycentric (d-1)-simplex coordinates for a
@@ -102,27 +103,20 @@ class RecursivePointSet(object):
             raise ValueError("illegal dimension")
 
 
-def make_recursive_point_set(family):
-    from FIAT import quadrature, reference_element
-    ref_el = reference_element.UFCInterval()
-    if family == "equispaced":
-        f = lambda n: numpy.linspace(0.0, 1.0, n + 1)
-    elif family == "dg_equispaced":
-        f = lambda n: numpy.linspace(1.0/(n+2.0), (n+1.0)/(n+2.0), n + 1)
-    elif family == "gl":
-        lr = quadrature.GaussLegendreQuadratureLineRule
-        f = lambda n: lr(ref_el, n + 1).pts
-    elif family == "gll":
-        lr = quadrature.GaussLobattoLegendreQuadratureLineRule
-        f = lambda n: lr(ref_el, n + 1).pts if n else None
-    else:
-        raise ValueError("Invalid node family %s" % family)
-    return RecursivePointSet(f)
-
-
 if __name__ == "__main__":
-    from FIAT import reference_element
+    from FIAT import reference_element, quadrature
     from matplotlib import pyplot as plt
+
+    interval = reference_element.UFCInterval()
+    cg = lambda n: numpy.linspace(0.0, 1.0, n + 1)
+    dg = lambda n: numpy.linspace(1.0/(n+2.0), (n+1.0)/(n+2.0), n + 1)
+    gll = lambda n: quadrature.GaussLegendreQuadratureLineRule(interval, n + 1).get_points()
+    gl = lambda n: quadrature.GaussLobattoLegendreQuadratureLineRule(interval, n + 1).get_points() if n else None
+
+    order = 11
+    cg_points = RecursivePointSet(gll)
+    dg_points = RecursivePointSet(gl)
+
     ref_el = reference_element.ufc_simplex(2)
     h = numpy.sqrt(3)
     s = 2*h/3
@@ -130,23 +124,13 @@ if __name__ == "__main__":
     x = numpy.array(ref_el.vertices + ref_el.vertices[:1])
     plt.plot(x[:, 0], x[:, 1], "k")
 
-    order = 7
-    rule = "gll"
-    dg_rule = "gl"
-
-    # rule = "equispaced"
-    # dg_rule = "dg_equispaced"
-
-    family = make_recursive_point_set(rule)
-    dg_family = make_recursive_point_set(dg_rule)
-
     for d in range(1, 4):
-        print(family.make_points(reference_element.ufc_simplex(d), d, 0, d))
+        assert cg_points.make_points(reference_element.ufc_simplex(d), d, 0, d) == []
 
     topology = ref_el.get_topology()
     for dim in topology:
         for entity in topology[dim]:
-            pts = family.make_points(ref_el, dim, entity, order)
+            pts = cg_points.make_points(ref_el, dim, entity, order)
             if len(pts):
                 x = numpy.array(pts)
                 for r in range(1, 3):
@@ -168,7 +152,7 @@ if __name__ == "__main__":
     x0 = sum(x[:d])/d
     plt.plot(x[:, 0], x[:, 1], "k")
 
-    pts = dg_family.recursive_points(ref_el.vertices, order)
+    pts = dg_points.recursive_points(ref_el.vertices, order)
     x = numpy.array(pts)
     for r in range(1, 3):
         th = r * (2*numpy.pi)/3

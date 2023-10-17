@@ -21,7 +21,7 @@ class GaussLobattoLegendrePointSet(recursive_points.RecursivePointSet):
     def __init__(self):
         ref_el = UFCInterval()
         lr = quadrature.GaussLobattoLegendreQuadratureLineRule
-        f = lambda n: lr(ref_el, n + 1).pts if n else None
+        f = lambda n: lr(ref_el, n + 1).get_points() if n else None
         super(GaussLobattoLegendrePointSet, self).__init__(f)
 
 
