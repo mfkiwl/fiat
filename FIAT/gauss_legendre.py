@@ -8,37 +8,44 @@
 #
 # Modified by Pablo D. Brubeck (brubeck@protonmail.com), 2021
 
-from FIAT import finite_element, polynomial_set, dual_set, functional
-from FIAT.reference_element import POINT, LINE, TRIANGLE, TETRAHEDRON
+from FIAT import (finite_element, polynomial_set, dual_set, functional,
+                  quadrature, recursive_points)
+from FIAT.reference_element import POINT, LINE, TRIANGLE, TETRAHEDRON, UFCInterval
 from FIAT.orientation_utils import make_entity_permutations_simplex
 from FIAT.barycentric_interpolation import LagrangePolynomialSet
-from FIAT.recursive_points import make_node_family, recursive_points
+
+
+class GaussLegendrePointSet(recursive_points.RecursivePointSet):
+    """Recursive point set on simplices based on the Gauss-Legendre points on
+    the interval"""
+    def __init__(self):
+        ref_el = UFCInterval()
+        lr = quadrature.GaussLegendreQuadratureLineRule
+        f = lambda n: lr(ref_el, n + 1).pts
+        super(GaussLegendrePointSet, self).__init__(f)
 
 
 class GaussLegendreDualSet(dual_set.DualSet):
-    """The dual basis for 1D discontinuous elements with nodes at the
+    """The dual basis for discontinuous elements with nodes at the
     (recursive) Gauss-Legendre points."""
-    node_family = make_node_family("gl")
+    point_set = GaussLegendrePointSet()
 
     def __init__(self, ref_el, degree):
         entity_ids = {}
         entity_permutations = {}
-
-        # make nodes by getting points
-        # need to do this dimension-by-dimension, facet-by-facet
         top = ref_el.get_topology()
-
         for dim in sorted(top):
             entity_ids[dim] = {}
             entity_permutations[dim] = {}
-            perms = make_entity_permutations_simplex(dim, degree + 1 if dim == len(top) - 1 else -1)
             for entity in sorted(top[dim]):
                 entity_ids[dim][entity] = []
-                entity_permutations[dim][entity] = perms
+                entity_permutations[dim][entity] = []
 
-        pts = recursive_points(self.node_family, ref_el.vertices, degree)
+        # make nodes by getting points
+        pts = self.point_set.recursive_points(ref_el.get_vertices(), degree)
         nodes = [functional.PointEvaluation(ref_el, x) for x in pts]
         entity_ids[dim][0] = list(range(len(nodes)))
+        entity_permutations[dim][0] = make_entity_permutations_simplex(dim, degree + 1)
         super(GaussLegendreDualSet, self).__init__(nodes, ref_el, entity_ids, entity_permutations)
 
 

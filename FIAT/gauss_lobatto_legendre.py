@@ -8,17 +8,26 @@
 #
 # Modified by Pablo D. Brubeck (brubeck@protonmail.com), 2021
 
-from FIAT import finite_element, polynomial_set, dual_set, functional
-from FIAT.reference_element import LINE, TRIANGLE, TETRAHEDRON
+from FIAT import (finite_element, polynomial_set, dual_set, functional,
+                  quadrature, recursive_points)
+from FIAT.reference_element import LINE, TRIANGLE, TETRAHEDRON, UFCInterval
 from FIAT.orientation_utils import make_entity_permutations_simplex
 from FIAT.barycentric_interpolation import LagrangePolynomialSet
-from FIAT.recursive_points import make_node_family, make_points
+
+
+class GaussLobattoLegendrePointSet(recursive_points.RecursivePointSet):
+
+    def __init__(self):
+        ref_el = UFCInterval()
+        lr = quadrature.GaussLobattoLegendreQuadratureLineRule
+        f = lambda n: lr(ref_el, n + 1).pts if n else None
+        super(GaussLobattoLegendrePointSet, self).__init__(f)
 
 
 class GaussLobattoLegendreDualSet(dual_set.DualSet):
-    """The dual basis for simplex continuous elements with nodes at the
+    """The dual basis for continuous elements with nodes at the
     (recursive) Gauss-Lobatto points."""
-    node_family = make_node_family("gll")
+    point_set = GaussLobattoLegendrePointSet()
 
     def __init__(self, ref_el, degree):
         entity_ids = {}
@@ -35,7 +44,7 @@ class GaussLobattoLegendreDualSet(dual_set.DualSet):
             entity_permutations[dim] = {}
             perms = {0: [0]} if dim == 0 else make_entity_permutations_simplex(dim, degree - dim)
             for entity in sorted(top[dim]):
-                pts_cur = make_points(self.node_family, ref_el, dim, entity, degree)
+                pts_cur = self.point_set.make_points(ref_el, dim, entity, degree)
                 nodes_cur = [functional.PointEvaluation(ref_el, x)
                              for x in pts_cur]
                 nnodes_cur = len(nodes_cur)
