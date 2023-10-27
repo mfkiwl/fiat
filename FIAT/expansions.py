@@ -459,26 +459,15 @@ def eta_cube(xi):
     return eta1, eta2, eta3
 
 
-from operator import mul
-from functools import reduce
 from math import prod
 
 
 def chain_rule(eta, dphi_deta):
     dim = len(eta)
-
-    dphi_dxi = list(map(sympy.Symbol, ("fx", "fy", "fz")[:dim]))
+    dphi_dxi = [dphi_deta[alpha] for alpha in reversed(sorted(dphi_deta)) if sum(alpha) == 1]
     for i in range(dim):
-        offdiag = [prod((1. - eta[k])*0.5 for k in range(j+1, dim) if k != i) * (1. + eta[j])*0.5 for j in range(i)]
-        dphi_dxi[i] += sum(reduce(mul, dphi_dxi[:i], offdiag))
-        dphi_dxi[i] /= prod((1. - eta[k])*0.5 for k in range(i+1, dim))
-    print(dphi_dxi)
-
-
-    dphi_dxi = [dphi_deta[alpha] for alpha in sorted(reversed(dphi_deta)) if sum(alpha) == 1]
-    for i in range(dim):
-        offdiag = [prod((1. - eta[k])*0.5 for k in range(j+1, dim) if k != i) * (1. + eta[j])*0.5 for j in range(i)]
-        dphi_dxi[i] += sum(reduce(mul, dphi_dxi[:i], offdiag))
+        for j in range(i):
+            dphi_dxi[i] += dphi_dxi[j] * (1. + eta[j])*0.5 * prod((1. - eta[k])*0.5 for k in range(j+1, dim) if k != i)
         dphi_dxi[i] /= prod((1. - eta[k])*0.5 for k in range(i+1, dim))
 
 
@@ -509,7 +498,7 @@ def dubiner_deriv_1d(order, dim, x):
     sd = (order + 1) * (order + 2) // 2
     dphi = numpy.zeros((sd, x.size), dtype=x.dtype)
     xhat = (1. - x) * 0.5
-    for j in range(order):
+    for j in range(order+1):
         n = order - j
         alpha = 2 * j + dim
         derivs = jacobi.eval_jacobi_deriv_batch(alpha, 0, n, x[:, None])
@@ -519,24 +508,23 @@ def dubiner_deriv_1d(order, dim, x):
             derivs += results * (-0.5*j)
             if j > 1:
                 derivs *= xhat ** (j - 1)
+
         indices = [flat_index(i, j) for i in range(n + 1)]
         dphi[indices, :] = derivs
     return dphi
 
 
-def dubiner_2d(order, xi, alphas=None):
-    if alphas is None:
-        alphas = [(0,) * 2]
+def dubiner_2d(order, xi):
     sd = (order + 1) * (order + 2) // 2
     eta = eta_square(numpy.transpose(xi))
     B = [dubiner_1d(order, k, eta_k) for k, eta_k in enumerate(eta)]
-    D = [None] * len(B)
-    if any(sum(alpha) > 0 for alpha in alphas):
-        D = [dubiner_deriv_1d(order, k, eta_k) for k, eta_k in enumerate(eta)]
-
+    D = [dubiner_deriv_1d(order, k, eta_k) for k, eta_k in enumerate(eta)]
     def idx(p, q):
         return (p + q) * (p + q + 1) // 2 + q
 
+    dim = len(eta)
+    alphas = [(0,) * dim]
+    alphas.extend(tuple(row) for row in numpy.eye(dim, dtype=int))
     tabulations = {}
     for alpha in alphas:
         T = [Bj if aj == 0 else Dj for aj, Bj, Dj in zip(alpha, B, D)]
@@ -548,25 +536,21 @@ def dubiner_2d(order, xi, alphas=None):
                 phi[idx(i, j)] = T[1][flat_index(j, i)] * Ti * scale
         tabulations[alpha] = phi
 
-    print(tabulations[(1,0)])
-    if len([alpha for alpha in alphas if sum(alpha) == 1]) == len(eta):
-        chain_rule(eta, tabulations)
-    print(tabulations[(1,0)])
+    chain_rule(eta, tabulations)
     return tabulations
 
 
-def dubiner_3d(order, xi, alphas=None):
-    if alphas is None:
-        alphas = [(0,) * 3]
+def dubiner_3d(order, xi):
     sd = (order + 1) * (order + 2) * (order + 3) // 6
     eta = eta_cube(numpy.transpose(xi))
     B = [dubiner_1d(order, k, x) for k, x in enumerate(eta)]
-    D = [None] * len(B)
-    if any(sum(alpha) > 0 for alpha in alphas):
-        D = [dubiner_deriv_1d(order, k, x) for k, x in enumerate(eta)]
+    D = [dubiner_deriv_1d(order, k, x) for k, x in enumerate(eta)]
     def idx(p, q, r):
         return (p + q + r)*(p + q + r + 1)*(p + q + r + 2)//6 + (q + r)*(q + r + 1)//2 + r
 
+    dim = len(eta)
+    alphas = [(0,) * dim]
+    alphas.extend(tuple(row) for row in numpy.eye(dim, dtype=int))
     tabulations = {}
     for alpha in alphas:
         T = [Dj if aj else Bj for aj, Bj, Dj in zip(alpha, B, D)]
@@ -580,9 +564,7 @@ def dubiner_3d(order, xi, alphas=None):
                     phi[idx(i, j, k)] = T[2][flat_index(k, i + j)] * Tij * scale
         tabulations[alpha] = phi
 
-    gradients = [tabulations[alpha] for alpha in alphas if sum(alpha)]
-    if len(gradients) == len(eta):
-        chain_rule(eta, gradients)
+    chain_rule(eta, tabulations)
     return tabulations
 
 
@@ -621,27 +603,21 @@ if __name__ == "__main__":
 
     if 1:
         X = [tuple(map(sympy.Symbol, ("x", "y", "z")[:dim]))]
-        print("Dubiner flat")
-        print(dubiner_1d(degree, 1, numpy.array(X[0][:1])))
-        print(dubiner_deriv_1d(degree, 1, numpy.array(X[0][:1])))
-
         print("Affine mapping")
         print(A)
         print(b)
-        alphas = [(0,) * dim]
-        alphas.extend(tuple(row) for row in numpy.eye(dim, dtype=int))
         simplify = lambda x: numpy.array(sympy.simplify(x))
         Told = expansion_set.tabulate(degree, X)
-        Tnew = tabulate(degree, mapping(X), alphas=alphas)
+        Tnew = tabulate(degree, mapping(X))
 
         print("New phi(X)")
         print(simplify(Tnew[(0,) * dim]))
         print("Old phi(X)")
         print(simplify(Told))
 
-        for i, (alpha, Xi) in enumerate(zip(alphas[1:], X[0])):
+        for i, (alpha, Xi) in enumerate(zip(numpy.eye(dim, dtype=int), X[0])):
             print("New d/dX_%d phi" % i)
-            print(simplify(Tnew[alpha]))
+            print(simplify(Tnew[tuple(alpha)]))
             print("Old d/dX_%d phi" % i)
             Di = lambda f: [sympy.simplify(sympy.diff(f[0], Xi))]
             print(numpy.array(list(map(Di, Told))))
