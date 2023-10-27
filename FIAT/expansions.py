@@ -464,16 +464,22 @@ from functools import reduce
 from math import prod
 
 
-def chain_rule(eta, dphi_dxi):
+def chain_rule(eta, dphi_deta):
     dim = len(eta)
-    Jii = 1.
-    dphi_deta = dphi_dxi
-    for i in reversed(range(dim)):
-        iupper = range(i + 1, dim)
-        offdiag = (prod(((1. - eta[k])*0.5 for k in iupper if k != j), (1. + eta[i])*0.5) for j in iupper)
-        dphi_deta[i] = sum(reduce(mul, dphi_dxi[i+1:], offdiag), dphi_deta[i]) * (1./Jii)
-        Jii *= (1. - eta[i])*0.5
-    return dphi_deta
+
+    dphi_dxi = list(map(sympy.Symbol, ("fx", "fy", "fz")[:dim]))
+    for i in range(dim):
+        offdiag = [prod((1. - eta[k])*0.5 for k in range(j+1, dim) if k != i) * (1. + eta[j])*0.5 for j in range(i)]
+        dphi_dxi[i] += sum(reduce(mul, dphi_dxi[:i], offdiag))
+        dphi_dxi[i] /= prod((1. - eta[k])*0.5 for k in range(i+1, dim))
+    print(dphi_dxi)
+
+
+    dphi_dxi = [dphi_deta[alpha] for alpha in sorted(reversed(dphi_deta)) if sum(alpha) == 1]
+    for i in range(dim):
+        offdiag = [prod((1. - eta[k])*0.5 for k in range(j+1, dim) if k != i) * (1. + eta[j])*0.5 for j in range(i)]
+        dphi_dxi[i] += sum(reduce(mul, dphi_dxi[:i], offdiag))
+        dphi_dxi[i] /= prod((1. - eta[k])*0.5 for k in range(i+1, dim))
 
 
 def flat_index(i, j):
@@ -492,8 +498,8 @@ def dubiner_1d(order, dim, x):
         results = jacobi.eval_jacobi_batch(alpha, 0, n, x[:, None])
         if j > 0:
             results *= xhat ** j
-        s = [flat_index(i, j) for i in range(n + 1)]
-        phi[s, :] = results
+        indices = [flat_index(i, j) for i in range(n + 1)]
+        phi[indices, :] = results
     return phi
 
 
@@ -510,11 +516,11 @@ def dubiner_deriv_1d(order, dim, x):
         if j > 0:
             results = jacobi.eval_jacobi_batch(alpha, 0, n, x[:, None])
             derivs *= xhat
-            derivs -= results * (0.5*j)
+            derivs += results * (-0.5*j)
             if j > 1:
                 derivs *= xhat ** (j - 1)
-        s = [flat_index(i, j) for i in range(n + 1)]
-        dphi[s, :] = derivs
+        indices = [flat_index(i, j) for i in range(n + 1)]
+        dphi[indices, :] = derivs
     return dphi
 
 
@@ -523,16 +529,17 @@ def dubiner_2d(order, xi, alphas=None):
         alphas = [(0,) * 2]
     sd = (order + 1) * (order + 2) // 2
     eta = eta_square(numpy.transpose(xi))
-    B = [dubiner_1d(order, k, x) for k, x in enumerate(eta)]
+    B = [dubiner_1d(order, k, eta_k) for k, eta_k in enumerate(eta)]
     D = [None] * len(B)
     if any(sum(alpha) > 0 for alpha in alphas):
-        D = [dubiner_deriv_1d(order, k, x) for k, x in enumerate(eta)]
+        D = [dubiner_deriv_1d(order, k, eta_k) for k, eta_k in enumerate(eta)]
+
     def idx(p, q):
         return (p + q) * (p + q + 1) // 2 + q
 
     tabulations = {}
     for alpha in alphas:
-        T = [Dj if aj else Bj for aj, Bj, Dj in zip(alpha, B, D)]
+        T = [Bj if aj == 0 else Dj for aj, Bj, Dj in zip(alpha, B, D)]
         phi = numpy.zeros((sd, T[0].shape[1]), dtype=T[0].dtype)
         for i in range(order + 1):
             Ti = T[0][i]
@@ -540,6 +547,11 @@ def dubiner_2d(order, xi, alphas=None):
                 scale = ((i + 0.5) * (i + j + 1.0)) ** 0.5
                 phi[idx(i, j)] = T[1][flat_index(j, i)] * Ti * scale
         tabulations[alpha] = phi
+
+    print(tabulations[(1,0)])
+    if len([alpha for alpha in alphas if sum(alpha) == 1]) == len(eta):
+        chain_rule(eta, tabulations)
+    print(tabulations[(1,0)])
     return tabulations
 
 
@@ -567,6 +579,10 @@ def dubiner_3d(order, xi, alphas=None):
                     scale = ((i + 0.5) * (i + j + 1.0) * (i + j + k + 1.5)) ** 0.5
                     phi[idx(i, j, k)] = T[2][flat_index(k, i + j)] * Tij * scale
         tabulations[alpha] = phi
+
+    gradients = [tabulations[alpha] for alpha in alphas if sum(alpha)]
+    if len(gradients) == len(eta):
+        chain_rule(eta, gradients)
     return tabulations
 
 
@@ -587,7 +603,6 @@ if __name__ == "__main__":
 
     # ref_el = symmetric_simplex(dim)
     ref_el = reference_element.ufc_simplex(dim)
-    expansion_set = get_expansion_set(ref_el)
 
     if dim == 1:
         base_ref_el = reference_element.DefaultInterval()
@@ -596,30 +611,40 @@ if __name__ == "__main__":
     elif dim == 3:
         base_ref_el = reference_element.DefaultTetrahedron()
 
+    ref_el = base_ref_el
+
     v1 = ref_el.get_vertices()
     v2 = base_ref_el.get_vertices()
     A, b = reference_element.make_affine_mapping(v1, v2)
     mapping = lambda x: numpy.dot(x, A.T) + b
+    expansion_set = get_expansion_set(ref_el)
 
     if 1:
-        alphas = [(0,) * dim]
-        alphas.extend(tuple(row) for row in numpy.eye(dim))
-        simplify = lambda x: numpy.array(sympy.simplify(x))
         X = [tuple(map(sympy.Symbol, ("x", "y", "z")[:dim]))]
-        Tnew = tabulate(degree, mapping(X), alphas=alphas)
+        print("Dubiner flat")
+        print(dubiner_1d(degree, 1, numpy.array(X[0][:1])))
+        print(dubiner_deriv_1d(degree, 1, numpy.array(X[0][:1])))
+
+        print("Affine mapping")
+        print(A)
+        print(b)
+        alphas = [(0,) * dim]
+        alphas.extend(tuple(row) for row in numpy.eye(dim, dtype=int))
+        simplify = lambda x: numpy.array(sympy.simplify(x))
         Told = expansion_set.tabulate(degree, X)
-        print("New")
+        Tnew = tabulate(degree, mapping(X), alphas=alphas)
+
+        print("New phi(X)")
         print(simplify(Tnew[(0,) * dim]))
-        print("Old")
+        print("Old phi(X)")
         print(simplify(Told))
 
-        dz = tabulate(degree, mapping(X), alphas=alphas)
-        dy = expansion_set.tabulate_derivatives(degree, X)
-        for alpha, Xi in zip(alphas, X):
-            print("New")
+        for i, (alpha, Xi) in enumerate(zip(alphas[1:], X[0])):
+            print("New d/dX_%d phi" % i)
             print(simplify(Tnew[alpha]))
-            print("Old")
-            print(simplify(sympy.diff(Told, Xi)))
+            print("Old d/dX_%d phi" % i)
+            Di = lambda f: [sympy.simplify(sympy.diff(f[0], Xi))]
+            print(numpy.array(list(map(Di, Told))))
 
     else:
         import FIAT
