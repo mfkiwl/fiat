@@ -12,7 +12,6 @@ import math
 import sympy
 from FIAT import reference_element
 from FIAT import jacobi
-
 from FIAT.reference_element import UFCInterval
 from FIAT.quadrature import GaussLegendreQuadratureLineRule
 from FIAT.recursive_points import RecursivePointSet
@@ -29,16 +28,16 @@ def dubiner_1d(order, dim, x):
         return numpy.multiply(scale[:, None], results, out=results)
     sd = (order + 1) * (order + 2) // 2
     phi = numpy.zeros((sd, x.size), dtype=x.dtype)
-    xhat = (1. - x) * 0.5
-    for j in range(order+1):
-        n = order - j
-        alpha = 2 * j + dim
+    x1 = (1. - x) * 0.5
+    for i in range(order + 1):
+        n = order - i
+        alpha = 2 * i + dim
         results = jacobi.eval_jacobi_batch(alpha, 0, n, x[:, None])
-        if j > 0:
-            results *= xhat ** j
+        if i > 0:
+            results *= x1 ** i
         scale = numpy.sqrt(0.5*(alpha + 1) + numpy.arange(n + 1))
         numpy.multiply(scale[:, None], results, out=results)
-        indices = [flat_index(j, i) for i in range(n + 1)]
+        indices = [flat_index(i, j) for j in range(n + 1)]
         phi[indices, :] = results
     return phi
 
@@ -50,27 +49,29 @@ def dubiner_deriv_1d(order, dim, x):
         return numpy.multiply(scale[:, None], results, out=results)
     sd = (order + 1) * (order + 2) // 2
     dphi = numpy.zeros((sd, x.size), dtype=x.dtype)
-    xhat = (1. - x) * 0.5
-    for j in range(order+1):
-        n = order - j
-        alpha = 2 * j + dim
+    x1 = (1. - x) * 0.5
+    for i in range(order + 1):
+        n = order - i
+        alpha = 2 * i + dim
         derivs = jacobi.eval_jacobi_deriv_batch(alpha, 0, n, x[:, None])
-        if j > 0:
+        if i > 0:
             results = jacobi.eval_jacobi_batch(alpha, 0, n, x[:, None])
-            derivs *= xhat
-            derivs += results * (-0.5*j)
-            if j > 1:
-                derivs *= xhat ** (j - 1)
+            derivs *= x1
+            derivs += results * (-0.5 * i)
+            if i > 1:
+                derivs *= x1 ** (i - 1)
         scale = numpy.sqrt(0.5*(alpha + 1) + numpy.arange(n + 1))
         numpy.multiply(scale[:, None], derivs, out=derivs)
-        indices = [flat_index(j, i) for i in range(n + 1)]
+        indices = [flat_index(i, j) for j in range(n + 1)]
         dphi[indices, :] = derivs
     return dphi
 
 
 def duffy_chain_rule(A, eta, tabulations):
-    dphi_dxi = [tabulations[alpha] for alpha in sorted(tabulations, reverse=True) if sum(alpha) == 1]
     dim = len(eta)
+    dphi_dxi = [tabulations[alpha] for alpha in sorted(tabulations, reverse=True) if sum(alpha) == 1]
+    if len(dphi_dxi) < dim:
+        return
     eta1 = [(1. - x) * 0.5 for x in eta]
     for i in range(dim):
         for j in range(i):
@@ -301,9 +302,8 @@ class LineExpansionSet(ExpansionSet):
 
     def _tabulate_duffy(self, n, pts):
         xi = numpy.dot(pts, self.A.T) + self.b
-        scale = self.A[0][0]
         tabulations = {(0,): dubiner_1d(n, 0, xi),
-                       (1,): dubiner_deriv_1d(n, 0, xi) * scale}
+                       (1,): dubiner_deriv_1d(n, 0, xi) * self.A[0][0]}
         return tabulations
 
     def tabulate_derivatives(self, n, pts):
@@ -415,9 +415,9 @@ class TriangleExpansionSet(ExpansionSet):
         sd = self.get_num_members(n)
         xi = numpy.transpose(numpy.dot(pts, self.A.T) + self.b)
         eta = eta_square(xi)
-        basis = [dubiner_1d(n, k, eta_k) for k, eta_k in enumerate(eta)]
-        derivs = [dubiner_deriv_1d(n, k, eta_k) for k, eta_k in enumerate(eta)]
         dim = len(eta)
+        basis = [dubiner_1d(n, k, eta[k]) for k in range(dim)]
+        derivs = [dubiner_deriv_1d(n, k, eta[k]) for k in range(dim)]
         alphas = [(0,) * dim]
         alphas.extend(tuple(row) for row in numpy.eye(dim, dtype=int))
         tabulations = {}
@@ -549,9 +549,9 @@ class TetrahedronExpansionSet(ExpansionSet):
         sd = self.get_num_members(n)
         xi = numpy.transpose(numpy.dot(pts, self.A.T) + self.b)
         eta = eta_cube(xi)
-        basis = [dubiner_1d(n, k, x) for k, x in enumerate(eta)]
-        derivs = [dubiner_deriv_1d(n, k, x) for k, x in enumerate(eta)]
         dim = len(eta)
+        basis = [dubiner_1d(n, k, eta[k]) for k in range(dim)]
+        derivs = [dubiner_deriv_1d(n, k, eta[k]) for k in range(dim)]
         alphas = [(0,) * dim]
         alphas.extend(tuple(row) for row in numpy.eye(dim, dtype=int))
         tabulations = {}
