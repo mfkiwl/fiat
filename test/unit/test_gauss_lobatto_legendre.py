@@ -35,7 +35,8 @@ def symmetric_simplex(dim):
     return s
 
 
-@pytest.mark.parametrize("dim, degree", sum(([(d, p) for p in range(1, 8-d)] for d in range(1, 4)), []))
+@pytest.mark.parametrize("degree", range(1, 8))
+@pytest.mark.parametrize("dim", (1, 2, 3))
 def test_gll_basis_values(dim, degree):
     """Ensure that integrating a simple monomial produces the expected results."""
     from FIAT import GaussLobattoLegendre, make_quadrature

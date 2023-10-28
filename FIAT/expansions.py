@@ -12,7 +12,6 @@ import math
 import sympy
 from FIAT import reference_element
 from FIAT import jacobi
-from math import prod
 
 from FIAT.reference_element import UFCInterval
 from FIAT.quadrature import GaussLegendreQuadratureLineRule
@@ -56,7 +55,6 @@ def dubiner_deriv_1d(order, dim, x):
             derivs += results * (-0.5*j)
             if j > 1:
                 derivs *= xhat ** (j - 1)
-
         indices = [flat_index(i, j) for i in range(n + 1)]
         dphi[indices, :] = derivs
     return dphi
@@ -65,11 +63,16 @@ def dubiner_deriv_1d(order, dim, x):
 def duffy_chain_rule(A, eta, tabulations):
     dphi_dxi = [tabulations[alpha] for alpha in sorted(tabulations, reverse=True) if sum(alpha) == 1]
     dim = len(eta)
+    eta1 = [(1. - x) * 0.5 for x in eta]
     for i in range(dim):
         for j in range(i):
-            dphi_dxi[i] += dphi_dxi[j] * (1. + eta[j])*0.5 * prod((1. - eta[k])*0.5 for k in range(j+1, dim) if k != i)
-        dphi_dxi[i] /= prod((1. - x)*0.5 for x in eta[i+1:])
-
+            Jij = -0.5 * (1. + eta[j])
+            for k in range(j + 1, dim):
+                if k != i:
+                    Jij *= eta1[k]
+            dphi_dxi[i] -= dphi_dxi[j] * Jij
+        for j in range(i + 1, dim):
+            dphi_dxi[i] /= eta1[j]
     k = 0
     dphi_dx = [sum(dphi_dxi[j] * A[j][i] for j in range(dim)) for i in range(dim)]
     for alpha in sorted(tabulations, reverse=True):
@@ -297,7 +300,7 @@ class LineExpansionSet(ExpansionSet):
         for alpha in tabulations:
             results = tabulations[alpha]
             for k in range(n+1):
-                results[k, :] *= (k + 0.5)**0.5
+                results[k] *= (k + 0.5)**0.5
         return tabulations
 
     def tabulate_derivatives(self, n, pts):
