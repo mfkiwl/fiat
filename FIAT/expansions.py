@@ -24,7 +24,9 @@ def flat_index(i, j):
 
 def dubiner_1d(order, dim, x):
     if dim == 0:
-        return jacobi.eval_jacobi_batch(0, 0, order, x[:, None])
+        scale = numpy.sqrt(0.5 + numpy.arange(order + 1))
+        results = jacobi.eval_jacobi_batch(0, 0, order, x[:, None])
+        return numpy.multiply(scale[:, None], results, out=results)
     sd = (order + 1) * (order + 2) // 2
     phi = numpy.zeros((sd, x.size), dtype=x.dtype)
     xhat = (1. - x) * 0.5
@@ -34,14 +36,18 @@ def dubiner_1d(order, dim, x):
         results = jacobi.eval_jacobi_batch(alpha, 0, n, x[:, None])
         if j > 0:
             results *= xhat ** j
-        indices = [flat_index(i, j) for i in range(n + 1)]
+        scale = numpy.sqrt(0.5*(alpha + 1) + numpy.arange(n + 1))
+        numpy.multiply(scale[:, None], results, out=results)
+        indices = [flat_index(j, i) for i in range(n + 1)]
         phi[indices, :] = results
     return phi
 
 
 def dubiner_deriv_1d(order, dim, x):
     if dim == 0:
-        return jacobi.eval_jacobi_deriv_batch(0, 0, order, x[:, None])
+        scale = numpy.sqrt(0.5 + numpy.arange(order + 1))
+        results = jacobi.eval_jacobi_deriv_batch(0, 0, order, x[:, None])
+        return numpy.multiply(scale[:, None], results, out=results)
     sd = (order + 1) * (order + 2) // 2
     dphi = numpy.zeros((sd, x.size), dtype=x.dtype)
     xhat = (1. - x) * 0.5
@@ -55,7 +61,9 @@ def dubiner_deriv_1d(order, dim, x):
             derivs += results * (-0.5*j)
             if j > 1:
                 derivs *= xhat ** (j - 1)
-        indices = [flat_index(i, j) for i in range(n + 1)]
+        scale = numpy.sqrt(0.5*(alpha + 1) + numpy.arange(n + 1))
+        numpy.multiply(scale[:, None], derivs, out=derivs)
+        indices = [flat_index(j, i) for i in range(n + 1)]
         dphi[indices, :] = derivs
     return dphi
 
@@ -73,12 +81,11 @@ def duffy_chain_rule(A, eta, tabulations):
             dphi_dxi[i] -= dphi_dxi[j] * Jij
         for j in range(i + 1, dim):
             dphi_dxi[i] /= eta1[j]
-    k = 0
-    dphi_dx = [sum(dphi_dxi[j] * A[j][i] for j in range(dim)) for i in range(dim)]
+    j = 0
     for alpha in sorted(tabulations, reverse=True):
         if sum(alpha) == 1:
-            tabulations[alpha] = dphi_dx[k]
-            k += 1
+            tabulations[alpha] = sum(dphi_dxi[i] * A[i][j] for i in range(dim))
+            j += 1
 
 
 def jrc(a, b, n):
@@ -297,10 +304,6 @@ class LineExpansionSet(ExpansionSet):
         scale = self.A[0][0]
         tabulations = {(0,): dubiner_1d(n, 0, xi),
                        (1,): dubiner_deriv_1d(n, 0, xi) * scale}
-        for alpha in tabulations:
-            results = tabulations[alpha]
-            for k in range(n+1):
-                results[k] *= (k + 0.5)**0.5
         return tabulations
 
     def tabulate_derivatives(self, n, pts):
@@ -412,20 +415,19 @@ class TriangleExpansionSet(ExpansionSet):
         sd = self.get_num_members(n)
         xi = numpy.transpose(numpy.dot(pts, self.A.T) + self.b)
         eta = eta_square(xi)
-        B = [dubiner_1d(n, k, eta_k) for k, eta_k in enumerate(eta)]
-        D = [dubiner_deriv_1d(n, k, eta_k) for k, eta_k in enumerate(eta)]
+        basis = [dubiner_1d(n, k, eta_k) for k, eta_k in enumerate(eta)]
+        derivs = [dubiner_deriv_1d(n, k, eta_k) for k, eta_k in enumerate(eta)]
         dim = len(eta)
         alphas = [(0,) * dim]
         alphas.extend(tuple(row) for row in numpy.eye(dim, dtype=int))
         tabulations = {}
         for alpha in alphas:
-            T = [Bj if aj == 0 else Dj for aj, Bj, Dj in zip(alpha, B, D)]
+            T = [v if a == 0 else dv for a, v, dv in zip(alpha, basis, derivs)]
             phi = numpy.zeros((sd, T[0].shape[1]), dtype=T[0].dtype)
             for i in range(n + 1):
                 Ti = T[0][i]
                 for j in range(n + 1 - i):
-                    scale = ((i + 0.5) * (i + j + 1.0)) ** 0.5
-                    phi[idx(i, j)] = T[1][flat_index(j, i)] * Ti * scale
+                    phi[idx(i, j)] = T[1][flat_index(i, j)] * Ti
             tabulations[alpha] = phi
         duffy_chain_rule(self.A, eta, tabulations)
         return tabulations
@@ -547,22 +549,21 @@ class TetrahedronExpansionSet(ExpansionSet):
         sd = self.get_num_members(n)
         xi = numpy.transpose(numpy.dot(pts, self.A.T) + self.b)
         eta = eta_cube(xi)
-        B = [dubiner_1d(n, k, x) for k, x in enumerate(eta)]
-        D = [dubiner_deriv_1d(n, k, x) for k, x in enumerate(eta)]
+        basis = [dubiner_1d(n, k, x) for k, x in enumerate(eta)]
+        derivs = [dubiner_deriv_1d(n, k, x) for k, x in enumerate(eta)]
         dim = len(eta)
         alphas = [(0,) * dim]
         alphas.extend(tuple(row) for row in numpy.eye(dim, dtype=int))
         tabulations = {}
         for alpha in alphas:
-            T = [Dj if aj else Bj for aj, Bj, Dj in zip(alpha, B, D)]
+            T = [v if a == 0 else dv for a, v, dv in zip(alpha, basis, derivs)]
             phi = numpy.zeros((sd, T[0].shape[1]), dtype=T[0].dtype)
             for i in range(n + 1):
                 Ti = T[0][i]
                 for j in range(n + 1 - i):
-                    Tij = T[1][flat_index(j, i)] * Ti
+                    Tij = T[1][flat_index(i, j)] * Ti
                     for k in range(n + 1 - i - j):
-                        scale = ((i + 0.5) * (i + j + 1.0) * (i + j + k + 1.5)) ** 0.5
-                        phi[idx(i, j, k)] = T[2][flat_index(k, i + j)] * Tij * scale
+                        phi[idx(i, j, k)] = T[2][flat_index(i + j, k)] * Tij
             tabulations[alpha] = phi
         duffy_chain_rule(self.A, eta, tabulations)
         return tabulations
