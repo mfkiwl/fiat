@@ -12,6 +12,66 @@ import math
 import sympy
 from FIAT import reference_element
 from FIAT import jacobi
+from math import prod
+
+
+def flat_index(i, j):
+    return (i + j) * (i + j + 1) // 2 + j
+
+
+def dubiner_1d(order, dim, x):
+    if dim == 0:
+        return jacobi.eval_jacobi_batch(0, 0, order, x[:, None])
+    sd = (order + 1) * (order + 2) // 2
+    phi = numpy.zeros((sd, x.size), dtype=x.dtype)
+    xhat = (1. - x) * 0.5
+    for j in range(order+1):
+        n = order - j
+        alpha = 2 * j + dim
+        results = jacobi.eval_jacobi_batch(alpha, 0, n, x[:, None])
+        if j > 0:
+            results *= xhat ** j
+        indices = [flat_index(i, j) for i in range(n + 1)]
+        phi[indices, :] = results
+    return phi
+
+
+def dubiner_deriv_1d(order, dim, x):
+    if dim == 0:
+        return jacobi.eval_jacobi_deriv_batch(0, 0, order, x[:, None])
+    sd = (order + 1) * (order + 2) // 2
+    dphi = numpy.zeros((sd, x.size), dtype=x.dtype)
+    xhat = (1. - x) * 0.5
+    for j in range(order+1):
+        n = order - j
+        alpha = 2 * j + dim
+        derivs = jacobi.eval_jacobi_deriv_batch(alpha, 0, n, x[:, None])
+        if j > 0:
+            results = jacobi.eval_jacobi_batch(alpha, 0, n, x[:, None])
+            derivs *= xhat
+            derivs += results * (-0.5*j)
+            if j > 1:
+                derivs *= xhat ** (j - 1)
+
+        indices = [flat_index(i, j) for i in range(n + 1)]
+        dphi[indices, :] = derivs
+    return dphi
+
+
+def duffy_chain_rule(A, eta, tabulations):
+    dphi_dxi = [tabulations[alpha] for alpha in sorted(tabulations, reverse=True) if sum(alpha) == 1]
+    dim = len(eta)
+    for i in range(dim):
+        for j in range(i):
+            dphi_dxi[i] += dphi_dxi[j] * (1. + eta[j])*0.5 * prod((1. - eta[k])*0.5 for k in range(j+1, dim) if k != i)
+        dphi_dxi[i] /= prod((1. - x)*0.5 for x in eta[i+1:])
+
+    k = 0
+    dphi_dx = [sum(dphi_dxi[j] * A[j][i] for j in range(dim)) for i in range(dim)]
+    for alpha in sorted(tabulations, reverse=True):
+        if sum(alpha) == 1:
+            tabulations[alpha] = dphi_dx[k]
+            k += 1
 
 
 def jrc(a, b, n):
@@ -107,6 +167,31 @@ def xi_tetrahedron(eta):
     xi2 = 0.5 * (1. + eta2) * (1. - eta3) - 1.
     xi3 = eta3
     return xi1, xi2, xi3
+
+
+def eta_square(xi):
+    """Maps from the (-1,1) reference triangle to [-1,1]^2."""
+    xi1, xi2 = xi
+    with numpy.errstate(divide='ignore', invalid='ignore'):
+        eta1 = 2. * (1. + xi1) / (1. - xi2) - 1.
+    eta2 = xi2
+    if eta1.dtype != object:
+        eta1[numpy.logical_not(numpy.isfinite(eta1))] = 1.
+    return eta1, eta2
+
+
+def eta_cube(xi):
+    """Maps from the (-1,1) reference tetrahedron to [-1,1]^3."""
+    xi1, xi2, xi3 = xi
+    with numpy.errstate(divide='ignore', invalid='ignore'):
+        eta1 = 2. * (1. + xi1) / (-xi2 - xi3) - 1.
+        eta2 = 2. * (1. + xi2) / (1. - xi3) - 1.
+    eta3 = xi3
+    if eta1.dtype != object:
+        eta1[numpy.logical_not(numpy.isfinite(eta1))] = 1.
+    if eta2.dtype != object:
+        eta2[numpy.logical_not(numpy.isfinite(eta2))] = 1.
+    return eta1, eta2, eta3
 
 
 class PointExpansionSet(object):
@@ -272,7 +357,34 @@ class TriangleExpansionSet(object):
         return results
         # return self.scale * results
 
+    def _tabulate_duffy(self, n, pts):
+        def idx(p, q):
+            return (p + q) * (p + q + 1) // 2 + q
+        sd = self.get_num_members(n)
+        xi = numpy.transpose(numpy.dot(pts, self.A.T) + self.b)
+        eta = eta_square(xi)
+        B = [dubiner_1d(n, k, eta_k) for k, eta_k in enumerate(eta)]
+        D = [dubiner_deriv_1d(n, k, eta_k) for k, eta_k in enumerate(eta)]
+        dim = len(eta)
+        alphas = [(0,) * dim]
+        alphas.extend(tuple(row) for row in numpy.eye(dim, dtype=int))
+        tabulations = {}
+        for alpha in alphas:
+            T = [Bj if aj == 0 else Dj for aj, Bj, Dj in zip(alpha, B, D)]
+            phi = numpy.zeros((sd, T[0].shape[1]), dtype=T[0].dtype)
+            for i in range(n + 1):
+                Ti = T[0][i]
+                for j in range(n + 1 - i):
+                    scale = ((i + 0.5) * (i + j + 1.0)) ** 0.5
+                    phi[idx(i, j)] = T[1][flat_index(j, i)] * Ti * scale
+            tabulations[alpha] = phi
+        duffy_chain_rule(self.A, eta, tabulations)
+        return tabulations
+
     def tabulate_derivatives(self, n, pts):
+        tabulations = self._tabulate_duffy(n, pts)
+        return [tabulations[tuple(key)] for key in numpy.eye(2, dtype=int)]
+
         order = 1
         data = _tabulate_dpts(self._tabulate, 2, n, order, numpy.array(pts))
         # Put data in the required data structure, i.e.,
@@ -384,7 +496,36 @@ class TetrahedronExpansionSet(object):
 
         return results
 
+    def _tabulate_duffy(self, n, pts):
+        def idx(p, q, r):
+            return (p + q + r)*(p + q + r + 1)*(p + q + r + 2)//6 + (q + r)*(q + r + 1)//2 + r
+        sd = self.get_num_members(n)
+        xi = numpy.transpose(numpy.dot(pts, self.A.T) + self.b)
+        eta = eta_cube(xi)
+        B = [dubiner_1d(n, k, x) for k, x in enumerate(eta)]
+        D = [dubiner_deriv_1d(n, k, x) for k, x in enumerate(eta)]
+        dim = len(eta)
+        alphas = [(0,) * dim]
+        alphas.extend(tuple(row) for row in numpy.eye(dim, dtype=int))
+        tabulations = {}
+        for alpha in alphas:
+            T = [Dj if aj else Bj for aj, Bj, Dj in zip(alpha, B, D)]
+            phi = numpy.zeros((sd, T[0].shape[1]), dtype=T[0].dtype)
+            for i in range(n + 1):
+                Ti = T[0][i]
+                for j in range(n + 1 - i):
+                    Tij = T[1][flat_index(j, i)] * Ti
+                    for k in range(n + 1 - i - j):
+                        scale = ((i + 0.5) * (i + j + 1.0) * (i + j + k + 1.5)) ** 0.5
+                        phi[idx(i, j, k)] = T[2][flat_index(k, i + j)] * Tij * scale
+            tabulations[alpha] = phi
+        duffy_chain_rule(self.A, eta, tabulations)
+        return tabulations
+
     def tabulate_derivatives(self, n, pts):
+        tabulations = self._tabulate_duffy(n, pts)
+        return [tabulations[tuple(key)] for key in numpy.eye(3, dtype=int)]
+
         order = 1
         D = 3
         data = _tabulate_dpts(self._tabulate, D, n, order, numpy.array(pts))
@@ -432,210 +573,3 @@ def polynomial_dimension(ref_el, degree):
         return max(0, (degree + 1) * (degree + 2) * (degree + 3) // 6)
     else:
         raise ValueError("Unknown reference element type.")
-
-
-def eta_square(xi):
-    """Maps from the (-1,1) reference triangle to [-1,1]^2."""
-    xi1, xi2 = xi
-    with numpy.errstate(divide='ignore', invalid='ignore'):
-        eta1 = 2. * (1. + xi1) / (1. - xi2) - 1.
-    eta2 = xi2
-    if eta1.dtype != object:
-        eta1[numpy.logical_not(numpy.isfinite(eta1))] = 1.
-    return eta1, eta2
-
-
-def eta_cube(xi):
-    """Maps from the (-1,1) reference tetrahedron to [-1,1]^3."""
-    xi1, xi2, xi3 = xi
-    with numpy.errstate(divide='ignore', invalid='ignore'):
-        eta1 = 2. * (1. + xi1) / (-xi2 - xi3) - 1.
-        eta2 = 2. * (1. + xi2) / (1. - xi3) - 1.
-    eta3 = xi3
-    if eta1.dtype != object:
-        eta1[numpy.logical_not(numpy.isfinite(eta1))] = 1.
-    if eta2.dtype != object:
-        eta2[numpy.logical_not(numpy.isfinite(eta2))] = 1.
-    return eta1, eta2, eta3
-
-
-from math import prod
-
-
-def chain_rule(eta, dphi_deta):
-    dim = len(eta)
-    dphi_dxi = [dphi_deta[alpha] for alpha in reversed(sorted(dphi_deta)) if sum(alpha) == 1]
-    for i in range(dim):
-        for j in range(i):
-            dphi_dxi[i] += dphi_dxi[j] * (1. + eta[j])*0.5 * prod((1. - eta[k])*0.5 for k in range(j+1, dim) if k != i)
-        dphi_dxi[i] /= prod((1. - eta[k])*0.5 for k in range(i+1, dim))
-
-
-def flat_index(i, j):
-    return (i + j) * (i + j + 1) // 2 + j
-
-
-def dubiner_1d(order, dim, x):
-    if dim == 0:
-        return jacobi.eval_jacobi_batch(0, 0, degree, x[:, None])
-    sd = (order + 1) * (order + 2) // 2
-    phi = numpy.zeros((sd, x.size), dtype=x.dtype)
-    xhat = (1. - x) * 0.5
-    for j in range(order+1):
-        n = order - j
-        alpha = 2 * j + dim
-        results = jacobi.eval_jacobi_batch(alpha, 0, n, x[:, None])
-        if j > 0:
-            results *= xhat ** j
-        indices = [flat_index(i, j) for i in range(n + 1)]
-        phi[indices, :] = results
-    return phi
-
-
-def dubiner_deriv_1d(order, dim, x):
-    if dim == 0:
-        return jacobi.eval_jacobi_deriv_batch(0, 0, degree, x[:, None])
-    sd = (order + 1) * (order + 2) // 2
-    dphi = numpy.zeros((sd, x.size), dtype=x.dtype)
-    xhat = (1. - x) * 0.5
-    for j in range(order+1):
-        n = order - j
-        alpha = 2 * j + dim
-        derivs = jacobi.eval_jacobi_deriv_batch(alpha, 0, n, x[:, None])
-        if j > 0:
-            results = jacobi.eval_jacobi_batch(alpha, 0, n, x[:, None])
-            derivs *= xhat
-            derivs += results * (-0.5*j)
-            if j > 1:
-                derivs *= xhat ** (j - 1)
-
-        indices = [flat_index(i, j) for i in range(n + 1)]
-        dphi[indices, :] = derivs
-    return dphi
-
-
-def dubiner_2d(order, xi):
-    sd = (order + 1) * (order + 2) // 2
-    eta = eta_square(numpy.transpose(xi))
-    B = [dubiner_1d(order, k, eta_k) for k, eta_k in enumerate(eta)]
-    D = [dubiner_deriv_1d(order, k, eta_k) for k, eta_k in enumerate(eta)]
-    def idx(p, q):
-        return (p + q) * (p + q + 1) // 2 + q
-
-    dim = len(eta)
-    alphas = [(0,) * dim]
-    alphas.extend(tuple(row) for row in numpy.eye(dim, dtype=int))
-    tabulations = {}
-    for alpha in alphas:
-        T = [Bj if aj == 0 else Dj for aj, Bj, Dj in zip(alpha, B, D)]
-        phi = numpy.zeros((sd, T[0].shape[1]), dtype=T[0].dtype)
-        for i in range(order + 1):
-            Ti = T[0][i]
-            for j in range(order + 1 - i):
-                scale = ((i + 0.5) * (i + j + 1.0)) ** 0.5
-                phi[idx(i, j)] = T[1][flat_index(j, i)] * Ti * scale
-        tabulations[alpha] = phi
-
-    chain_rule(eta, tabulations)
-    return tabulations
-
-
-def dubiner_3d(order, xi):
-    sd = (order + 1) * (order + 2) * (order + 3) // 6
-    eta = eta_cube(numpy.transpose(xi))
-    B = [dubiner_1d(order, k, x) for k, x in enumerate(eta)]
-    D = [dubiner_deriv_1d(order, k, x) for k, x in enumerate(eta)]
-    def idx(p, q, r):
-        return (p + q + r)*(p + q + r + 1)*(p + q + r + 2)//6 + (q + r)*(q + r + 1)//2 + r
-
-    dim = len(eta)
-    alphas = [(0,) * dim]
-    alphas.extend(tuple(row) for row in numpy.eye(dim, dtype=int))
-    tabulations = {}
-    for alpha in alphas:
-        T = [Dj if aj else Bj for aj, Bj, Dj in zip(alpha, B, D)]
-        phi = numpy.zeros((sd, T[0].shape[1]), dtype=T[0].dtype)
-        for i in range(order + 1):
-            Ti = T[0][i]
-            for j in range(order + 1 - i):
-                Tij = T[1][flat_index(j, i)] * Ti
-                for k in range(order + 1 - i - j):
-                    scale = ((i + 0.5) * (i + j + 1.0) * (i + j + k + 1.5)) ** 0.5
-                    phi[idx(i, j, k)] = T[2][flat_index(k, i + j)] * Tij * scale
-        tabulations[alpha] = phi
-
-    chain_rule(eta, tabulations)
-    return tabulations
-
-
-if __name__ == "__main__":
-    def symmetric_simplex(dim):
-        s = reference_element.ufc_simplex(dim)
-        r = lambda x: x ** 0.5
-        if dim == 2:
-            s.vertices = [(0.0, 0.0), (-1.0, -r(3.0)), (1.0, -r(3.0))]
-        elif dim == 3:
-            s.vertices = [(r(3.0)/3, 0.0, 0.0), (-r(3.0)/6, 0.5, 0.0),
-                          (-r(3.0)/6, -0.5, 0.0), (0.0, 0.0, r(6.0)/3)]
-        return s
-
-    dim = 2
-    degree = 2
-    tabulate = [lambda n, x: jacobi.eval_jacobi_batch(0, 0, n, x), dubiner_2d, dubiner_3d][dim-1]
-
-    # ref_el = symmetric_simplex(dim)
-    ref_el = reference_element.ufc_simplex(dim)
-
-    if dim == 1:
-        base_ref_el = reference_element.DefaultInterval()
-    elif dim == 2:
-        base_ref_el = reference_element.DefaultTriangle()
-    elif dim == 3:
-        base_ref_el = reference_element.DefaultTetrahedron()
-
-    ref_el = base_ref_el
-
-    v1 = ref_el.get_vertices()
-    v2 = base_ref_el.get_vertices()
-    A, b = reference_element.make_affine_mapping(v1, v2)
-    mapping = lambda x: numpy.dot(x, A.T) + b
-    expansion_set = get_expansion_set(ref_el)
-
-    if 1:
-        X = [tuple(map(sympy.Symbol, ("x", "y", "z")[:dim]))]
-        print("Affine mapping")
-        print(A)
-        print(b)
-        simplify = lambda x: numpy.array(sympy.simplify(x))
-        Told = expansion_set.tabulate(degree, X)
-        Tnew = tabulate(degree, mapping(X))
-
-        print("New phi(X)")
-        print(simplify(Tnew[(0,) * dim]))
-        print("Old phi(X)")
-        print(simplify(Told))
-
-        for i, (alpha, Xi) in enumerate(zip(numpy.eye(dim, dtype=int), X[0])):
-            print("New d/dX_%d phi" % i)
-            print(simplify(Tnew[tuple(alpha)]))
-            print("Old d/dX_%d phi" % i)
-            Di = lambda f: [sympy.simplify(sympy.diff(f[0], Xi))]
-            print(numpy.array(list(map(Di, Told))))
-
-    else:
-        import FIAT
-        from matplotlib import pyplot as plt
-
-        line = reference_element.ufc_simplex(1)
-        lr = FIAT.quadrature.GaussLobattoLegendreQuadratureLineRule
-        point_set = FIAT.recursive_points.RecursivePointSet(lambda n: lr(line, n+1).get_points() if n else None)
-        points = point_set.recursive_points(ref_el.get_vertices(), degree*5)
-        phi = tabulate(degree, mapping(points))
-        z = phi[(0,) * dim]
-        y = expansion_set.tabulate(degree, points)
-
-        x = numpy.array(points)
-        fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
-        ax.plot_trisurf(x[:, 0], x[:, 1], z[-1], linewidth=0.2, antialiased=True)
-        ax.plot_trisurf(x[:, 0], x[:, 1], y[-1], linewidth=0.2, antialiased=True)
-        plt.show()

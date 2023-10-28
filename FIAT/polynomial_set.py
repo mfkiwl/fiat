@@ -164,15 +164,10 @@ class ONPolynomialSet(PolynomialSet):
             dmats = [numpy.array([[0.0]], "d") for i in range(sd)]
         else:
             pts = self.point_set.recursive_points(ref_el.get_vertices(), degree)
-
             v = numpy.transpose(expansion_set.tabulate(degree, pts))
-
             dv = expansion_set.tabulate_derivatives(degree, pts)
-            dtildes = [[[a[1][i] for a in dvrow] for dvrow in dv]
-                       for i in range(sd)]
-
             dmats = [numpy.linalg.solve(v, numpy.transpose(dtilde))
-                     for dtilde in dtildes]
+                     for dtilde in dv]
         PolynomialSet.__init__(self, ref_el, degree, embedded_degree,
                                expansion_set, coeffs, dmats)
 
@@ -273,10 +268,7 @@ class ONSymTensorPolynomialSet(PolynomialSet):
         # construct dmats. this is the same as ONPolynomialSet.
         pts = ref_el.make_points(sd, 0, degree + sd + 1)
         v = numpy.transpose(expansion_set.tabulate(degree, pts))
-        vinv = numpy.linalg.inv(v)
         dv = expansion_set.tabulate_derivatives(degree, pts)
-        dtildes = [[[a[1][i] for a in dvrow] for dvrow in dv]
-                   for i in range(sd)]
-        dmats = [numpy.dot(vinv, numpy.transpose(dtilde)) for dtilde in dtildes]
+        dmats = [numpy.linalg.solve(v, numpy.transpose(dtilde)) for dtilde in dv]
         PolynomialSet.__init__(self, ref_el, degree, embedded_degree,
                                expansion_set, coeffs, dmats)
