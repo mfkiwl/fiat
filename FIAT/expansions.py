@@ -14,6 +14,10 @@ from FIAT import reference_element
 from FIAT import jacobi
 from math import prod
 
+from FIAT.reference_element import UFCInterval
+from FIAT.quadrature import GaussLegendreQuadratureLineRule
+from FIAT.recursive_points import RecursivePointSet
+
 
 def flat_index(i, j):
     return (i + j) * (i + j + 1) // 2 + j
@@ -194,7 +198,28 @@ def eta_cube(xi):
     return eta1, eta2, eta3
 
 
-class PointExpansionSet(object):
+class ExpansionSet(object):
+    point_set = RecursivePointSet(lambda n: GaussLegendreQuadratureLineRule(UFCInterval(), n + 1).get_points())
+
+    def __init__(self, ref_el):
+        pass
+
+    def _tabulate_duffy(self, degree, pts):
+        raise NotImplementedError
+
+    def make_dmats(self, degree):
+        pts = self.point_set.recursive_points(self.ref_el.get_vertices(), degree)
+        tabulations = self._tabulate_duffy(degree, pts)
+        dmats = []
+        v, = [tabulations[alpha] for alpha in tabulations if sum(alpha) == 0]
+        for alpha in sorted(tabulations, reverse=True):
+            if sum(alpha) == 1:
+                dv = tabulations[alpha]
+                dmats.append(numpy.linalg.solve(v.T, dv.T))
+        return dmats
+
+
+class PointExpansionSet(ExpansionSet):
     """Evaluates the point basis on a point reference element."""
 
     def __init__(self, ref_el):
@@ -222,7 +247,7 @@ class PointExpansionSet(object):
         return deriv_vals
 
 
-class LineExpansionSet(object):
+class LineExpansionSet(ExpansionSet):
     """Evaluates the Legendre basis on a line reference element."""
 
     def __init__(self, ref_el):
@@ -253,6 +278,13 @@ class LineExpansionSet(object):
         else:
             return []
 
+    def _tabulate_duffy(self, n, pts):
+        xi = numpy.transpose(numpy.dot(pts, self.A.T) + self.b)
+        tabulations = {(0,): dubiner_1d(n, 0, xi),
+                       (1,): dubiner_deriv_1d(n, 0, xi)}
+        duffy_chain_rule(self.A, xi, tabulations)
+        return tabulations
+
     def tabulate_derivatives(self, n, pts):
         """Returns a tuple of length one (A,) such that
         A[i,j] = D phi_i(pts[j]).  The tuple is returned for
@@ -281,7 +313,7 @@ class LineExpansionSet(object):
         return dv
 
 
-class TriangleExpansionSet(object):
+class TriangleExpansionSet(ExpansionSet):
     """Evaluates the orthonormal Dubiner basis on a triangular
     reference element."""
 
@@ -382,9 +414,6 @@ class TriangleExpansionSet(object):
         return tabulations
 
     def tabulate_derivatives(self, n, pts):
-        tabulations = self._tabulate_duffy(n, pts)
-        return [tabulations[tuple(key)] for key in numpy.eye(2, dtype=int)]
-
         order = 1
         data = _tabulate_dpts(self._tabulate, 2, n, order, numpy.array(pts))
         # Put data in the required data structure, i.e.,
@@ -401,7 +430,7 @@ class TriangleExpansionSet(object):
         return _tabulate_dpts(self._tabulate, 2, n, order, numpy.array(pts))
 
 
-class TetrahedronExpansionSet(object):
+class TetrahedronExpansionSet(ExpansionSet):
     """Collapsed orthonormal polynomial expanion on a tetrahedron."""
 
     def __init__(self, ref_el):
@@ -523,9 +552,6 @@ class TetrahedronExpansionSet(object):
         return tabulations
 
     def tabulate_derivatives(self, n, pts):
-        tabulations = self._tabulate_duffy(n, pts)
-        return [tabulations[tuple(key)] for key in numpy.eye(3, dtype=int)]
-
         order = 1
         D = 3
         data = _tabulate_dpts(self._tabulate, D, n, order, numpy.array(pts))

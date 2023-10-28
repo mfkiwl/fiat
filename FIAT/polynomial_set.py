@@ -18,9 +18,6 @@
 import numpy
 from FIAT import expansions
 from FIAT.functional import index_iterator
-from FIAT.reference_element import UFCInterval
-from FIAT.quadrature import GaussLegendreQuadratureLineRule
-from FIAT.recursive_points import RecursivePointSet
 
 
 def mis(m, n):
@@ -128,8 +125,6 @@ class ONPolynomialSet(PolynomialSet):
     for vector- and tensor-valued sets as well.
 
     """
-    point_set = RecursivePointSet(lambda n: GaussLegendreQuadratureLineRule(UFCInterval(), n + 1).get_points())
-
     def __init__(self, ref_el, degree, shape=tuple()):
 
         if shape == tuple():
@@ -163,11 +158,7 @@ class ONPolynomialSet(PolynomialSet):
         if degree == 0:
             dmats = [numpy.array([[0.0]], "d") for i in range(sd)]
         else:
-            pts = self.point_set.recursive_points(ref_el.get_vertices(), degree)
-            v = numpy.transpose(expansion_set.tabulate(degree, pts))
-            dv = expansion_set.tabulate_derivatives(degree, pts)
-            dmats = [numpy.linalg.solve(v, numpy.transpose(dtilde))
-                     for dtilde in dv]
+            dmats = expansion_set.make_dmats(degree)
         PolynomialSet.__init__(self, ref_el, degree, embedded_degree,
                                expansion_set, coeffs, dmats)
 
@@ -266,9 +257,6 @@ class ONSymTensorPolynomialSet(PolynomialSet):
                     cur_bf += 1
 
         # construct dmats. this is the same as ONPolynomialSet.
-        pts = ref_el.make_points(sd, 0, degree + sd + 1)
-        v = numpy.transpose(expansion_set.tabulate(degree, pts))
-        dv = expansion_set.tabulate_derivatives(degree, pts)
-        dmats = [numpy.linalg.solve(v, numpy.transpose(dtilde)) for dtilde in dv]
+        dmats = expansion_set.make_dmats(degree)
         PolynomialSet.__init__(self, ref_el, degree, embedded_degree,
                                expansion_set, coeffs, dmats)
