@@ -294,6 +294,10 @@ class LineExpansionSet(ExpansionSet):
         scale = self.A[0][0]
         tabulations = {(0,): dubiner_1d(n, 0, xi),
                        (1,): dubiner_deriv_1d(n, 0, xi) * scale}
+        for alpha in tabulations:
+            results = tabulations[alpha]
+            for k in range(n+1):
+                results[k, :] *= (k + 0.5)**0.5
         return tabulations
 
     def tabulate_derivatives(self, n, pts):
