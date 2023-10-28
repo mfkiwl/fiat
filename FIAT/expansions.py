@@ -201,8 +201,21 @@ def eta_cube(xi):
 class ExpansionSet(object):
     point_set = RecursivePointSet(lambda n: GaussLegendreQuadratureLineRule(UFCInterval(), n + 1).get_points())
 
-    def __init__(self, ref_el):
-        pass
+    def __new__(cls, ref_el, *args, **kwargs):
+        """Returns an ExpansionSet instance appopriate for the given
+        reference element."""
+        if cls is not ExpansionSet:
+            return super(ExpansionSet, cls).__new__(cls)
+        if ref_el.get_shape() == reference_element.POINT:
+            return PointExpansionSet(ref_el)
+        elif ref_el.get_shape() == reference_element.LINE:
+            return LineExpansionSet(ref_el)
+        elif ref_el.get_shape() == reference_element.TRIANGLE:
+            return TriangleExpansionSet(ref_el)
+        elif ref_el.get_shape() == reference_element.TETRAHEDRON:
+            return TetrahedronExpansionSet(ref_el)
+        else:
+            raise Exception("Unknown reference element type.")
 
     def _tabulate_duffy(self, degree, pts):
         raise NotImplementedError
@@ -221,7 +234,6 @@ class ExpansionSet(object):
 
 class PointExpansionSet(ExpansionSet):
     """Evaluates the point basis on a point reference element."""
-
     def __init__(self, ref_el):
         if ref_el.get_spatial_dimension() != 0:
             raise ValueError("Must have a point")
@@ -249,7 +261,6 @@ class PointExpansionSet(ExpansionSet):
 
 class LineExpansionSet(ExpansionSet):
     """Evaluates the Legendre basis on a line reference element."""
-
     def __init__(self, ref_el):
         if ref_el.get_spatial_dimension() != 1:
             raise Exception("Must have a line")
@@ -279,10 +290,10 @@ class LineExpansionSet(ExpansionSet):
             return []
 
     def _tabulate_duffy(self, n, pts):
-        xi = numpy.transpose(numpy.dot(pts, self.A.T) + self.b)
+        xi = numpy.dot(pts, self.A.T) + self.b
+        scale = self.A[0][0]
         tabulations = {(0,): dubiner_1d(n, 0, xi),
-                       (1,): dubiner_deriv_1d(n, 0, xi)}
-        duffy_chain_rule(self.A, xi, tabulations)
+                       (1,): dubiner_deriv_1d(n, 0, xi) * scale}
         return tabulations
 
     def tabulate_derivatives(self, n, pts):
@@ -316,7 +327,6 @@ class LineExpansionSet(ExpansionSet):
 class TriangleExpansionSet(ExpansionSet):
     """Evaluates the orthonormal Dubiner basis on a triangular
     reference element."""
-
     def __init__(self, ref_el):
         if ref_el.get_spatial_dimension() != 2:
             raise Exception("Must have a triangle")
@@ -432,7 +442,6 @@ class TriangleExpansionSet(ExpansionSet):
 
 class TetrahedronExpansionSet(ExpansionSet):
     """Collapsed orthonormal polynomial expanion on a tetrahedron."""
-
     def __init__(self, ref_el):
         if ref_el.get_spatial_dimension() != 3:
             raise Exception("Must be a tetrahedron")
@@ -567,21 +576,6 @@ class TetrahedronExpansionSet(ExpansionSet):
 
     def tabulate_jet(self, n, pts, order=1):
         return _tabulate_dpts(self._tabulate, 3, n, order, numpy.array(pts))
-
-
-def get_expansion_set(ref_el):
-    """Returns an ExpansionSet instance appopriate for the given
-    reference element."""
-    if ref_el.get_shape() == reference_element.POINT:
-        return PointExpansionSet(ref_el)
-    elif ref_el.get_shape() == reference_element.LINE:
-        return LineExpansionSet(ref_el)
-    elif ref_el.get_shape() == reference_element.TRIANGLE:
-        return TriangleExpansionSet(ref_el)
-    elif ref_el.get_shape() == reference_element.TETRAHEDRON:
-        return TetrahedronExpansionSet(ref_el)
-    else:
-        raise Exception("Unknown reference element type.")
 
 
 def polynomial_dimension(ref_el, degree):

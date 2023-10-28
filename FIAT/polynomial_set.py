@@ -135,7 +135,7 @@ class ONPolynomialSet(PolynomialSet):
         num_exp_functions = expansions.polynomial_dimension(ref_el, degree)
         num_members = num_components * num_exp_functions
         embedded_degree = degree
-        expansion_set = expansions.get_expansion_set(ref_el)
+        expansion_set = expansions.ExpansionSet(ref_el)
         sd = ref_el.get_spatial_dimension()
 
         # set up coefficients
@@ -235,7 +235,7 @@ class ONSymTensorPolynomialSet(PolynomialSet):
         num_components = size * (size + 1) // 2
         num_members = num_components * num_exp_functions
         embedded_degree = degree
-        expansion_set = expansions.get_expansion_set(ref_el)
+        expansion_set = expansions.ExpansionSet(ref_el)
 
         # set up coefficients for symmetric tensors
         coeffs_shape = tuple([num_members] + list(shape) + [num_exp_functions])
