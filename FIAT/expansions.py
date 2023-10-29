@@ -25,74 +25,6 @@ def morton_index3(p, q, r):
     return (p + q + r)*(p + q + r + 1)*(p + q + r + 2)//6 + (q + r)*(q + r + 1)//2 + r
 
 
-def dubiner_1d(order, dim, x):
-    if dim == 0:
-        scale = numpy.sqrt(0.5 + numpy.arange(order + 1))
-        results = jacobi.eval_jacobi_batch(0, 0, order, x[:, None])
-        return numpy.multiply(scale[:, None], results, out=results)
-    sd = (order + 1) * (order + 2) // 2
-    phi = numpy.zeros((sd, x.size), dtype=x.dtype)
-    x1 = (1. - x) * 0.5
-    for i in range(order + 1):
-        n = order - i
-        alpha = 2 * i + dim
-        results = jacobi.eval_jacobi_batch(alpha, 0, n, x[:, None])
-        if i > 0:
-            results *= x1 ** i
-        scale = numpy.sqrt(0.5*(alpha + 1) + numpy.arange(n + 1))
-        numpy.multiply(scale[:, None], results, out=results)
-        indices = [morton_index2(i, j) for j in range(n + 1)]
-        phi[indices, :] = results
-    return phi
-
-
-def dubiner_deriv_1d(order, dim, x):
-    if dim == 0:
-        scale = numpy.sqrt(0.5 + numpy.arange(order + 1))
-        results = jacobi.eval_jacobi_deriv_batch(0, 0, order, x[:, None])
-        return numpy.multiply(scale[:, None], results, out=results)
-    sd = (order + 1) * (order + 2) // 2
-    dphi = numpy.zeros((sd, x.size), dtype=x.dtype)
-    x1 = (1. - x) * 0.5
-    for i in range(order + 1):
-        n = order - i
-        alpha = 2 * i + dim
-        derivs = jacobi.eval_jacobi_deriv_batch(alpha, 0, n, x[:, None])
-        if i > 0:
-            results = jacobi.eval_jacobi_batch(alpha, 0, n, x[:, None])
-            derivs *= x1
-            derivs += results * (-0.5 * i)
-            if i > 1:
-                derivs *= x1 ** (i - 1)
-        scale = numpy.sqrt(0.5*(alpha + 1) + numpy.arange(n + 1))
-        numpy.multiply(scale[:, None], derivs, out=derivs)
-        indices = [morton_index2(i, j) for j in range(n + 1)]
-        dphi[indices, :] = derivs
-    return dphi
-
-
-def duffy_chain_rule(A, eta, tabulations):
-    dim = len(eta)
-    dphi_dxi = [tabulations[alpha] for alpha in sorted(tabulations, reverse=True) if sum(alpha) == 1]
-    if len(dphi_dxi) < dim:
-        return
-    eta1 = [(1. - x) * 0.5 for x in eta]
-    for i in range(dim):
-        for j in range(i):
-            Jij = -0.5 * (1. + eta[j])
-            for k in range(j + 1, dim):
-                if k != i:
-                    Jij *= eta1[k]
-            dphi_dxi[i] -= dphi_dxi[j] * Jij
-        for j in range(i + 1, dim):
-            dphi_dxi[i] /= eta1[j]
-    j = 0
-    for alpha in sorted(tabulations, reverse=True):
-        if sum(alpha) == 1:
-            tabulations[alpha] = sum(dphi_dxi[i] * A[i][j] for i in range(dim))
-            j += 1
-
-
 def jrc(a, b, n):
     an = (2*n+1+a+b)*(2*n+2+a+b) / (2*(n+1)*(n+1+a+b))
     bn = (a*a-b*b) * (2*n+1+a+b) / (2*(n+1)*(2*n+a+b)*(n+1+a+b))
@@ -213,6 +145,86 @@ def eta_cube(xi):
     return eta1, eta2, eta3
 
 
+def dubiner_1d(order, dim, x):
+    """Returns a tabulation of the orthonormal Dubiner 1D polymoials, defined as
+       c_i P_i^(0,0)(x)                  if dim == 0,
+       c_ij (1-x)^i P_j^(2i + dim, 0)(x) otherwise."""
+    if dim == 0:
+        scale = numpy.sqrt(0.5 + numpy.arange(order + 1))
+        results = jacobi.eval_jacobi_batch(0, 0, order, x[:, None])
+        return numpy.multiply(scale[:, None], results, out=results)
+    sd = (order + 1) * (order + 2) // 2
+    phi = numpy.zeros((sd, x.size), dtype=x.dtype)
+    x1 = (1. - x) * 0.5
+    for i in range(order + 1):
+        n = order - i
+        alpha = 2 * i + dim
+        results = jacobi.eval_jacobi_batch(alpha, 0, n, x[:, None])
+        if i > 0:
+            results *= x1 ** i
+        scale = numpy.sqrt(0.5*(alpha + 1) + numpy.arange(n + 1))
+        numpy.multiply(scale[:, None], results, out=results)
+        indices = [morton_index2(i, j) for j in range(n + 1)]
+        phi[indices, :] = results
+    return phi
+
+
+def dubiner_deriv_1d(order, dim, x):
+    """Returns a tabulation of the first derivatives of the orthonormal Dubiner
+    1D polynomials."""
+    if dim == 0:
+        scale = numpy.sqrt(0.5 + numpy.arange(order + 1))
+        results = jacobi.eval_jacobi_deriv_batch(0, 0, order, x[:, None])
+        return numpy.multiply(scale[:, None], results, out=results)
+    sd = (order + 1) * (order + 2) // 2
+    dphi = numpy.zeros((sd, x.size), dtype=x.dtype)
+    x1 = (1. - x) * 0.5
+    for i in range(order + 1):
+        n = order - i
+        alpha = 2 * i + dim
+        derivs = jacobi.eval_jacobi_deriv_batch(alpha, 0, n, x[:, None])
+        if i > 0:
+            results = jacobi.eval_jacobi_batch(alpha, 0, n, x[:, None])
+            derivs *= x1
+            derivs += results * (-0.5 * i)
+            if i > 1:
+                derivs *= x1 ** (i - 1)
+        scale = numpy.sqrt(0.5*(alpha + 1) + numpy.arange(n + 1))
+        numpy.multiply(scale[:, None], derivs, out=derivs)
+        indices = [morton_index2(i, j) for j in range(n + 1)]
+        dphi[indices, :] = derivs
+    return dphi
+
+
+def duffy_chain_rule(A, eta, tabulations):
+    """Applies the chain rule associated with an affine transformation onto the
+    default simplex on (-1, 1), followed by the Duffy transformation onto [-1, 1]^d.
+    A: the Jacobian of the affine transformation
+    eta: the points in [-1, 1]^d
+    tabulations: On entry, the tabulations of the reference gradient with
+        respect to eta. On exit, the tabulations of the gradient in physical space.
+    """
+    dim = len(eta)
+    dphi_dxi = [tabulations[alpha] for alpha in sorted(tabulations, reverse=True) if sum(alpha) == 1]
+    if len(dphi_dxi) < dim:
+        return
+    eta1 = [(1. - x) * 0.5 for x in eta]
+    for i in range(dim):
+        for j in range(i):
+            Jij = -0.5 * (1. + eta[j])
+            for k in range(j + 1, dim):
+                if k != i:
+                    Jij *= eta1[k]
+            dphi_dxi[i] -= dphi_dxi[j] * Jij
+        for j in range(i + 1, dim):
+            dphi_dxi[i] /= eta1[j]
+    j = 0
+    for alpha in sorted(tabulations, reverse=True):
+        if sum(alpha) == 1:
+            tabulations[alpha] = sum(dphi_dxi[i] * A[i][j] for i in range(dim))
+            j += 1
+
+
 class ExpansionSet(object):
     point_set = RecursivePointSet(lambda n: GaussLegendreQuadratureLineRule(UFCInterval(), n + 1).get_points())
 
@@ -244,6 +256,11 @@ class ExpansionSet(object):
         self._dmats_cache = {}
 
     def _tabulate_duffy(self, n, pts):
+        """Returns a dict of tabulations of phi_i(pts[j]) and each component of
+        the gradient d/dx_k phi_i(pts[j]). Here we employ the Duffy transform,
+        and thus this tabulation mode is only recommended for use with interior
+        points.
+        """
         from FIAT.polynomial_set import mis
         dim = self.ref_el.get_spatial_dimension()
         sd = self.get_num_members(n)
@@ -275,6 +292,10 @@ class ExpansionSet(object):
         return tabulations
 
     def make_dmats(self, degree):
+        """Returns a numpy array with the expansion coefficients dmat[k, j, i]
+        of the gradient of each member of the expansion set:
+            d/dx_k phi_j = sum_i dmat[k, j, i] phi_i.
+        """
         cache = self._dmats_cache
         key = degree
         try:
