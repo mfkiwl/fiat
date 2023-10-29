@@ -54,15 +54,14 @@ class PolynomialSet(object):
          function.
     """
 
-    def __init__(self, ref_el, degree, embedded_degree, expansion_set, coeffs,
-                 dmats):
+    def __init__(self, ref_el, degree, embedded_degree, expansion_set, coeffs):
         self.ref_el = ref_el
         self.num_members = coeffs.shape[0]
         self.degree = degree
         self.embedded_degree = embedded_degree
         self.expansion_set = expansion_set
         self.coeffs = coeffs
-        self.dmats = dmats
+        self.dmats = []
 
     def tabulate_new(self, pts):
         return numpy.dot(self.coeffs,
@@ -72,11 +71,14 @@ class PolynomialSet(object):
         """Returns the values of the polynomial set."""
         result = {}
         base_vals = self.expansion_set.tabulate(self.embedded_degree, pts)
+        dmats = self.get_dmats() if jet_order > 0 else self.dmats
         for i in range(jet_order + 1):
             alphas = mis(self.ref_el.get_spatial_dimension(), i)
             for alpha in alphas:
-                if len(self.dmats) > 0:
-                    D = form_matrix_product(self.dmats, alpha)
+                if sum(alpha) == 0:
+                    D = numpy.eye(len(base_vals))
+                elif len(dmats) > 0:
+                    D = form_matrix_product(dmats, alpha)
                 else:
                     # special for vertex without defined point location
                     assert pts == [()]
@@ -102,6 +104,8 @@ class PolynomialSet(object):
         return self.embedded_degree
 
     def get_dmats(self):
+        if len(self.dmats) == 0:
+            self.dmats = self.expansion_set.make_dmats(self.degree)
         return self.dmats
 
     def get_reference_element(self):
@@ -116,7 +120,7 @@ class PolynomialSet(object):
         """Extracts subset of polynomials given by items."""
         new_coeffs = numpy.take(self.get_coeffs(), items, 0)
         return PolynomialSet(self.ref_el, self.degree, self.embedded_degree,
-                             self.expansion_set, new_coeffs, self.dmats)
+                             self.expansion_set, new_coeffs)
 
 
 class ONPolynomialSet(PolynomialSet):
@@ -136,7 +140,6 @@ class ONPolynomialSet(PolynomialSet):
         num_members = num_components * num_exp_functions
         embedded_degree = degree
         expansion_set = expansions.ExpansionSet(ref_el)
-        sd = ref_el.get_spatial_dimension()
 
         # set up coefficients
         coeffs_shape = tuple([num_members] + list(shape) + [num_exp_functions])
@@ -154,13 +157,8 @@ class ONPolynomialSet(PolynomialSet):
                     cur_idx = tuple([cur_bf] + list(idx) + [exp_bf])
                     coeffs[cur_idx] = 1.0
                     cur_bf += 1
-        # construct dmats
-        if degree == 0:
-            dmats = [numpy.array([[0.0]], "d") for i in range(sd)]
-        else:
-            dmats = expansion_set.make_dmats(degree)
         PolynomialSet.__init__(self, ref_el, degree, embedded_degree,
-                               expansion_set, coeffs, dmats)
+                               expansion_set, coeffs)
 
 
 def project(f, U, Q):
@@ -214,8 +212,7 @@ def polynomial_set_union_normalized(A, B):
                          A.get_degree(),
                          A.get_embedded_degree(),
                          A.get_expansion_set(),
-                         coeffs,
-                         A.get_dmats())
+                         coeffs)
 
 
 class ONSymTensorPolynomialSet(PolynomialSet):
@@ -257,6 +254,5 @@ class ONSymTensorPolynomialSet(PolynomialSet):
                     cur_bf += 1
 
         # construct dmats. this is the same as ONPolynomialSet.
-        dmats = expansion_set.make_dmats(degree)
         PolynomialSet.__init__(self, ref_el, degree, embedded_degree,
-                               expansion_set, coeffs, dmats)
+                               expansion_set, coeffs)

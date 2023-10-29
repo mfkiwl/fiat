@@ -17,8 +17,12 @@ from FIAT.quadrature import GaussLegendreQuadratureLineRule
 from FIAT.recursive_points import RecursivePointSet
 
 
-def flat_index(i, j):
+def morton_index2(i, j):
     return (i + j) * (i + j + 1) // 2 + j
+
+
+def morton_index3(p, q, r):
+    return (p + q + r)*(p + q + r + 1)*(p + q + r + 2)//6 + (q + r)*(q + r + 1)//2 + r
 
 
 def dubiner_1d(order, dim, x):
@@ -37,7 +41,7 @@ def dubiner_1d(order, dim, x):
             results *= x1 ** i
         scale = numpy.sqrt(0.5*(alpha + 1) + numpy.arange(n + 1))
         numpy.multiply(scale[:, None], results, out=results)
-        indices = [flat_index(i, j) for j in range(n + 1)]
+        indices = [morton_index2(i, j) for j in range(n + 1)]
         phi[indices, :] = results
     return phi
 
@@ -62,7 +66,7 @@ def dubiner_deriv_1d(order, dim, x):
                 derivs *= x1 ** (i - 1)
         scale = numpy.sqrt(0.5*(alpha + 1) + numpy.arange(n + 1))
         numpy.multiply(scale[:, None], derivs, out=derivs)
-        indices = [flat_index(i, j) for j in range(n + 1)]
+        indices = [morton_index2(i, j) for j in range(n + 1)]
         dphi[indices, :] = derivs
     return dphi
 
@@ -232,15 +236,22 @@ class ExpansionSet(object):
         raise NotImplementedError
 
     def make_dmats(self, degree):
+        if not hasattr(self, "_dmats_cache"):
+            self._dmats_cache = {}
+        cache = self._dmats_cache
+        key = degree
+        try:
+            return cache[key]
+        except KeyError:
+            pass
+        if degree == 0:
+            return cache.setdefault(key, numpy.zeros((self.ref_el.get_spatial_dimension(), 1, 1), "d"))
         pts = self.point_set.recursive_points(self.ref_el.get_vertices(), degree)
-        tabulations = self._tabulate_duffy(degree, pts)
-        dmats = []
-        v, = [tabulations[alpha] for alpha in tabulations if sum(alpha) == 0]
-        for alpha in sorted(tabulations, reverse=True):
-            if sum(alpha) == 1:
-                dv = tabulations[alpha]
-                dmats.append(numpy.linalg.solve(v.T, dv.T))
-        return dmats
+        tab = self._tabulate_duffy(degree, pts)
+        v, = [tab[alpha].T for alpha in tab if sum(alpha) == 0]
+        dv = numpy.stack([tab[alpha].T for alpha in sorted(tab, reverse=True) if sum(alpha) == 1])
+        dmats = numpy.linalg.solve(v, dv)
+        return cache.setdefault(key, dmats)
 
 
 class PointExpansionSet(ExpansionSet):
@@ -364,9 +375,7 @@ class TriangleExpansionSet(ExpansionSet):
         ref_pts = [sum(self.A[i][j] * pts[j] for j in range(m2)) + self.b[i]
                    for i in range(m1)]
 
-        def idx(p, q):
-            return (p + q) * (p + q + 1) // 2 + q
-
+        idx = morton_index2
         results = ((n + 1) * (n + 2) // 2) * [None]
 
         results[0] = 1.0 \
@@ -410,24 +419,23 @@ class TriangleExpansionSet(ExpansionSet):
         # return self.scale * results
 
     def _tabulate_duffy(self, n, pts):
-        def idx(p, q):
-            return (p + q) * (p + q + 1) // 2 + q
+        from FIAT.polynomial_set import mis
+        idx = morton_index2
         sd = self.get_num_members(n)
         xi = numpy.transpose(numpy.dot(pts, self.A.T) + self.b)
         eta = eta_square(xi)
         dim = len(eta)
         basis = [dubiner_1d(n, k, eta[k]) for k in range(dim)]
         derivs = [dubiner_deriv_1d(n, k, eta[k]) for k in range(dim)]
-        alphas = [(0,) * dim]
-        alphas.extend(tuple(row) for row in numpy.eye(dim, dtype=int))
+        alphas = mis(dim, 0) + mis(dim, 1)
         tabulations = {}
         for alpha in alphas:
-            T = [v if a == 0 else dv for a, v, dv in zip(alpha, basis, derivs)]
-            phi = numpy.zeros((sd, T[0].shape[1]), dtype=T[0].dtype)
+            V = [v if a == 0 else dv for a, v, dv in zip(alpha, basis, derivs)]
+            phi = numpy.zeros((sd, V[0].shape[1]), dtype=V[0].dtype)
             for i in range(n + 1):
-                Ti = T[0][i]
+                Vi = V[0][i]
                 for j in range(n + 1 - i):
-                    phi[idx(i, j)] = T[1][flat_index(i, j)] * Ti
+                    phi[idx(i, j)] = V[1][morton_index2(i, j)] * Vi
             tabulations[alpha] = phi
         duffy_chain_rule(self.A, eta, tabulations)
         return tabulations
@@ -478,9 +486,7 @@ class TetrahedronExpansionSet(ExpansionSet):
         ref_pts = [sum(self.A[i][j] * pts[j] for j in range(m2)) + self.b[i]
                    for i in range(m1)]
 
-        def idx(p, q, r):
-            return (p + q + r)*(p + q + r + 1)*(p + q + r + 2)//6 + (q + r)*(q + r + 1)//2 + r
-
+        idx = morton_index3
         results = ((n + 1) * (n + 2) * (n + 3) // 6) * [None]
         results[0] = 1.0 \
             + pts[0] - pts[0] \
@@ -544,26 +550,25 @@ class TetrahedronExpansionSet(ExpansionSet):
         return results
 
     def _tabulate_duffy(self, n, pts):
-        def idx(p, q, r):
-            return (p + q + r)*(p + q + r + 1)*(p + q + r + 2)//6 + (q + r)*(q + r + 1)//2 + r
+        from FIAT.polynomial_set import mis
+        idx = morton_index3
         sd = self.get_num_members(n)
         xi = numpy.transpose(numpy.dot(pts, self.A.T) + self.b)
         eta = eta_cube(xi)
         dim = len(eta)
         basis = [dubiner_1d(n, k, eta[k]) for k in range(dim)]
         derivs = [dubiner_deriv_1d(n, k, eta[k]) for k in range(dim)]
-        alphas = [(0,) * dim]
-        alphas.extend(tuple(row) for row in numpy.eye(dim, dtype=int))
+        alphas = mis(dim, 0) + mis(dim, 1)
         tabulations = {}
         for alpha in alphas:
-            T = [v if a == 0 else dv for a, v, dv in zip(alpha, basis, derivs)]
-            phi = numpy.zeros((sd, T[0].shape[1]), dtype=T[0].dtype)
+            V = [v if a == 0 else dv for a, v, dv in zip(alpha, basis, derivs)]
+            phi = numpy.zeros((sd, V[0].shape[1]), dtype=V[0].dtype)
             for i in range(n + 1):
-                Ti = T[0][i]
+                Vi = V[0][i]
                 for j in range(n + 1 - i):
-                    Tij = T[1][flat_index(i, j)] * Ti
+                    Vij = V[1][morton_index2(i, j)] * Vi
                     for k in range(n + 1 - i - j):
-                        phi[idx(i, j, k)] = T[2][flat_index(i + j, k)] * Tij
+                        phi[idx(i, j, k)] = V[2][morton_index2(i + j, k)] * Vij
             tabulations[alpha] = phi
         duffy_chain_rule(self.A, eta, tabulations)
         return tabulations

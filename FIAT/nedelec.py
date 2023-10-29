@@ -68,8 +68,7 @@ def NedelecSpace2D(ref_el, k):
                                              k + 1,
                                              k + 1,
                                              vec_Pkp1.get_expansion_set(),
-                                             PkH_crossx_coeffs,
-                                             vec_Pkp1.get_dmats())
+                                             PkH_crossx_coeffs)
 
     return polynomial_set.polynomial_set_union_normalized(vec_Pk_from_Pkp1,
                                                           PkHcrossx)
@@ -136,8 +135,7 @@ def NedelecSpace3D(ref_el, k):
                                             k + 1,
                                             k + 1,
                                             vec_Pkp1.get_expansion_set(),
-                                            PkCrossXcoeffs,
-                                            vec_Pkp1.get_dmats())
+                                            PkCrossXcoeffs)
     return polynomial_set.polynomial_set_union_normalized(vec_Pk, PkCrossX)
 
 

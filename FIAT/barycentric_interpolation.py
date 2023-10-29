@@ -89,6 +89,5 @@ class LagrangePolynomialSet(polynomial_set.PolynomialSet):
                     coeffs[cur_idx] = 1.0
                     cur_bf += 1
 
-        dmats = expansion_set.make_dmats(degree)
         super(LagrangePolynomialSet, self).__init__(ref_el, degree, embedded_degree,
-                                                    expansion_set, coeffs, dmats)
+                                                    expansion_set, coeffs)
