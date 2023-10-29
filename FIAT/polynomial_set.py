@@ -54,14 +54,14 @@ class PolynomialSet(object):
          function.
     """
 
-    def __init__(self, ref_el, degree, embedded_degree, expansion_set, coeffs, dmats=None):
+    def __init__(self, ref_el, degree, embedded_degree, expansion_set, coeffs):
         self.ref_el = ref_el
         self.num_members = coeffs.shape[0]
         self.degree = degree
         self.embedded_degree = embedded_degree
         self.expansion_set = expansion_set
         self.coeffs = coeffs
-        self.dmats = dmats or []
+        self.dmats = []
 
     def tabulate_new(self, pts):
         return numpy.dot(self.coeffs,

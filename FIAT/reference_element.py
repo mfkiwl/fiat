@@ -1266,7 +1266,9 @@ def make_affine_mapping(xs, ys):
 def default_simplex(spatial_dim):
     """Factory function that maps spatial dimension to an instance of
     the default reference simplex of that dimension."""
-    if spatial_dim == 1:
+    if spatial_dim == 0:
+        return Point()
+    elif spatial_dim == 1:
         return DefaultLine()
     elif spatial_dim == 2:
         return DefaultTriangle()
