@@ -232,12 +232,21 @@ class ExpansionSet(object):
         else:
             raise Exception("Unknown reference element type.")
 
-    def _tabulate_duffy(self, degree, pts):
-        raise NotImplementedError
+    def __init__(self, ref_el):
+        self.ref_el = ref_el
+        dim = ref_el.get_spatial_dimension()
+        self.base_ref_el = reference_element.default_simplex(dim)
+        v1 = ref_el.get_vertices()
+        v2 = self.base_ref_el.get_vertices()
+        self.A, self.b = reference_element.make_affine_mapping(v1, v2)
+        self.mapping = lambda x: numpy.dot(self.A, x) + self.b
+        self.scale = numpy.sqrt(numpy.linalg.det(self.A))
+        self._dmats_cache = {}
+
+    def _tabulate_duffy(self, n, pts):
+        raise NotImplementedError()
 
     def make_dmats(self, degree):
-        if not hasattr(self, "_dmats_cache"):
-            self._dmats_cache = {}
         cache = self._dmats_cache
         key = degree
         try:
@@ -259,8 +268,7 @@ class PointExpansionSet(ExpansionSet):
     def __init__(self, ref_el):
         if ref_el.get_spatial_dimension() != 0:
             raise ValueError("Must have a point")
-        self.ref_el = ref_el
-        self.base_ref_el = reference_element.Point()
+        super(PointExpansionSet, self).__init__(ref_el)
 
     def get_num_members(self, n):
         return 1
@@ -286,13 +294,7 @@ class LineExpansionSet(ExpansionSet):
     def __init__(self, ref_el):
         if ref_el.get_spatial_dimension() != 1:
             raise Exception("Must have a line")
-        self.ref_el = ref_el
-        self.base_ref_el = reference_element.DefaultLine()
-        v1 = ref_el.get_vertices()
-        v2 = self.base_ref_el.get_vertices()
-        self.A, self.b = reference_element.make_affine_mapping(v1, v2)
-        self.mapping = lambda x: numpy.dot(self.A, x) + self.b
-        self.scale = numpy.sqrt(numpy.linalg.det(self.A))
+        super(LineExpansionSet, self).__init__(ref_el)
 
     def get_num_members(self, n):
         return n + 1
@@ -351,13 +353,7 @@ class TriangleExpansionSet(ExpansionSet):
     def __init__(self, ref_el):
         if ref_el.get_spatial_dimension() != 2:
             raise Exception("Must have a triangle")
-        self.ref_el = ref_el
-        self.base_ref_el = reference_element.DefaultTriangle()
-        v1 = ref_el.get_vertices()
-        v2 = self.base_ref_el.get_vertices()
-        self.A, self.b = reference_element.make_affine_mapping(v1, v2)
-        self.mapping = lambda x: numpy.dot(self.A, x) + self.b
-#        self.scale = numpy.sqrt(numpy.linalg.det(self.A))
+        super(TriangleExpansionSet, self).__init__(ref_el)
 
     def get_num_members(self, n):
         return (n + 1) * (n + 2) // 2
@@ -462,13 +458,7 @@ class TetrahedronExpansionSet(ExpansionSet):
     def __init__(self, ref_el):
         if ref_el.get_spatial_dimension() != 3:
             raise Exception("Must be a tetrahedron")
-        self.ref_el = ref_el
-        self.base_ref_el = reference_element.DefaultTetrahedron()
-        v1 = ref_el.get_vertices()
-        v2 = self.base_ref_el.get_vertices()
-        self.A, self.b = reference_element.make_affine_mapping(v1, v2)
-        self.mapping = lambda x: numpy.dot(self.A, x) + self.b
-        self.scale = numpy.sqrt(numpy.linalg.det(self.A))
+        super(TetrahedronExpansionSet, self).__init__(ref_el)
 
     def get_num_members(self, n):
         return (n + 1) * (n + 2) * (n + 3) // 6
