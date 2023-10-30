@@ -69,23 +69,9 @@ class PolynomialSet(object):
 
     def tabulate(self, pts, jet_order=0):
         """Returns the values of the polynomial set."""
-        result = {}
-        base_vals = self.expansion_set.tabulate(self.embedded_degree, pts)
-        dmats = self.get_dmats() if jet_order > 0 else self.dmats
-        for i in range(jet_order + 1):
-            alphas = mis(self.ref_el.get_spatial_dimension(), i)
-            for alpha in alphas:
-                if sum(alpha) == 0:
-                    D = numpy.eye(len(base_vals))
-                elif len(dmats) > 0:
-                    D = form_matrix_product(dmats, alpha)
-                else:
-                    # special for vertex without defined point location
-                    assert pts == [()]
-                    D = numpy.eye(1)
-                result[alpha] = numpy.dot(self.coeffs,
-                                          numpy.dot(numpy.transpose(D),
-                                                    base_vals))
+        result = self.expansion_set._tabulate_jet(self.embedded_degree, pts, order=jet_order)
+        for alpha in result:
+            result[alpha] = numpy.dot(self.coeffs, result[alpha])
         return result
 
     def get_expansion_set(self):
@@ -173,16 +159,6 @@ def project(f, U, Q):
     U_at_qps = U.tabulate(pts)
     coeffs = numpy.array([sum(wts * f_at_qps * phi) for phi in U_at_qps])
     return coeffs
-
-
-def form_matrix_product(mats, alpha):
-    """Forms product over mats[i]**alpha[i]"""
-    m = mats[0].shape[0]
-    result = numpy.eye(m)
-    for i in range(len(alpha)):
-        for j in range(alpha[i]):
-            result = numpy.dot(mats[i], result)
-    return result
 
 
 def polynomial_set_union_normalized(A, B):

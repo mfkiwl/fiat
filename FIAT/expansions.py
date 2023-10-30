@@ -268,8 +268,8 @@ class ExpansionSet(object):
         eta = (lambda x: x, lambda x: x, eta_square, eta_cube)[dim](xi)
         basis = [dubiner_1d(n, k, eta[k]) for k in range(dim)]
         derivs = [dubiner_deriv_1d(n, k, eta[k]) for k in range(dim)]
-        alphas = mis(dim, 0) + mis(dim, 1)
         tabulations = {}
+        alphas = mis(dim, 0) + mis(dim, 1)
         for alpha in alphas:
             V = [v if a == 0 else dv for a, v, dv in zip(alpha, basis, derivs)]
             phi = V[0]
@@ -310,6 +310,23 @@ class ExpansionSet(object):
         dv = numpy.stack([tab[alpha].T for alpha in sorted(tab, reverse=True) if sum(alpha) == 1])
         dmats = numpy.linalg.solve(v, dv)
         return cache.setdefault(key, dmats)
+
+    def _tabulate_jet(self, degree, pts, order=0):
+        from FIAT.polynomial_set import mis
+        result = {}
+        base_vals = self.tabulate(degree, pts)
+        dmats = self.make_dmats(degree) if order > 0 else []
+        for i in range(order + 1):
+            alphas = mis(self.ref_el.get_spatial_dimension(), i)
+            for alpha in alphas:
+                beta = next((beta for beta in sorted(result, reverse=True)
+                             if all(bj <= aj for bj, aj in zip(beta, alpha))), (0,) * len(alpha))
+                vals = base_vals if sum(beta) == 0 else result[beta]
+                for dmat, start, end in zip(dmats, beta, alpha):
+                    for j in range(start, end):
+                        vals = numpy.dot(dmat.T, vals)
+                result[alpha] = vals
+        return result
 
 
 class PointExpansionSet(ExpansionSet):
