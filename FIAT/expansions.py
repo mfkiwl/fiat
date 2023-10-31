@@ -32,6 +32,105 @@ def jrc(a, b, n):
     return an, bn, cn
 
 
+def recurrence(dim, n, factors, phi, dfactors=None, dphi=None):
+    if dim == 0:
+        return
+    elif dim == 1:
+        idx = lambda p: p
+    elif dim == 2:
+        idx = morton_index2
+    elif dim == 3:
+        idx = morton_index3
+    else:
+        raise ValueError("Invalid number of spatial dimensions")
+
+    skip_derivs = dphi is None
+    f1, f2, f3, f4 = factors
+    f5 = f4 ** 2
+    if dfactors is not None:
+        df1, df2, df3, df4 = dfactors
+        df5 = 2 * f4 * df4
+
+    # p = 1
+    phi[idx(1)] = f1
+    if not skip_derivs:
+        dphi[idx(1)] = df1
+
+    # general p by recurrence
+    for p in range(1, n):
+        icur = idx(p)
+        inext = idx(p + 1)
+        iprev = idx(p - 1)
+        a = (2. * p + 1.) / (1. + p)
+        b = p / (1. + p)
+        phi[inext] = a * f1 * phi[icur] - b * f2 * phi[iprev]
+        if skip_derivs:
+            continue
+        dphi[inext] = (a * f1 * dphi[icur] - b * f2 * dphi[iprev] +
+                       a * phi[icur] * df1 - b * phi[iprev] * df2)
+    if dim < 2:
+        return
+
+    # q = 1
+    for p in range(n):
+        icur = idx(p, 0)
+        inext = idx(p, 1)
+        g = (p + 1.5) * f3 - f4
+        phi[inext] = g * phi[icur]
+        if dphi is None:
+            continue
+        dg = (p + 1.5) * df3 - df4
+        dphi[inext] = g * dphi[icur] + phi[icur] * dg
+
+    # general q by recurrence
+    for p in range(n - 1):
+        for q in range(1, n - p):
+            icur = idx(p, q)
+            inext = idx(p, q + 1)
+            iprev = idx(p, q - 1)
+            aq, bq, cq = jrc(2 * p + 1, 0, q)
+            g = aq * f3 + (bq - aq) * f4
+            h = cq * f5
+            phi[inext] = g * phi[icur] - h * phi[iprev]
+            if skip_derivs:
+                continue
+            dg = aq * df3 + (bq - aq) * df4
+            dh = cq * df5
+            dphi[inext] = g * dphi[icur] + phi[icur] * dg - h * dphi[iprev] - phi[iprev] * dh
+    if dim < 3:
+        return
+
+    z = 1 - 2 * f4
+    if dfactors:
+        dz = -2 * df4
+    # r = 1
+    for p in range(n):
+        for q in range(n - p):
+            icur = idx(p, q, 0)
+            inext = idx(p, q, 1)
+            a = 2.0 + p + q
+            b = 1.0 + p + q
+            g = a * z + b
+            phi[inext] = g * phi[icur]
+            if dphi is None:
+                continue
+            dg = a * dz
+            dphi[inext] = g * dphi[icur] + phi[icur] * dg
+
+    # general r by recurrence
+    for p in range(n - 1):
+        for q in range(0, n - p - 1):
+            for r in range(1, n - p - q):
+                icur = idx(p, q, r)
+                inext = idx(p, q, r + 1)
+                iprev = idx(p, q, r - 1)
+                ar, br, cr = jrc(2 * p + 2 * q + 2, 0, r)
+                phi[inext] = (ar * z + br) * phi[icur] - cr * phi[iprev]
+                if skip_derivs:
+                    continue
+                dphi[inext] = (ar * z + br) * dphi[icur] + ar * phi[icur] * dz - cr * dphi[iprev]
+
+
 def _tabulate_dpts(tabulator, D, n, order, pts):
     X = sympy.DeferredVector('x')
 
@@ -120,208 +219,6 @@ def xi_tetrahedron(eta):
     return xi1, xi2, xi3
 
 
-def eta_square(xi):
-    """Maps from the (-1,1) reference triangle to [-1,1]^2."""
-    xi1, xi2 = xi
-    with numpy.errstate(divide='ignore', invalid='ignore'):
-        eta1 = 2. * (1. + xi1) / (1. - xi2) - 1.
-    eta2 = xi2
-    if eta1.dtype != object:
-        eta1[numpy.logical_not(numpy.isfinite(eta1))] = 1.
-    return eta1, eta2
-
-
-def eta_cube(xi):
-    """Maps from the (-1,1) reference tetrahedron to [-1,1]^3."""
-    xi1, xi2, xi3 = xi
-    with numpy.errstate(divide='ignore', invalid='ignore'):
-        eta1 = 2. * (1. + xi1) / (-xi2 - xi3) - 1.
-        eta2 = 2. * (1. + xi2) / (1. - xi3) - 1.
-    eta3 = xi3
-    if eta1.dtype != object:
-        eta1[numpy.logical_not(numpy.isfinite(eta1))] = 1.
-    if eta2.dtype != object:
-        eta2[numpy.logical_not(numpy.isfinite(eta2))] = 1.
-    return eta1, eta2, eta3
-
-
-def dubiner_1d(order, dim, x):
-    """Returns a tabulation of the orthonormal Dubiner 1D polymoials, defined as
-       c_i P_i^(0,0)(x)                  if dim == 0,
-       c_ij (1-x)^i P_j^(2i + dim, 0)(x) otherwise."""
-    if dim == 0:
-        scale = numpy.sqrt(0.5 + numpy.arange(order + 1))
-        results = jacobi.eval_jacobi_batch(0, 0, order, x[:, None])
-        return numpy.multiply(scale[:, None], results, out=results)
-    sd = (order + 1) * (order + 2) // 2
-    phi = numpy.zeros((sd, x.size), dtype=x.dtype)
-    x1 = (1. - x) * 0.5
-    for i in range(order + 1):
-        n = order - i
-        alpha = 2 * i + dim
-        results = jacobi.eval_jacobi_batch(alpha, 0, n, x[:, None])
-        if i > 0:
-            results *= x1 ** i
-        scale = numpy.sqrt(0.5*(alpha + 1) + numpy.arange(n + 1))
-        numpy.multiply(scale[:, None], results, out=results)
-        indices = [morton_index2(i, j) for j in range(n + 1)]
-        phi[indices, :] = results
-    return phi
-
-
-def dubiner_deriv_1d(order, dim, x):
-    """Returns a tabulation of the first derivatives of the orthonormal Dubiner
-    1D polynomials."""
-    if dim == 0:
-        scale = numpy.sqrt(0.5 + numpy.arange(order + 1))
-        results = jacobi.eval_jacobi_deriv_batch(0, 0, order, x[:, None])
-        return numpy.multiply(scale[:, None], results, out=results)
-    sd = (order + 1) * (order + 2) // 2
-    dphi = numpy.zeros((sd, x.size), dtype=x.dtype)
-    x1 = (1. - x) * 0.5
-    for i in range(order + 1):
-        n = order - i
-        alpha = 2 * i + dim
-        derivs = jacobi.eval_jacobi_deriv_batch(alpha, 0, n, x[:, None])
-        if i > 0:
-            results = jacobi.eval_jacobi_batch(alpha, 0, n, x[:, None])
-            derivs *= x1
-            derivs += results * (-0.5 * i)
-            if i > 1:
-                derivs *= x1 ** (i - 1)
-        scale = numpy.sqrt(0.5*(alpha + 1) + numpy.arange(n + 1))
-        numpy.multiply(scale[:, None], derivs, out=derivs)
-        indices = [morton_index2(i, j) for j in range(n + 1)]
-        dphi[indices, :] = derivs
-    return dphi
-
-
-def duffy_chain_rule(A, eta, tabulations):
-    """Applies the chain rule associated with an affine transformation onto the
-    default simplex on (-1, 1), followed by the Duffy transformation onto [-1, 1]^d.
-    A: the Jacobian of the affine transformation
-    eta: the points in [-1, 1]^d
-    tabulations: On entry, the tabulations of the reference gradient with
-        respect to eta. On exit, the tabulations of the gradient in physical space.
-    """
-    dim = len(eta)
-    dphi_dxi = [tabulations[alpha] for alpha in sorted(tabulations, reverse=True) if sum(alpha) == 1]
-    if len(dphi_dxi) < dim:
-        return
-    eta1 = [(1. - x) * 0.5 for x in eta]
-    for i in range(dim):
-        for j in range(i):
-            Jij = -0.5 * (1. + eta[j])
-            for k in range(j + 1, dim):
-                if k != i:
-                    Jij *= eta1[k]
-            dphi_dxi[i] -= dphi_dxi[j] * Jij
-        for j in range(i + 1, dim):
-            dphi_dxi[i] /= eta1[j]
-    j = 0
-    for alpha in sorted(tabulations, reverse=True):
-        if sum(alpha) == 1:
-            tabulations[alpha] = sum(dphi_dxi[i] * A[i][j] for i in range(dim))
-            j += 1
-
-
-def recurrence(dim, n, factors, phi, dfactors=None, dphi=None):
-    if dim == 1:
-        idx = lambda p: p
-    elif dim == 2:
-        idx = morton_index2
-    elif dim == 3:
-        idx = morton_index3
-    else:
-        raise ValueError("Invalid number of spatial dimensions")
-
-    skip_derivs = dphi is None
-    f1, f2, f3, f4 = factors
-    f5 = f4 ** 2
-    if dfactors is not None:
-        df1, df2, df3, df4 = dfactors
-        df5 = 2 * f4 * df4
-
-    # p = 1
-    phi[idx(1)] = f1
-    if dphi is not None:
-        dphi[idx(1)] = df1
-
-    # general p by recurrence
-    for p in range(1, n):
-        icur = idx(p)
-        inext = idx(p + 1)
-        iprev = idx(p - 1)
-        a = (2. * p + 1.) / (1. + p)
-        b = p / (1. + p)
-        phi[inext] = a * f1 * phi[icur] - b * f2 * phi[iprev]
-        if skip_derivs:
-            continue
-        dphi[inext] = a * f1 * dphi[icur] - b * f2 * dphi[iprev] \
-                      + a * phi[icur] * df1 - b * phi[iprev] * df2
-    if dim < 2:
-        return
-
-    # q = 1
-    for p in range(n):
-        icur = idx(p, 0)
-        inext = idx(p, 1)
-        g = (p + 1.5) * f3 - f4
-        phi[inext] = g * phi[icur]
-        if dphi is None:
-            continue
-        dg = (p + 1.5) * df3 - df4
-        dphi[inext] = g * dphi[icur] + phi[icur] * dg
-
-    # general q by recurrence
-    for p in range(n - 1):
-        for q in range(1, n - p):
-            icur = idx(p, q)
-            inext = idx(p, q + 1)
-            iprev = idx(p, q - 1)
-            aq, bq, cq = jrc(2 * p + 1, 0, q)
-            g = aq * f3 + (bq - aq) * f4
-            h =  cq * f5
-            phi[inext] = g * phi[icur] - h * phi[iprev]
-            if skip_derivs:
-                continue
-            dg = aq * df3 + (bq - aq) * df4
-            dh = cq * df5
-            dphi[inext] = g * dphi[icur] + phi[icur] * dg - h * dphi[iprev] - phi[iprev] * dh
-    if dim < 3:
-        return
-
-    z = 1 - 2 * f4
-    if dfactors:
-        dz = -2 * df4
-    # r = 1
-    for p in range(n):
-        for q in range(n - p):
-            icur = idx(p, q, 0)
-            inext = idx(p, q, 1)
-            a = 2.0 + p + q
-            b = 1.0 + p + q
-            g = a * z + b
-            phi[inext] = g * phi[icur]
-            if dphi is None:
-                continue
-            dg = a * dz
-            dphi[inext] = g * dphi[icur] + phi[icur] * dg
-
-    # general r by recurrence
-    for p in range(n - 1):
-        for q in range(0, n - p - 1):
-            for r in range(1, n - p - q):
-                icur = idx(p, q, r)
-                inext = idx(p, q, r + 1)
-                iprev = idx(p, q, r - 1)
-                ar, br, cr = jrc(2 * p + 2 * q + 2, 0, r)
-                phi[inext] = (ar * z + br) * phi[icur] - cr * phi[iprev]
-                if skip_derivs:
-                    continue
-                dphi[inext] = (ar * z + br) * dphi[icur] + ar * phi[icur] * dz - cr * dphi[iprev]
-
-
 class ExpansionSet(object):
     point_set = RecursivePointSet(lambda n: GaussLegendreQuadratureLineRule(UFCInterval(), n + 1).get_points())
 
@@ -388,42 +285,6 @@ class ExpansionSet(object):
         self._normalize(n, phi)
         self._normalize(n, dphi)
         return phi, dphi
-
-    def _tabulate_duffy(self, n, pts):
-        """Returns a dict of tabulations of phi_i(pts[j]) and each component of
-        the gradient d/dx_k phi_i(pts[j]). Here we employ the Duffy transform,
-        and thus this tabulation mode is only recommended for use with interior
-        points.
-        """
-        from FIAT.polynomial_set import mis
-        dim = self.ref_el.get_spatial_dimension()
-        sd = self.get_num_members(n)
-        xi = numpy.transpose(numpy.dot(pts, self.A.T) + self.b)
-        eta = (lambda x: x, lambda x: x, eta_square, eta_cube)[dim](xi)
-        basis = [dubiner_1d(n, k, eta[k]) for k in range(dim)]
-        derivs = [dubiner_deriv_1d(n, k, eta[k]) for k in range(dim)]
-        tabulations = {}
-        alphas = mis(dim, 0) + mis(dim, 1)
-        for alpha in alphas:
-            V = [v if a == 0 else dv for a, v, dv in zip(alpha, basis, derivs)]
-            phi = V[0]
-            if dim >= 2:
-                phi1 = phi
-                phi = numpy.copy(V[1])
-                for i in range(n + 1):
-                    indices = [morton_index2(i, j) for j in range(n + 1 - i)]
-                    phi[indices] *= phi1[i]
-            if dim >= 3:
-                phi2 = phi
-                phi = numpy.zeros((sd, V[0].shape[1]), dtype=V[0].dtype)
-                for i in range(n + 1):
-                    for j in range(n + 1 - i):
-                        Vij = phi2[morton_index2(i, j)]
-                        for k in range(n + 1 - i - j):
-                            phi[morton_index3(i, j, k)] = V[2][morton_index2(i + j, k)] * Vij
-            tabulations[alpha] = phi
-        duffy_chain_rule(self.A, eta, tabulations)
-        return tabulations
 
     def make_dmats(self, degree):
         """Returns a numpy array with the expansion coefficients dmat[k, j, i]
@@ -650,7 +511,7 @@ class TetrahedronExpansionSet(ExpansionSet):
         for p in range(n + 1):
             for q in range(n - p + 1):
                 for r in range(n - p - q + 1):
-                    phi[idx(p, q, r)] *= math.sqrt((p + 0.5) * (p + q + 1.0) * (p + q + r +1.5))
+                    phi[idx(p, q, r)] *= math.sqrt((p + 0.5) * (p + q + 1.0) * (p + q + r + 1.5))
 
     def tabulate_derivatives(self, n, pts):
         order = 1
