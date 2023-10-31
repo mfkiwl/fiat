@@ -17,11 +17,11 @@ from FIAT.quadrature import GaussLegendreQuadratureLineRule
 from FIAT.recursive_points import RecursivePointSet
 
 
-def morton_index2(i, j):
+def morton_index2(i, j=0):
     return (i + j) * (i + j + 1) // 2 + j
 
 
-def morton_index3(p, q, r):
+def morton_index3(p, q=0, r=0):
     return (p + q + r)*(p + q + r + 1)*(p + q + r + 2)//6 + (q + r)*(q + r + 1)//2 + r
 
 
@@ -225,6 +225,103 @@ def duffy_chain_rule(A, eta, tabulations):
             j += 1
 
 
+def recurrence(dim, n, factors, phi, dfactors=None, dphi=None):
+    if dim == 1:
+        idx = lambda p: p
+    elif dim == 2:
+        idx = morton_index2
+    elif dim == 3:
+        idx = morton_index3
+    else:
+        raise ValueError("Invalid number of spatial dimensions")
+
+    skip_derivs = dphi is None
+    f1, f2, f3, f4 = factors
+    f5 = f4 ** 2
+    if dfactors is not None:
+        df1, df2, df3, df4 = dfactors
+        df5 = 2 * f4 * df4
+
+    # p = 1
+    phi[idx(1)] = f1
+    if dphi is not None:
+        dphi[idx(1)] = df1
+
+    # general p by recurrence
+    for p in range(1, n):
+        icur = idx(p)
+        inext = idx(p + 1)
+        iprev = idx(p - 1)
+        a = (2. * p + 1.) / (1. + p)
+        b = p / (1. + p)
+        phi[inext] = a * f1 * phi[icur] - b * f2 * phi[iprev]
+        if skip_derivs:
+            continue
+        dphi[inext] = a * f1 * dphi[icur] - b * f2 * dphi[iprev] \
+                      + a * phi[icur] * df1 - b * phi[iprev] * df2
+    if dim < 2:
+        return
+
+    # q = 1
+    for p in range(n):
+        icur = idx(p, 0)
+        inext = idx(p, 1)
+        g = (p + 1.5) * f3 - f4
+        phi[inext] = g * phi[icur]
+        if dphi is None:
+            continue
+        dg = (p + 1.5) * df3 - df4
+        dphi[inext] = g * dphi[icur] + phi[icur] * dg
+
+    # general q by recurrence
+    for p in range(n - 1):
+        for q in range(1, n - p):
+            icur = idx(p, q)
+            inext = idx(p, q + 1)
+            iprev = idx(p, q - 1)
+            aq, bq, cq = jrc(2 * p + 1, 0, q)
+            g = aq * f3 + (bq - aq) * f4
+            h =  cq * f5
+            phi[inext] = g * phi[icur] - h * phi[iprev]
+            if skip_derivs:
+                continue
+            dg = aq * df3 + (bq - aq) * df4
+            dh = cq * df5
+            dphi[inext] = g * dphi[icur] + phi[icur] * dg - h * dphi[iprev] - phi[iprev] * dh
+    if dim < 3:
+        return
+
+    z = 1 - 2 * f4
+    if dfactors:
+        dz = -2 * df4
+    # r = 1
+    for p in range(n):
+        for q in range(n - p):
+            icur = idx(p, q, 0)
+            inext = idx(p, q, 1)
+            a = 2.0 + p + q
+            b = 1.0 + p + q
+            g = a * z + b
+            phi[inext] = g * phi[icur]
+            if dphi is None:
+                continue
+            dg = a * dz
+            dphi[inext] = g * dphi[icur] + phi[icur] * dg
+
+    # general r by recurrence
+    for p in range(n - 1):
+        for q in range(0, n - p - 1):
+            for r in range(1, n - p - q):
+                icur = idx(p, q, r)
+                inext = idx(p, q, r + 1)
+                iprev = idx(p, q, r - 1)
+                ar, br, cr = jrc(2 * p + 2 * q + 2, 0, r)
+                phi[inext] = (ar * z + br) * phi[icur] - cr * phi[iprev]
+                if skip_derivs:
+                    continue
+                dphi[inext] = (ar * z + br) * dphi[icur] + ar * phi[icur] * dz - cr * dphi[iprev]
+
+
 class ExpansionSet(object):
     point_set = RecursivePointSet(lambda n: GaussLegendreQuadratureLineRule(UFCInterval(), n + 1).get_points())
 
@@ -254,6 +351,43 @@ class ExpansionSet(object):
         self.mapping = lambda x: numpy.dot(self.A, x) + self.b
         self.scale = numpy.sqrt(numpy.linalg.det(self.A))
         self._dmats_cache = {}
+
+    def _tabulate(self, n, pts):
+        '''A version of tabulate() that also works for a single point.
+        '''
+        dim = self.ref_el.get_spatial_dimension()
+        results = [None] * self.get_num_members(n)
+        results[0] = sum((pts[i] - pts[i] for i in range(dim)), 1.)
+        if n == 0:
+            return results
+        m1, m2 = self.A.shape
+        ref_pts = [sum((self.A[i][j] * pts[j] for j in range(m2)), self.b[i])
+                   for i in range(m1)]
+        recurrence(dim, n, self._make_factors(ref_pts), results)
+        self._normalize(n, results)
+        return results
+
+    def _tabulate_derivatives(self, n, pts):
+        '''A version of tabulate_derivatives() that also works for a single point.
+        '''
+        dim = self.ref_el.get_spatial_dimension()
+        phi = [None] * self.get_num_members(n)
+        dphi = [None] * self.get_num_members(n)
+        phi[0] = sum((pts[i] - pts[i] for i in range(dim)), 1.)
+        dphi[0] = pts - pts
+        if n == 0:
+            return phi, dphi
+        m1, m2 = self.A.shape
+        ref_pts = [sum((self.A[i][j] * pts[j] for j in range(m2)), self.b[i])
+                   for i in range(m1)]
+
+        ref_pts = numpy.array(ref_pts)
+        factors = self._make_factors(ref_pts)
+        dfactors = self._make_dfactors(ref_pts)
+        recurrence(dim, n, factors, phi, dfactors=dfactors, dphi=dphi)
+        self._normalize(n, phi)
+        self._normalize(n, dphi)
+        return phi, dphi
 
     def _tabulate_duffy(self, n, pts):
         """Returns a dict of tabulations of phi_i(pts[j]) and each component of
@@ -305,10 +439,15 @@ class ExpansionSet(object):
         if degree == 0:
             return cache.setdefault(key, numpy.zeros((self.ref_el.get_spatial_dimension(), 1, 1), "d"))
         pts = self.point_set.recursive_points(self.ref_el.get_vertices(), degree)
+
         tab = self._tabulate_duffy(degree, pts)
         v, = [tab[alpha].T for alpha in tab if sum(alpha) == 0]
         dv = numpy.stack([tab[alpha].T for alpha in sorted(tab, reverse=True) if sum(alpha) == 1])
         dmats = numpy.linalg.solve(v, dv)
+
+        # v, dv = self._tabulate_derivatives(degree, numpy.transpose(pts))
+        # dv = numpy.array(dv).transpose((1, 2, 0))
+        # dmats = numpy.linalg.solve(numpy.transpose(v), dv)
         return cache.setdefault(key, dmats)
 
     def _tabulate_jet(self, degree, pts, order=0):
@@ -365,6 +504,18 @@ class LineExpansionSet(ExpansionSet):
     def get_num_members(self, n):
         return n + 1
 
+    def _make_factors(self, ref_pts):
+        return [ref_pts[0], 1., 0., 0.]
+
+    def _make_dfactors(self, ref_pts):
+        dx = ref_pts - ref_pts
+        dx[..., 0] = 1.
+        return [dx, 0.*dx, 0.*dx, 0.*dx]
+
+    def _normalize(self, n, phi):
+        for p in range(n + 1):
+            phi[p] *= math.sqrt(p + 0.5)
+
     def tabulate(self, n, pts):
         """Returns a numpy array A[i,j] = phi_i(pts[j])"""
         if len(pts) > 0:
@@ -407,95 +558,6 @@ class LineExpansionSet(ExpansionSet):
         return dv
 
 
-def recurrence(n, x, factors, phi, dx=None, dfactors=None, dphi=None):
-    dim = len(x)
-    if dim == 2:
-        idx = morton_index2
-    elif dim == 3:
-        idx = lambda p, q: morton_index3(p, q, 0)
-    else:
-        raise ValueError("Invalid number of spatial dimensions")
-    f1, f2, f3, f4, f5 = factors
-    if dfactors is not None:
-        df1, df2, df3, df4, df5 = dfactors
-
-    # p = 1
-    phi[idx(1, 0)] = f1
-    if dphi is not None:
-        dphi[idx(1, 0)] = df1
-
-    # general p by recurrence
-    for p in range(1, n):
-        icur = idx(p, 0)
-        inext = idx(p + 1, 0)
-        iprev = idx(p - 1, 0)
-        a = (2. * p + 1.) / (1. + p)
-        b = p / (1. + p)
-        phi[inext] = a * f1 * phi[icur] - b * f2 * phi[iprev]
-        if dphi is None:
-            continue
-        dphi[inext] = a * f1 * dphi[icur] - b * f2 * dphi[iprev] \
-                      + a * phi[icur] * df1 - b * phi[iprev] * df2
-
-    # q = 1
-    for p in range(n):
-        icur = idx(p, 0)
-        inext = idx(p, 1)
-        g = (p + 0.5) * (1 + x[1]) + f3
-        phi[inext] = g * phi[icur]
-        if dphi is None:
-            continue
-        dg = (p + 0.5) * dx[1] + df3
-        dphi[inext] = g * dphi[icur] + phi[icur] * dg
-
-    # general q by recurrence
-    for p in range(n - 1):
-        for q in range(1, n - p):
-            icur = idx(p, q)
-            inext = idx(p, q + 1)
-            iprev = idx(p, q - 1)
-            aq, bq, cq = jrc(2 * p + 1, 0, q)
-            g = aq * f3 + bq * f4
-            h =  cq * f5
-            phi[inext] = g * phi[icur] - h * phi[iprev]
-            if dphi is None:
-                continue
-            dg = aq * df3 + bq * df4
-            dh = cq * df5
-            dphi[inext] = g * dphi[icur] + phi[icur] * dg - h * dphi[iprev] - phi[iprev] * dh
-
-    if dim < 3:
-        return
-    idx = morton_index3
-
-    # r = 1
-    for p in range(n):
-        for q in range(n - p):
-            icur = idx(p, q, 0)
-            inext = idx(p, q, 1)
-            a = 2.0 + p + q
-            b = 1.0 + p + q
-            g = a * x[2] + b
-            phi[inext] = g * phi[icur]
-            if dphi is None:
-                continue
-            dg = a * dx[2]
-            dphi[inext] = g * dphi[icur] + phi[icur] * dg
-
-    # general r by recurrence
-    for p in range(n - 1):
-        for q in range(0, n - p - 1):
-            for r in range(1, n - p - q):
-                icur = idx(p, q, r)
-                inext = idx(p, q, r + 1)
-                iprev = idx(p, q, r - 1)
-                ar, br, cr = jrc(2 * p + 2 * q + 2, 0, r)
-                phi[inext] = (ar * x[2] + br) * phi[icur] - cr * phi[iprev]
-                if dphi is None:
-                    continue
-                dphi[inext] = (ar * x[2] + br) * dphi[icur] + ar * phi[icur] * dx[2] - cr * dphi[iprev]
-
-
 class TriangleExpansionSet(ExpansionSet):
     """Evaluates the orthonormal Dubiner basis on a triangular
     reference element."""
@@ -513,32 +575,30 @@ class TriangleExpansionSet(ExpansionSet):
         else:
             return numpy.array(self._tabulate(n, numpy.array(pts).T))
 
-    def _tabulate(self, n, pts):
-        '''A version of tabulate() that also works for a single point.
-        '''
-        results = ((n + 1) * (n + 2) // 2) * [None]
-        results[0] = 1. + pts[0] - pts[0]
-        if n == 0:
-            return results
-
-        m1, m2 = self.A.shape
-        ref_pts = [sum((self.A[i][j] * pts[j] for j in range(m2)), self.b[i])
-                   for i in range(m1)]
+    def _make_factors(self, ref_pts):
         x = ref_pts[0]
         y = ref_pts[1]
+        return [0.5 * (1. + 2. * x + y),
+                (0.5 * (1. - y)) ** 2,
+                1. + y,
+                1.]
 
-        factors = [(1. + 2 * x + y) / 2.,
-                   (y - 1.) ** 2 / 4.,
-                   y,
-                   y, 1.]
-        recurrence(n, ref_pts, factors, results)
+    def _make_dfactors(self, ref_pts):
+        y = ref_pts[1]
+        dx = ref_pts - ref_pts
+        dy = ref_pts - ref_pts
+        dx[..., 0] = 1.
+        dy[..., 1] = 1.
+        return [dx + dy,
+                0.5 * y * dy,
+                dy,
+                0 * dx]
+
+    def _normalize(self, n, phi):
         idx = morton_index2
         for p in range(n + 1):
             for q in range(n - p + 1):
-                icur = idx(p, q)
-                a = math.sqrt((p + 0.5) * (p + q + 1.0))
-                results[icur] *= a
-        return results
+                phi[idx(p, q)] *= math.sqrt((p + 0.5) * (p + q + 1.0))
 
     def tabulate_derivatives(self, n, pts):
         order = 1
@@ -573,41 +633,35 @@ class TetrahedronExpansionSet(ExpansionSet):
         else:
             return numpy.array(self._tabulate(n, numpy.array(pts).T))
 
-    def _tabulate(self, n, pts):
-        '''A version of tabulate() that also works for a single point.
-        '''
-        results = ((n + 1) * (n + 2) * (n + 3) // 6) * [None]
-        results[0] = 1.0 \
-            + pts[0] - pts[0] \
-            + pts[1] - pts[1] \
-            + pts[2] - pts[2]
-
-        if n == 0:
-            return results
-
-        m1, m2 = self.A.shape
-        ref_pts = [sum(self.A[i][j] * pts[j] for j in range(m2)) + self.b[i]
-                   for i in range(m1)]
+    def _make_factors(self, ref_pts):
         x = ref_pts[0]
         y = ref_pts[1]
         z = ref_pts[2]
+        return [0.5 * (2. + 2. * x + y + z),
+                (0.5 * (y + z))**2,
+                1. + y,
+                0.5 * (1. - z)]
 
-        factors = [0.5 * (2.0 + 2.0 * x + y + z),
-                   (0.5 * (y + z))**2,
-                   0.5 * (1 + 2.0 * y + z),
-                   0.5 * (1 - z)]
-        factors.append(factors[3]**2)
+    def _make_dfactors(self, ref_pts):
+        y = ref_pts[1]
+        z = ref_pts[2]
+        dx = ref_pts - ref_pts
+        dy = ref_pts - ref_pts
+        dz = ref_pts - ref_pts
+        dx[..., 0] = 1.
+        dy[..., 1] = 1.
+        dz[..., 2] = 1.
+        return [dx + 0.5 * dy + 0.5 * dz,
+                0.5 * (y + z) * (dy + dz),
+                dy,
+                -0.5 * dz]
 
-        recurrence(n, ref_pts, factors, results)
-
+    def _normalize(self, n, phi):
         idx = morton_index3
         for p in range(n + 1):
             for q in range(n - p + 1):
                 for r in range(n - p - q + 1):
-                    icur = idx(p, q, r)
-                    a = math.sqrt((p+0.5)*(p+q+1.0)*(p+q+r+1.5))
-                    results[icur] *= a
-        return results
+                    phi[idx(p, q, r)] *= math.sqrt((p + 0.5) * (p + q + 1.0) * (p + q + r +1.5))
 
     def tabulate_derivatives(self, n, pts):
         order = 1
