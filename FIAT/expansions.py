@@ -440,14 +440,9 @@ class ExpansionSet(object):
             return cache.setdefault(key, numpy.zeros((self.ref_el.get_spatial_dimension(), 1, 1), "d"))
         pts = self.point_set.recursive_points(self.ref_el.get_vertices(), degree)
 
-        tab = self._tabulate_duffy(degree, pts)
-        v, = [tab[alpha].T for alpha in tab if sum(alpha) == 0]
-        dv = numpy.stack([tab[alpha].T for alpha in sorted(tab, reverse=True) if sum(alpha) == 1])
-        dmats = numpy.linalg.solve(v, dv)
-
-        # v, dv = self._tabulate_derivatives(degree, numpy.transpose(pts))
-        # dv = numpy.array(dv).transpose((1, 2, 0))
-        # dmats = numpy.linalg.solve(numpy.transpose(v), dv)
+        v, dv = self._tabulate_derivatives(degree, numpy.transpose(pts))
+        dv = numpy.array(dv).transpose((1, 2, 0))
+        dmats = numpy.linalg.solve(numpy.transpose(v), dv)
         return cache.setdefault(key, dmats)
 
     def _tabulate_jet(self, degree, pts, order=0):
@@ -508,8 +503,7 @@ class LineExpansionSet(ExpansionSet):
         return [ref_pts[0], 1., 0., 0.]
 
     def _make_dfactors(self, ref_pts):
-        dx = ref_pts - ref_pts
-        dx[..., 0] = 1.
+        dx = ref_pts - ref_pts + self.A[:, 0][:, None]
         return [dx, 0.*dx, 0.*dx, 0.*dx]
 
     def _normalize(self, n, phi):
@@ -585,12 +579,10 @@ class TriangleExpansionSet(ExpansionSet):
 
     def _make_dfactors(self, ref_pts):
         y = ref_pts[1]
-        dx = ref_pts - ref_pts
-        dy = ref_pts - ref_pts
-        dx[..., 0] = 1.
-        dy[..., 1] = 1.
-        return [dx + dy,
-                0.5 * y * dy,
+        dx = ref_pts - ref_pts + self.A[:, 0][:, None]
+        dy = ref_pts - ref_pts + self.A[:, 1][:, None]
+        return [dx + 0.5 * dy,
+                -0.5 * (1. - y) * dy,
                 dy,
                 0 * dx]
 
@@ -645,12 +637,9 @@ class TetrahedronExpansionSet(ExpansionSet):
     def _make_dfactors(self, ref_pts):
         y = ref_pts[1]
         z = ref_pts[2]
-        dx = ref_pts - ref_pts
-        dy = ref_pts - ref_pts
-        dz = ref_pts - ref_pts
-        dx[..., 0] = 1.
-        dy[..., 1] = 1.
-        dz[..., 2] = 1.
+        dx = ref_pts - ref_pts + self.A[:, 0][:, None]
+        dy = ref_pts - ref_pts + self.A[:, 1][:, None]
+        dz = ref_pts - ref_pts + self.A[:, 2][:, None]
         return [dx + 0.5 * dy + 0.5 * dz,
                 0.5 * (y + z) * (dy + dz),
                 dy,
