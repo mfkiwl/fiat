@@ -407,6 +407,95 @@ class LineExpansionSet(ExpansionSet):
         return dv
 
 
+def recurrence(n, x, factors, phi, dx=None, dfactors=None, dphi=None):
+    dim = len(x)
+    if dim == 2:
+        idx = morton_index2
+    elif dim == 3:
+        idx = lambda p, q: morton_index3(p, q, 0)
+    else:
+        raise ValueError("Invalid number of spatial dimensions")
+    f1, f2, f3, f4, f5 = factors
+    if dfactors is not None:
+        df1, df2, df3, df4, df5 = dfactors
+
+    # p = 1
+    phi[idx(1, 0)] = f1
+    if dphi is not None:
+        dphi[idx(1, 0)] = df1
+
+    # general p by recurrence
+    for p in range(1, n):
+        icur = idx(p, 0)
+        inext = idx(p + 1, 0)
+        iprev = idx(p - 1, 0)
+        a = (2. * p + 1.) / (1. + p)
+        b = p / (1. + p)
+        phi[inext] = a * f1 * phi[icur] - b * f2 * phi[iprev]
+        if dphi is None:
+            continue
+        dphi[inext] = a * f1 * dphi[icur] - b * f2 * dphi[iprev] \
+                      + a * phi[icur] * df1 - b * phi[iprev] * df2
+
+    # q = 1
+    for p in range(n):
+        icur = idx(p, 0)
+        inext = idx(p, 1)
+        g = (p + 0.5) * (1 + x[1]) + f3
+        phi[inext] = g * phi[icur]
+        if dphi is None:
+            continue
+        dg = (p + 0.5) * dx[1] + df3
+        dphi[inext] = g * dphi[icur] + phi[icur] * dg
+
+    # general q by recurrence
+    for p in range(n - 1):
+        for q in range(1, n - p):
+            icur = idx(p, q)
+            inext = idx(p, q + 1)
+            iprev = idx(p, q - 1)
+            aq, bq, cq = jrc(2 * p + 1, 0, q)
+            g = aq * f3 + bq * f4
+            h =  cq * f5
+            phi[inext] = g * phi[icur] - h * phi[iprev]
+            if dphi is None:
+                continue
+            dg = aq * df3 + bq * df4
+            dh = cq * df5
+            dphi[inext] = g * dphi[icur] + phi[icur] * dg - h * dphi[iprev] - phi[iprev] * dh
+
+    if dim < 3:
+        return
+    idx = morton_index3
+
+    # r = 1
+    for p in range(n):
+        for q in range(n - p):
+            icur = idx(p, q, 0)
+            inext = idx(p, q, 1)
+            a = 2.0 + p + q
+            b = 1.0 + p + q
+            g = a * x[2] + b
+            phi[inext] = g * phi[icur]
+            if dphi is None:
+                continue
+            dg = a * dx[2]
+            dphi[inext] = g * dphi[icur] + phi[icur] * dg
+
+    # general r by recurrence
+    for p in range(n - 1):
+        for q in range(0, n - p - 1):
+            for r in range(1, n - p - q):
+                icur = idx(p, q, r)
+                inext = idx(p, q, r + 1)
+                iprev = idx(p, q, r - 1)
+                ar, br, cr = jrc(2 * p + 2 * q + 2, 0, r)
+                phi[inext] = (ar * x[2] + br) * phi[icur] - cr * phi[iprev]
+                if dphi is None:
+                    continue
+                dphi[inext] = (ar * x[2] + br) * dphi[icur] + ar * phi[icur] * dx[2] - cr * dphi[iprev]
+
+
 class TriangleExpansionSet(ExpansionSet):
     """Evaluates the orthonormal Dubiner basis on a triangular
     reference element."""
@@ -427,52 +516,29 @@ class TriangleExpansionSet(ExpansionSet):
     def _tabulate(self, n, pts):
         '''A version of tabulate() that also works for a single point.
         '''
-        m1, m2 = self.A.shape
-        ref_pts = [sum(self.A[i][j] * pts[j] for j in range(m2)) + self.b[i]
-                   for i in range(m1)]
-
-        idx = morton_index2
         results = ((n + 1) * (n + 2) // 2) * [None]
-
-        results[0] = 1.0 \
-            + pts[0] - pts[0] \
-            + pts[1] - pts[1]
-
+        results[0] = 1. + pts[0] - pts[0]
         if n == 0:
             return results
 
+        m1, m2 = self.A.shape
+        ref_pts = [sum((self.A[i][j] * pts[j] for j in range(m2)), self.b[i])
+                   for i in range(m1)]
         x = ref_pts[0]
         y = ref_pts[1]
 
-        f1 = (1.0 + 2 * x + y) / 2.0
-        f2 = (1.0 - y) / 2.0
-        f3 = f2**2
-
-        results[idx(1, 0)] = f1
-
-        for p in range(1, n):
-            a = (2.0 * p + 1) / (1.0 + p)
-            # b = p / (p+1.0)
-            results[idx(p+1, 0)] = a * f1 * results[idx(p, 0)] \
-                - p/(1.0+p) * f3 * results[idx(p-1, 0)]
-
-        for p in range(n):
-            results[idx(p, 1)] = 0.5 * (1+2.0*p+(3.0+2.0*p)*y) \
-                * results[idx(p, 0)]
-
-        for p in range(n - 1):
-            for q in range(1, n - p):
-                (a1, a2, a3) = jrc(2 * p + 1, 0, q)
-                results[idx(p, q+1)] = \
-                    (a1 * y + a2) * results[idx(p, q)] \
-                    - a3 * results[idx(p, q-1)]
-
+        factors = [(1. + 2 * x + y) / 2.,
+                   (y - 1.) ** 2 / 4.,
+                   y,
+                   y, 1.]
+        recurrence(n, ref_pts, factors, results)
+        idx = morton_index2
         for p in range(n + 1):
             for q in range(n - p + 1):
-                results[idx(p, q)] *= math.sqrt((p + 0.5) * (p + q + 1.0))
-
+                icur = idx(p, q)
+                a = math.sqrt((p + 0.5) * (p + q + 1.0))
+                results[icur] *= a
         return results
-        # return self.scale * results
 
     def tabulate_derivatives(self, n, pts):
         order = 1
@@ -510,11 +576,6 @@ class TetrahedronExpansionSet(ExpansionSet):
     def _tabulate(self, n, pts):
         '''A version of tabulate() that also works for a single point.
         '''
-        m1, m2 = self.A.shape
-        ref_pts = [sum(self.A[i][j] * pts[j] for j in range(m2)) + self.b[i]
-                   for i in range(m1)]
-
-        idx = morton_index3
         results = ((n + 1) * (n + 2) * (n + 3) // 6) * [None]
         results[0] = 1.0 \
             + pts[0] - pts[0] \
@@ -524,57 +585,28 @@ class TetrahedronExpansionSet(ExpansionSet):
         if n == 0:
             return results
 
+        m1, m2 = self.A.shape
+        ref_pts = [sum(self.A[i][j] * pts[j] for j in range(m2)) + self.b[i]
+                   for i in range(m1)]
         x = ref_pts[0]
         y = ref_pts[1]
         z = ref_pts[2]
 
-        factor1 = 0.5 * (2.0 + 2.0 * x + y + z)
-        factor2 = (0.5 * (y + z))**2
-        factor3 = 0.5 * (1 + 2.0 * y + z)
-        factor4 = 0.5 * (1 - z)
-        factor5 = factor4**2
+        factors = [0.5 * (2.0 + 2.0 * x + y + z),
+                   (0.5 * (y + z))**2,
+                   0.5 * (1 + 2.0 * y + z),
+                   0.5 * (1 - z)]
+        factors.append(factors[3]**2)
 
-        results[idx(1, 0, 0)] = factor1
-        for p in range(1, n):
-            a1 = (2.0 * p + 1.0) / (p + 1.0)
-            a2 = p / (p + 1.0)
-            results[idx(p+1, 0, 0)] = a1 * factor1 * results[idx(p, 0, 0)] \
-                - a2 * factor2 * results[idx(p-1, 0, 0)]
+        recurrence(n, ref_pts, factors, results)
 
-        # q = 1
-        for p in range(0, n):
-            results[idx(p, 1, 0)] = results[idx(p, 0, 0)] \
-                * (p * (1.0 + y) + (2.0 + 3.0 * y + z) / 2)
-
-        for p in range(0, n - 1):
-            for q in range(1, n - p):
-                (aq, bq, cq) = jrc(2 * p + 1, 0, q)
-                qmcoeff = aq * factor3 + bq * factor4
-                qm1coeff = cq * factor5
-                results[idx(p, q+1, 0)] = qmcoeff * results[idx(p, q, 0)] \
-                    - qm1coeff * results[idx(p, q-1, 0)]
-
-        # now handle r=1
-        for p in range(n):
-            for q in range(n - p):
-                results[idx(p, q, 1)] = results[idx(p, q, 0)] \
-                    * (1.0 + p + q + (2.0 + q + p) * z)
-
-        # general r by recurrence
-        for p in range(n - 1):
-            for q in range(0, n - p - 1):
-                for r in range(1, n - p - q):
-                    ar, br, cr = jrc(2 * p + 2 * q + 2, 0, r)
-                    results[idx(p, q, r+1)] = \
-                        (ar * z + br) * results[idx(p, q, r)] \
-                        - cr * results[idx(p, q, r-1)]
-
+        idx = morton_index3
         for p in range(n + 1):
             for q in range(n - p + 1):
                 for r in range(n - p - q + 1):
-                    results[idx(p, q, r)] *= \
-                        math.sqrt((p+0.5)*(p+q+1.0)*(p+q+r+1.5))
-
+                    icur = idx(p, q, r)
+                    a = math.sqrt((p+0.5)*(p+q+1.0)*(p+q+r+1.5))
+                    results[icur] *= a
         return results
 
     def tabulate_derivatives(self, n, pts):
