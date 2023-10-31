@@ -33,6 +33,7 @@ def jrc(a, b, n):
 
 
 def recurrence(dim, n, factors, phi, dfactors=None, dphi=None):
+    skip_derivs = dphi is None
     if dim == 0:
         return
     elif dim == 1:
@@ -44,7 +45,6 @@ def recurrence(dim, n, factors, phi, dfactors=None, dphi=None):
     else:
         raise ValueError("Invalid number of spatial dimensions")
 
-    skip_derivs = dphi is None
     f1, f2, f3, f4 = factors
     f5 = f4 ** 2
     if dfactors is not None:
@@ -77,7 +77,7 @@ def recurrence(dim, n, factors, phi, dfactors=None, dphi=None):
         inext = idx(p, 1)
         g = (p + 1.5) * f3 - f4
         phi[inext] = g * phi[icur]
-        if dphi is None:
+        if skip_derivs:
             continue
         dg = (p + 1.5) * df3 - df4
         dphi[inext] = g * dphi[icur] + phi[icur] * dg
@@ -112,7 +112,7 @@ def recurrence(dim, n, factors, phi, dfactors=None, dphi=None):
             b = 1.0 + p + q
             g = a * z + b
             phi[inext] = g * phi[icur]
-            if dphi is None:
+            if skip_derivs:
                 continue
             dg = a * dz
             dphi[inext] = g * dphi[icur] + phi[icur] * dg
