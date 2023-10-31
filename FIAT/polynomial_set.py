@@ -161,6 +161,16 @@ def project(f, U, Q):
     return coeffs
 
 
+def form_matrix_product(mats, alpha):
+    """Forms product over mats[i]**alpha[i]"""
+    m = mats[0].shape[0]
+    result = numpy.eye(m)
+    for i in range(len(alpha)):
+        for j in range(alpha[i]):
+            result = numpy.dot(mats[i], result)
+    return result
+
+
 def polynomial_set_union_normalized(A, B):
     """Given polynomial sets A and B, constructs a new polynomial set
     whose span is the same as that of span(A) union span(B).  It may
