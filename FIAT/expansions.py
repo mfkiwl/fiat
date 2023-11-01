@@ -46,10 +46,8 @@ def recurrence(dim, n, factors, phi, dfactors=None, dphi=None):
         raise ValueError("Invalid number of spatial dimensions")
 
     f1, f2, f3, f4 = factors
-    f5 = f4 ** 2
     if dfactors is not None:
         df1, df2, df3, df4 = dfactors
-        df5 = 2 * f4 * df4
 
     # p = 1
     icur = idx(0)
@@ -70,6 +68,10 @@ def recurrence(dim, n, factors, phi, dfactors=None, dphi=None):
                        a * phi[icur] * df1 - b * phi[iprev] * df2)
     if dim < 2:
         return
+
+    f5 = f4 ** 2
+    if dfactors is not None:
+        df5 = 2 * f4 * df4
 
     for p in range(n):
         # q = 1

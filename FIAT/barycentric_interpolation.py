@@ -36,8 +36,8 @@ class LagrangeLineExpansionSet(expansions.LineExpansionSet):
     def get_num_members(self, n):
         return len(self.nodes)
 
-    def make_dmats(self, degree):
-        return [numpy.transpose(self.dmat)]
+    def get_dmats(self, degree):
+        return [self.dmat.T]
 
     def tabulate(self, n, pts):
         assert n == len(self.nodes)-1
