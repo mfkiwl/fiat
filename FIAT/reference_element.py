@@ -38,7 +38,6 @@ TETRAHEDRON = 3
 QUADRILATERAL = 11
 HEXAHEDRON = 111
 TENSORPRODUCT = 99
-_family_cache = {}
 
 
 def multiindex_equal(d, isum, imin=0):
@@ -78,11 +77,9 @@ def make_lattice(verts, n, interior=0, family=None):
     and interior = 0, this function will return the vertices and
     midpoint, but with interior = 1, it will only return the
     midpoint."""
-    key = family or "equi"
-    try:
-        family = _family_cache[key]
-    except KeyError:
-        family = _family_cache.setdefault(key, _decode_family(family))
+    if family is None or family == "equispaced":
+        family = "equi"
+    family = _decode_family(family)
     D = len(verts)
     X = numpy.array(verts)
     get_point = lambda alpha: tuple(numpy.dot(_recursive(D - 1, n, alpha, family), X))
