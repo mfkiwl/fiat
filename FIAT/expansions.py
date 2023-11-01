@@ -249,6 +249,13 @@ class ExpansionSet(object):
         self.scale = numpy.sqrt(numpy.linalg.det(self.A))
         self._dmats_cache = {}
 
+    def get_num_members(self, n):
+        dim = self.ref_el.get_spatial_dimension()
+        num_members = 1
+        for k in range(1, dim+1):
+            num_members = (num_members * (n + k)) // k
+        return num_members
+
     def _tabulate(self, n, pts):
         '''A version of tabulate() that also works for a single point.
         '''
@@ -285,6 +292,29 @@ class ExpansionSet(object):
         self._normalize(n, phi)
         self._normalize(n, dphi)
         return phi, dphi
+
+    def tabulate(self, n, pts):
+        if len(pts) == 0:
+            return numpy.array([])
+        else:
+            return numpy.array(self._tabulate(n, numpy.array(pts).T))
+
+    def tabulate_derivatives(self, n, pts):
+        order = 1
+        D = self.ref_el.get_spatial_dimension()
+        data = _tabulate_dpts(self._tabulate, D, n, order, numpy.array(pts))
+        # Put data in the required data structure, i.e.,
+        # k-tuples which contain the value, and the k-1 derivatives
+        # (gradient, Hessian, ...)
+        m, n = data[0].shape
+        data2 = [[tuple([data[r][i][j] for r in range(order+1)])
+                  for j in range(n)]
+                 for i in range(m)]
+        return data2
+
+    def tabulate_jet(self, n, pts, order=1):
+        D = self.ref_el.get_spatial_dimension()
+        return _tabulate_dpts(self._tabulate, D, n, order, numpy.array(pts))
 
     def make_dmats(self, degree):
         """Returns a numpy array with the expansion coefficients dmat[k, j, i]
@@ -331,9 +361,6 @@ class PointExpansionSet(ExpansionSet):
             raise ValueError("Must have a point")
         super(PointExpansionSet, self).__init__(ref_el)
 
-    def get_num_members(self, n):
-        return 1
-
     def tabulate(self, n, pts):
         """Returns a numpy array A[i,j] = phi_i(pts[j]) = 1.0."""
         assert n == 0
@@ -357,14 +384,11 @@ class LineExpansionSet(ExpansionSet):
             raise Exception("Must have a line")
         super(LineExpansionSet, self).__init__(ref_el)
 
-    def get_num_members(self, n):
-        return n + 1
-
     def _make_factors(self, ref_pts):
         return [ref_pts[0], 1., 0., 0.]
 
     def _make_dfactors(self, ref_pts):
-        dx = ref_pts - ref_pts + self.A[:, 0][:, None]
+        dx = ref_pts - ref_pts + self.A[:, 0:1]
         return [dx, 0.*dx, 0.*dx, 0.*dx]
 
     def _normalize(self, n, phi):
@@ -375,12 +399,8 @@ class LineExpansionSet(ExpansionSet):
         """Returns a numpy array A[i,j] = phi_i(pts[j])"""
         if len(pts) > 0:
             ref_pts = numpy.array([self.mapping(pt) for pt in pts])
-            psitilde_as = jacobi.eval_jacobi_batch(0, 0, n, ref_pts)
-
-            results = numpy.zeros((n + 1, len(pts)), type(pts[0][0]))
-            for k in range(n + 1):
-                results[k, :] = psitilde_as[k, :] * math.sqrt(k + 0.5)
-
+            results = jacobi.eval_jacobi_batch(0, 0, n, ref_pts)
+            self._normalize(n, results)
             return results
         else:
             return []
@@ -391,14 +411,11 @@ class LineExpansionSet(ExpansionSet):
         compatibility with the interfaces of the triangle and
         tetrahedron expansions."""
         ref_pts = numpy.array([self.mapping(pt) for pt in pts])
-        psitilde_as_derivs = jacobi.eval_jacobi_deriv_batch(0, 0, n, ref_pts)
+        results = jacobi.eval_jacobi_deriv_batch(0, 0, n, ref_pts)
 
         # Jacobi polynomials defined on [-1, 1], first derivatives need scaling
-        psitilde_as_derivs *= 2.0 / self.ref_el.volume()
-
-        results = numpy.zeros((n + 1, len(pts)), "d")
-        for k in range(0, n + 1):
-            results[k, :] = psitilde_as_derivs[k, :] * numpy.sqrt(k + 0.5)
+        results *= 2.0 / self.ref_el.volume()
+        self._normalize(n, results)
 
         vals = self.tabulate(n, pts)
         deriv_vals = (results,)
@@ -421,15 +438,6 @@ class TriangleExpansionSet(ExpansionSet):
             raise Exception("Must have a triangle")
         super(TriangleExpansionSet, self).__init__(ref_el)
 
-    def get_num_members(self, n):
-        return (n + 1) * (n + 2) // 2
-
-    def tabulate(self, n, pts):
-        if len(pts) == 0:
-            return numpy.array([])
-        else:
-            return numpy.array(self._tabulate(n, numpy.array(pts).T))
-
     def _make_factors(self, ref_pts):
         x = ref_pts[0]
         y = ref_pts[1]
@@ -440,8 +448,8 @@ class TriangleExpansionSet(ExpansionSet):
 
     def _make_dfactors(self, ref_pts):
         y = ref_pts[1]
-        dx = ref_pts - ref_pts + self.A[:, 0][:, None]
-        dy = ref_pts - ref_pts + self.A[:, 1][:, None]
+        dx = ref_pts - ref_pts + self.A[:, 0:1]
+        dy = ref_pts - ref_pts + self.A[:, 1:2]
         return [dx + 0.5 * dy,
                 -0.5 * (1. - y) * dy,
                 dy,
@@ -453,22 +461,6 @@ class TriangleExpansionSet(ExpansionSet):
             for q in range(n - p + 1):
                 phi[idx(p, q)] *= math.sqrt((p + 0.5) * (p + q + 1.0))
 
-    def tabulate_derivatives(self, n, pts):
-        order = 1
-        data = _tabulate_dpts(self._tabulate, 2, n, order, numpy.array(pts))
-        # Put data in the required data structure, i.e.,
-        # k-tuples which contain the value, and the k-1 derivatives
-        # (gradient, Hessian, ...)
-        m = data[0].shape[0]
-        n = data[0].shape[1]
-        data2 = [[tuple([data[r][i][j] for r in range(order+1)])
-                  for j in range(n)]
-                 for i in range(m)]
-        return data2
-
-    def tabulate_jet(self, n, pts, order=1):
-        return _tabulate_dpts(self._tabulate, 2, n, order, numpy.array(pts))
-
 
 class TetrahedronExpansionSet(ExpansionSet):
     """Collapsed orthonormal polynomial expanion on a tetrahedron."""
@@ -476,15 +468,6 @@ class TetrahedronExpansionSet(ExpansionSet):
         if ref_el.get_spatial_dimension() != 3:
             raise Exception("Must be a tetrahedron")
         super(TetrahedronExpansionSet, self).__init__(ref_el)
-
-    def get_num_members(self, n):
-        return (n + 1) * (n + 2) * (n + 3) // 6
-
-    def tabulate(self, n, pts):
-        if len(pts) == 0:
-            return numpy.array([])
-        else:
-            return numpy.array(self._tabulate(n, numpy.array(pts).T))
 
     def _make_factors(self, ref_pts):
         x = ref_pts[0]
@@ -498,9 +481,9 @@ class TetrahedronExpansionSet(ExpansionSet):
     def _make_dfactors(self, ref_pts):
         y = ref_pts[1]
         z = ref_pts[2]
-        dx = ref_pts - ref_pts + self.A[:, 0][:, None]
-        dy = ref_pts - ref_pts + self.A[:, 1][:, None]
-        dz = ref_pts - ref_pts + self.A[:, 2][:, None]
+        dx = ref_pts - ref_pts + self.A[:, 0:1]
+        dy = ref_pts - ref_pts + self.A[:, 1:2]
+        dz = ref_pts - ref_pts + self.A[:, 2:3]
         return [dx + 0.5 * dy + 0.5 * dz,
                 0.5 * (y + z) * (dy + dz),
                 dy,
@@ -512,23 +495,6 @@ class TetrahedronExpansionSet(ExpansionSet):
             for q in range(n - p + 1):
                 for r in range(n - p - q + 1):
                     phi[idx(p, q, r)] *= math.sqrt((p + 0.5) * (p + q + 1.0) * (p + q + r + 1.5))
-
-    def tabulate_derivatives(self, n, pts):
-        order = 1
-        D = 3
-        data = _tabulate_dpts(self._tabulate, D, n, order, numpy.array(pts))
-        # Put data in the required data structure, i.e.,
-        # k-tuples which contain the value, and the k-1 derivatives
-        # (gradient, Hessian, ...)
-        m = data[0].shape[0]
-        n = data[0].shape[1]
-        data2 = [[tuple([data[r][i][j] for r in range(order + 1)])
-                  for j in range(n)]
-                 for i in range(m)]
-        return data2
-
-    def tabulate_jet(self, n, pts, order=1):
-        return _tabulate_dpts(self._tabulate, 3, n, order, numpy.array(pts))
 
 
 def polynomial_dimension(ref_el, degree):
