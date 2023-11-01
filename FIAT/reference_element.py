@@ -70,7 +70,7 @@ def lattice_iter(start, finish, depth):
                 yield jj + [ii]
 
 
-def make_lattice(verts, n, interior=0, family="equi"):
+def make_lattice(verts, n, interior=0, family=None):
     """Constructs a lattice of points on the simplex defined by verts.
     For example, the 1:st order lattice will be just the vertices.
     The optional argument interior specifies how many points from
@@ -78,7 +78,7 @@ def make_lattice(verts, n, interior=0, family="equi"):
     and interior = 0, this function will return the vertices and
     midpoint, but with interior = 1, it will only return the
     midpoint."""
-    key = family
+    key = family or "equi"
     try:
         family = _family_cache[key]
     except KeyError:
@@ -409,7 +409,7 @@ class Simplex(Cell):
                 edge_ts.append(vert_coords[dest] - vert_coords[source])
         return edge_ts
 
-    def make_points(self, dim, entity_id, order, family="equi"):
+    def make_points(self, dim, entity_id, order, family=None):
         """Constructs a lattice of points on the entity_id:th
         facet of dimension dim.  Order indicates how many points to
         include in each direction."""
