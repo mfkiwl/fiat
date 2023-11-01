@@ -385,11 +385,11 @@ class LineExpansionSet(ExpansionSet):
         super(LineExpansionSet, self).__init__(ref_el)
 
     def _make_factors(self, ref_pts):
-        return [ref_pts[0], 1., 0., 0.]
+        return ref_pts[0], 1., 0., 0.
 
     def _make_dfactors(self, ref_pts):
         dx = ref_pts - ref_pts + self.A[:, 0:1]
-        return [dx, 0.*dx, 0.*dx, 0.*dx]
+        return dx, 0.*dx, 0.*dx, 0.*dx
 
     def _normalize(self, n, phi):
         for p in range(n + 1):
@@ -441,19 +441,21 @@ class TriangleExpansionSet(ExpansionSet):
     def _make_factors(self, ref_pts):
         x = ref_pts[0]
         y = ref_pts[1]
-        return [0.5 * (1. + 2. * x + y),
-                (0.5 * (1. - y)) ** 2,
-                1. + y,
-                1.]
+        factor1 = 0.5 * (1. + 2. * x + y)
+        factor2 = (0.5 * (1. - y)) ** 2
+        factor3 = 1. + y
+        factor4 = 1.
+        return factor1, factor2, factor3, factor4
 
     def _make_dfactors(self, ref_pts):
         y = ref_pts[1]
         dx = ref_pts - ref_pts + self.A[:, 0:1]
         dy = ref_pts - ref_pts + self.A[:, 1:2]
-        return [dx + 0.5 * dy,
-                -0.5 * (1. - y) * dy,
-                dy,
-                0 * dx]
+        dfactor1 = dx + 0.5 * dy
+        dfactor2 = -0.5 * (1. - y) * dy
+        dfactor3 = dy
+        dfactor4 = 0. * dx
+        return dfactor1, dfactor2, dfactor3, dfactor4
 
     def _normalize(self, n, phi):
         idx = morton_index2
@@ -473,10 +475,11 @@ class TetrahedronExpansionSet(ExpansionSet):
         x = ref_pts[0]
         y = ref_pts[1]
         z = ref_pts[2]
-        return [0.5 * (2. + 2. * x + y + z),
-                (0.5 * (y + z))**2,
-                1. + y,
-                0.5 * (1. - z)]
+        factor1 = 0.5 * (2. + 2. * x + y + z)
+        factor2 = (0.5 * (y + z))**2
+        factor3 = 1. + y
+        factor4 = 0.5 * (1. - z)
+        return factor1, factor2, factor3, factor4
 
     def _make_dfactors(self, ref_pts):
         y = ref_pts[1]
@@ -484,10 +487,11 @@ class TetrahedronExpansionSet(ExpansionSet):
         dx = ref_pts - ref_pts + self.A[:, 0:1]
         dy = ref_pts - ref_pts + self.A[:, 1:2]
         dz = ref_pts - ref_pts + self.A[:, 2:3]
-        return [dx + 0.5 * dy + 0.5 * dz,
-                0.5 * (y + z) * (dy + dz),
-                dy,
-                -0.5 * dz]
+        dfactor1 = 0.5 * (2. * dx + dy + dz)
+        dfactor2 = 0.5 * (y + z) * (dy + dz)
+        dfactor3 = dy
+        dfactor4 = -0.5 * dz
+        return dfactor1, dfactor2, dfactor3, dfactor4
 
     def _normalize(self, n, phi):
         idx = morton_index3
