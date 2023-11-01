@@ -25,9 +25,9 @@ def mis(m, n):
     if m == 1:
         return [(n,)]
     elif n == 0:
-        return [tuple([0] * m)]
+        return [(0,) * m]
     else:
-        return [tuple([n - i] + list(foo))
+        return [(n - i,) + foo
                 for i in range(n + 1)
                 for foo in mis(m - 1, i)]
 
@@ -91,7 +91,7 @@ class PolynomialSet(object):
 
     def get_dmats(self):
         if len(self.dmats) == 0:
-            self.dmats = self.expansion_set.make_dmats(self.degree)
+            self.dmats = self.expansion_set.get_dmats(self.degree)
         return self.dmats
 
     def get_reference_element(self):

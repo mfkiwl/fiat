@@ -17,8 +17,8 @@ from FIAT.quadrature import GaussLegendreQuadratureLineRule
 from FIAT.recursive_points import RecursivePointSet
 
 
-def morton_index2(i, j=0):
-    return (i + j) * (i + j + 1) // 2 + j
+def morton_index2(p, q=0):
+    return (p + q) * (p + q + 1) // 2 + q
 
 
 def morton_index3(p, q=0, r=0):
@@ -96,12 +96,12 @@ def recurrence(dim, n, factors, phi, dfactors=None, dphi=None):
     if dim < 3:
         return
 
-    z = 1 - 2 * f4
+    z = 1. - 2. * f4
     if dfactors:
-        dz = -2 * df4
+        dz = -2. * df4
 
     for p in range(n):
-        for q in range(0, n - p):
+        for q in range(n - p):
             # r = 1
             icur = idx(p, q, 0)
             inext = idx(p, q, 1)
@@ -248,36 +248,41 @@ class ExpansionSet(object):
             num_members = (num_members * (n + k)) // k
         return num_members
 
+    def _mapping(self, pts):
+        if isinstance(pts, numpy.ndarray):
+            return numpy.dot(self.A, pts) + self.b[:, None]
+        else:
+            m1, m2 = self.A.shape
+            return [sum((self.A[i][j] * pts[j] for j in range(m2)), self.b[i])
+                    for i in range(m1)]
+
     def _tabulate(self, n, pts):
-        '''A version of tabulate() that also works for a single point.
-        '''
+        """A version of tabulate() that also works for a single point.
+        """
         dim = self.ref_el.get_spatial_dimension()
         results = [None] * self.get_num_members(n)
         results[0] = sum((pts[i] - pts[i] for i in range(dim)), 1.)
         if n == 0:
             return results
-        m1, m2 = self.A.shape
-        ref_pts = [sum((self.A[i][j] * pts[j] for j in range(m2)), self.b[i])
-                   for i in range(m1)]
+
+        ref_pts = self._mapping(pts)
         recurrence(dim, n, self._make_factors(ref_pts), results)
         self._normalize(n, results)
         return results
 
     def _tabulate_derivatives(self, n, pts):
-        '''A version of tabulate_derivatives() that also works for a single point.
-        '''
+        """A version of tabulate_derivatives() that also works for a single point.
+        """
         dim = self.ref_el.get_spatial_dimension()
-        phi = [None] * self.get_num_members(n)
-        dphi = [None] * self.get_num_members(n)
+        num_members = self.get_num_members(n)
+        phi = [None] * num_members
+        dphi = [None] * num_members
         phi[0] = sum((pts[i] - pts[i] for i in range(dim)), 1.)
         dphi[0] = pts - pts
         if n == 0:
             return phi, dphi
-        m1, m2 = self.A.shape
-        ref_pts = [sum((self.A[i][j] * pts[j] for j in range(m2)), self.b[i])
-                   for i in range(m1)]
 
-        ref_pts = numpy.array(ref_pts)
+        ref_pts = self._mapping(pts)
         factors = self._make_factors(ref_pts)
         dfactors = self._make_dfactors(ref_pts)
         recurrence(dim, n, factors, phi, dfactors=dfactors, dphi=dphi)
@@ -308,7 +313,7 @@ class ExpansionSet(object):
         D = self.ref_el.get_spatial_dimension()
         return _tabulate_dpts(self._tabulate, D, n, order, numpy.array(pts))
 
-    def make_dmats(self, degree):
+    def get_dmats(self, degree):
         """Returns a numpy array with the expansion coefficients dmat[k, j, i]
         of the gradient of each member of the expansion set:
             d/dx_k phi_j = sum_i dmat[k, j, i] phi_i.
@@ -332,7 +337,7 @@ class ExpansionSet(object):
         from FIAT.polynomial_set import mis
         result = {}
         base_vals = self.tabulate(degree, pts)
-        dmats = self.make_dmats(degree) if order > 0 else []
+        dmats = self.get_dmats(degree) if order > 0 else []
         for i in range(order + 1):
             alphas = mis(self.ref_el.get_spatial_dimension(), i)
             for alpha in alphas:
