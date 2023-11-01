@@ -18,9 +18,7 @@
 import numpy
 from FIAT import expansions
 from FIAT.functional import index_iterator
-from FIAT.reference_element import UFCInterval
-from FIAT.quadrature import GaussLegendreQuadratureLineRule
-from FIAT.recursive_points import RecursivePointSet
+from FIAT.reference_element import make_lattice
 
 
 def mis(m, n):
@@ -128,7 +126,6 @@ class ONPolynomialSet(PolynomialSet):
     for vector- and tensor-valued sets as well.
 
     """
-    point_set = RecursivePointSet(lambda n: GaussLegendreQuadratureLineRule(UFCInterval(), n + 1).get_points())
 
     def __init__(self, ref_el, degree, shape=tuple()):
 
@@ -163,7 +160,7 @@ class ONPolynomialSet(PolynomialSet):
         if degree == 0:
             dmats = [numpy.array([[0.0]], "d") for i in range(sd)]
         else:
-            pts = self.point_set.recursive_points(ref_el.get_vertices(), degree)
+            pts = make_lattice(ref_el.get_vertices(), degree, family="gl")
 
             v = numpy.transpose(expansion_set.tabulate(degree, pts))
 

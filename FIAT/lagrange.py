@@ -14,7 +14,7 @@ class LagrangeDualSet(dual_set.DualSet):
     simplices of any dimension.  Nodes are point evaluation at
     equispaced points."""
 
-    def __init__(self, ref_el, degree):
+    def __init__(self, ref_el, degree, family="equi"):
         entity_ids = {}
         nodes = []
         entity_permutations = {}
@@ -29,7 +29,7 @@ class LagrangeDualSet(dual_set.DualSet):
             entity_permutations[dim] = {}
             perms = {0: [0]} if dim == 0 else make_entity_permutations_simplex(dim, degree - dim)
             for entity in sorted(top[dim]):
-                pts_cur = ref_el.make_points(dim, entity, degree)
+                pts_cur = ref_el.make_points(dim, entity, degree, family=family)
                 nodes_cur = [functional.PointEvaluation(ref_el, x)
                              for x in pts_cur]
                 nnodes_cur = len(nodes_cur)
