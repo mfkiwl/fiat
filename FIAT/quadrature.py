@@ -33,7 +33,7 @@ class QuadratureRule(object):
         return numpy.array(self.wts)
 
     def integrate(self, f):
-        return sum([w * f(x) for (x, w) in zip(self.pts, self.wts)])
+        return sum(w * f(x) for x, w in zip(self.pts, self.wts))
 
 
 class GaussJacobiQuadratureLineRule(QuadratureRule):
