@@ -26,12 +26,12 @@ import numpy as np
 def symmetric_simplex(dim):
     from FIAT import ufc_simplex
     s = ufc_simplex(dim)
-    r = lambda x: x ** 0.5
+    h = 0.5 * (3.**0.5)
     if dim == 2:
-        s.vertices = [(0.0, 0.0), (-1.0, -r(3.0)), (1.0, -r(3.0))]
+        s.vertices = [(0., 1.), (-h, -0.5), (h, -0.5)]
     elif dim == 3:
-        s.vertices = [(r(3.0)/3, 0.0, 0.0), (-r(3.0)/6, 0.5, 0.0),
-                      (-r(3.0)/6, -0.5, 0.0), (0.0, 0.0, r(6.0)/3)]
+        s.vertices = [(-h, -h, -h), (h, -h, -h),
+                      (-h, h, -h), (-h, -h, h)]
     return s
 
 
@@ -81,6 +81,41 @@ def test_symmetry(dim, degree):
             assert np.allclose(points[edge_dofs[entity]], np.array(list(map(transform, quadrature_points))))
 
     # TODO add rotational symmetry tests on each facet
+
+
+@pytest.mark.parametrize("dim, degree", [(1, 64), (2, 64), (3, 16)])
+def test_interpolation(dim, degree):
+    from FIAT import GaussLobattoLegendre, quadrature, reference_element
+
+    alphas = [tuple(row) for row in np.eye(dim, dtype=int)]
+    a = np.pi
+    f = lambda x: np.cos(a * sum(x))
+    df = lambda x: -a * np.sin(a * sum(x))
+
+    s = symmetric_simplex(dim)
+    # s = reference_element.default_simplex(dim)
+    rule = quadrature.make_quadrature(s, degree + 1)
+    points = rule.get_points()
+    weights = rule.get_weights()
+
+    f_at_pts = {}
+    f_at_pts[(0,)*dim] = np.array(list(map(f, points)))
+    for alpha in alphas:
+        f_at_pts[alpha] = np.array(list(map(df, points)))
+
+    print()
+    k = 1
+    while k <= degree:
+        fe = GaussLobattoLegendre(s, k)
+        tab = fe.tabulate(1, points)
+        coefficients = np.array([v(f) for v in fe.dual_basis()])
+
+        alpha = (0,) * dim
+        errorL2 = np.sqrt(np.dot(weights, (f_at_pts[alpha] - np.dot(coefficients, tab[alpha])) ** 2))
+        err2 = sum((f_at_pts[alpha] - np.dot(coefficients, tab[alpha])) ** 2 for alpha in tab)
+        errorH1 = np.sqrt(np.dot(weights, err2))
+        print("dim = %d, degree = %2d, L2-error = %.4E, H1-error = %.4E" % (dim, k, errorL2, errorH1))
+        k *= 2
 
 
 if __name__ == '__main__':

@@ -387,7 +387,7 @@ class LineExpansionSet(ExpansionSet):
         return ref_pts[0], 1., 0., 0.
 
     def _make_dfactors(self, ref_pts):
-        dx = ref_pts - ref_pts + self.A[:, 0:1]
+        dx = ref_pts - ref_pts + self.A[0][:, None]
         return dx, 0.*dx, 0.*dx, 0.*dx
 
     def _normalize(self, n, phi):
@@ -448,8 +448,8 @@ class TriangleExpansionSet(ExpansionSet):
 
     def _make_dfactors(self, ref_pts):
         y = ref_pts[1]
-        dx = ref_pts - ref_pts + self.A[:, 0:1]
-        dy = ref_pts - ref_pts + self.A[:, 1:2]
+        dx = ref_pts - ref_pts + self.A[0][:, None]
+        dy = ref_pts - ref_pts + self.A[1][:, None]
         dfactor1 = dx + 0.5 * dy
         dfactor2 = -0.5 * (1. - y) * dy
         dfactor3 = dy
@@ -483,9 +483,9 @@ class TetrahedronExpansionSet(ExpansionSet):
     def _make_dfactors(self, ref_pts):
         y = ref_pts[1]
         z = ref_pts[2]
-        dx = ref_pts - ref_pts + self.A[:, 0:1]
-        dy = ref_pts - ref_pts + self.A[:, 1:2]
-        dz = ref_pts - ref_pts + self.A[:, 2:3]
+        dx = ref_pts - ref_pts + self.A[0][:, None]
+        dy = ref_pts - ref_pts + self.A[1][:, None]
+        dz = ref_pts - ref_pts + self.A[2][:, None]
         dfactor1 = 0.5 * (2. * dx + dy + dz)
         dfactor2 = 0.5 * (y + z) * (dy + dz)
         dfactor3 = dy

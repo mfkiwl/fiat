@@ -24,6 +24,7 @@ from functools import reduce
 from collections import defaultdict
 import operator
 from math import factorial
+from recursivenodes.nodes import _recursive, _decode_family
 from FIAT.orientation_utils import make_cell_orientation_reflection_map_simplex, make_cell_orientation_reflection_map_tensorproduct
 
 
@@ -37,6 +38,20 @@ TETRAHEDRON = 3
 QUADRILATERAL = 11
 HEXAHEDRON = 111
 TENSORPRODUCT = 99
+
+
+def multiindex_equal(d, isum, imin=0):
+    """A generator for d-tuple multi-indices whose sum is isum and minimum is imin.
+    """
+    if d <= 0:
+        return
+    imax = isum - (d - 1) * imin
+    if imax < imin:
+        return
+    for i in range(imin, imax):
+        for a in multiindex_equal(d - 1, isum - i, imin=imin):
+            yield a + (i,)
+    yield (imin,) * (d - 1) + (imax,)
 
 
 def lattice_iter(start, finish, depth):
@@ -54,7 +69,7 @@ def lattice_iter(start, finish, depth):
                 yield jj + [ii]
 
 
-def make_lattice(verts, n, interior=0):
+def make_lattice(verts, n, interior=0, family="equi"):
     """Constructs a lattice of points on the simplex defined by verts.
     For example, the 1:st order lattice will be just the vertices.
     The optional argument interior specifies how many points from
@@ -62,15 +77,11 @@ def make_lattice(verts, n, interior=0):
     and interior = 0, this function will return the vertices and
     midpoint, but with interior = 1, it will only return the
     midpoint."""
-
-    vs = numpy.array(verts)
-    hs = (vs - vs[0])[1:, :] / n
-
-    m = hs.shape[0]
-    result = [tuple(vs[0] + numpy.array(indices).dot(hs))
-              for indices in lattice_iter(interior, n + 1 - interior, m)]
-
-    return result
+    family = _decode_family(family)
+    D = len(verts)
+    X = numpy.array(verts)
+    get_point = lambda alpha: tuple(numpy.dot(_recursive(D - 1, n, alpha, family), X))
+    return list(map(get_point, multiindex_equal(D, n, interior)))
 
 
 def linalg_subspace_intersection(A, B):
@@ -393,7 +404,7 @@ class Simplex(Cell):
                 edge_ts.append(vert_coords[dest] - vert_coords[source])
         return edge_ts
 
-    def make_points(self, dim, entity_id, order):
+    def make_points(self, dim, entity_id, order, family="equi"):
         """Constructs a lattice of points on the entity_id:th
         facet of dimension dim.  Order indicates how many points to
         include in each direction."""
@@ -403,9 +414,9 @@ class Simplex(Cell):
             entity_verts = \
                 self.get_vertices_of_subcomplex(
                     self.get_topology()[dim][entity_id])
-            return make_lattice(entity_verts, order, 1)
+            return make_lattice(entity_verts, order, 1, family=family)
         elif dim == self.get_spatial_dimension():
-            return make_lattice(self.get_vertices(), order, 1)
+            return make_lattice(self.get_vertices(), order, 1, family=family)
         else:
             raise ValueError("illegal dimension")
 

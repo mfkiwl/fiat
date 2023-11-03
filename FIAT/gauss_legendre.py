@@ -8,27 +8,16 @@
 #
 # Modified by Pablo D. Brubeck (brubeck@protonmail.com), 2021
 
-from FIAT import (finite_element, polynomial_set, dual_set, functional,
-                  quadrature, recursive_points)
-from FIAT.reference_element import POINT, LINE, TRIANGLE, TETRAHEDRON, UFCInterval
+from FIAT import finite_element, polynomial_set, dual_set, functional
+from FIAT.reference_element import POINT, LINE, TRIANGLE, TETRAHEDRON
 from FIAT.orientation_utils import make_entity_permutations_simplex
 from FIAT.barycentric_interpolation import LagrangePolynomialSet
-
-
-class GaussLegendrePointSet(recursive_points.RecursivePointSet):
-    """Recursive point set on simplices based on the Gauss-Legendre points on
-    the interval"""
-    def __init__(self):
-        ref_el = UFCInterval()
-        lr = quadrature.GaussLegendreQuadratureLineRule
-        f = lambda n: lr(ref_el, n + 1).get_points()
-        super(GaussLegendrePointSet, self).__init__(f)
+from FIAT.reference_element import make_lattice
 
 
 class GaussLegendreDualSet(dual_set.DualSet):
     """The dual basis for discontinuous elements with nodes at the
     (recursive) Gauss-Legendre points."""
-    point_set = GaussLegendrePointSet()
 
     def __init__(self, ref_el, degree):
         entity_ids = {}
@@ -43,7 +32,7 @@ class GaussLegendreDualSet(dual_set.DualSet):
                 entity_permutations[dim][entity] = perms
 
         # make nodes by getting points
-        pts = self.point_set.recursive_points(ref_el.get_vertices(), degree)
+        pts = make_lattice(ref_el.get_vertices(), degree, family="gl")
         nodes = [functional.PointEvaluation(ref_el, x) for x in pts]
         entity_ids[dim][0] = list(range(len(nodes)))
         super(GaussLegendreDualSet, self).__init__(nodes, ref_el, entity_ids, entity_permutations)

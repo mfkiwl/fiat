@@ -115,6 +115,7 @@ class ONPolynomialSet(PolynomialSet):
     for vector- and tensor-valued sets as well.
 
     """
+
     def __init__(self, ref_el, degree, shape=tuple()):
 
         if shape == tuple():
@@ -143,6 +144,7 @@ class ONPolynomialSet(PolynomialSet):
                     cur_idx = tuple([cur_bf] + list(idx) + [exp_bf])
                     coeffs[cur_idx] = 1.0
                     cur_bf += 1
+
         PolynomialSet.__init__(self, ref_el, degree, embedded_degree,
                                expansion_set, coeffs)
 
