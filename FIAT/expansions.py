@@ -350,7 +350,7 @@ class ExpansionSet(object):
         from FIAT.polynomial_set import mis
         result = {}
         D = self.ref_el.get_spatial_dimension()
-        if order == 0:
+        if order == 0 or degree == 0 or D == 0:
             base_vals = self.tabulate(degree, pts)
         else:
             v, dv = self._tabulate_derivatives(degree, numpy.transpose(pts))
