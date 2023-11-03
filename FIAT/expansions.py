@@ -26,6 +26,7 @@ def morton_index3(p, q=0, r=0):
 
 
 def jrc(a, b, n):
+    """Jacobi recurrence coefficients"""
     an = (2*n+1+a+b)*(2*n+2+a+b) / (2*(n+1)*(n+1+a+b))
     bn = (a*a-b*b) * (2*n+1+a+b) / (2*(n+1)*(2*n+a+b)*(n+1+a+b))
     cn = (n+a)*(n+b)*(2*n+2+a+b) / ((n+1)*(n+1+a+b)*(2*n+a+b))
@@ -33,6 +34,7 @@ def jrc(a, b, n):
 
 
 def recurrence(dim, n, factors, phi, dfactors=None, dphi=None):
+    """Dubiner recurrence from (Kirby 2010)"""
     skip_derivs = dphi is None
     if dim == 0:
         return
