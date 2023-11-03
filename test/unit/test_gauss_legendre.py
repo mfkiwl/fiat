@@ -24,14 +24,14 @@ import numpy as np
 
 
 def symmetric_simplex(dim):
-    from FIAT import ufc_simplex
-    s = ufc_simplex(dim)
-    r = lambda x: x ** 0.5
+    from FIAT.reference_element import default_simplex
+    s = default_simplex(dim)
     if dim == 2:
-        s.vertices = [(0.0, 0.0), (-1.0, -r(3.0)), (1.0, -r(3.0))]
+        h = 3.**0.5 / dim
+        s.vertices = [(0., 1.), (-h, -0.5), (h, -0.5)]
     elif dim == 3:
-        s.vertices = [(r(3.0)/3, 0.0, 0.0), (-r(3.0)/6, 0.5, 0.0),
-                      (-r(3.0)/6, -0.5, 0.0), (0.0, 0.0, r(6.0)/3)]
+        h = 3.**0.5 / dim
+        s.vertices = [(-h, h, h), (h, -h, h), (h, h, -h), (h, h, h)]
     return s
 
 
@@ -79,7 +79,49 @@ def test_symmetry(dim, degree):
             transform = s.get_entity_transform(1, entity)
             assert np.allclose(points[edge_dofs[entity]], np.array(list(map(transform, quadrature_points))))
 
-    # TODO add rotational symmetry tests
+
+@pytest.mark.parametrize("dim, degree", [(1, 128), (2, 64), (3, 16)])
+def test_interpolation(dim, degree):
+    from FIAT import GaussLobattoLegendre, quadrature
+    from FIAT.polynomial_set import mis
+
+    a = (1. + 0.5)
+    a = 0.5 * a**2
+    r2 = lambda x: 0.5 * np.linalg.norm(x, axis=-1)**2
+    f = lambda x: np.exp(a / (r2(x) - a))
+    df = lambda x: f(x) * (-a*(r2(x) - a)**-2)
+
+    s = symmetric_simplex(dim)
+    rule = quadrature.make_quadrature(s, degree + 1)
+    points = rule.get_points()
+    weights = rule.get_weights()
+
+    f_at_pts = {}
+    f_at_pts[(0,) * dim] = f(points)
+    df_at_pts = df(points) * points.T
+    alphas = mis(dim, 1)
+    for alpha in alphas:
+        i = next(j for j, aj in enumerate(alpha) if aj > 0)
+        f_at_pts[alpha] = df_at_pts[i]
+
+    print()
+    scaleL2 = 1 / np.sqrt(np.dot(weights, f(points)**2))
+    scaleH1 = 1 / np.sqrt(sum(np.dot(weights, f_at_pts[alpha]**2) for alpha in f_at_pts))
+
+    k = 1
+    while k <= degree:
+        fe = GaussLobattoLegendre(s, k)
+        tab = fe.tabulate(1, points)
+        coefficients = np.array([v(f) for v in fe.dual_basis()])
+
+        alpha = (0,) * dim
+        err = f_at_pts[alpha] - np.dot(coefficients, tab[alpha])
+        errorL2 = scaleL2 * np.sqrt(np.dot(weights, err**2))
+
+        err2 = sum((f_at_pts[alpha] - np.dot(coefficients, tab[alpha])) ** 2 for alpha in tab)
+        errorH1 = scaleH1 * np.sqrt(np.dot(weights, err2))
+        print("dim = %d, degree = %2d, L2-error = %.4E, H1-error = %.4E" % (dim, k, errorL2, errorH1))
+        k = min(k * 2, k + 16)
 
 
 if __name__ == '__main__':

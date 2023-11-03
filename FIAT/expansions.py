@@ -12,9 +12,6 @@ import math
 import sympy
 from FIAT import reference_element
 from FIAT import jacobi
-from FIAT.reference_element import UFCInterval
-from FIAT.quadrature import GaussLegendreQuadratureLineRule
-from FIAT.recursive_points import RecursivePointSet
 
 
 def morton_index2(p, q=0):
@@ -33,9 +30,8 @@ def jrc(a, b, n):
     return an, bn, cn
 
 
-def recurrence(dim, n, factors, phi, dfactors=None, dphi=None):
+def recurrence(dim, n, ref_pts, phi, jacobian=None, dphi=None):
     """Dubiner recurrence from (Kirby 2010)"""
-    skip_derivs = dphi is None
     if dim == 0:
         return
     elif dim == 1:
@@ -47,16 +43,23 @@ def recurrence(dim, n, factors, phi, dfactors=None, dphi=None):
     else:
         raise ValueError("Invalid number of spatial dimensions")
 
-    f1, f2, f3, f4 = factors
-    if dfactors is not None:
-        df1, df2, df3, df4 = dfactors
+    skip_derivs = dphi is None
+    x, y, z = ref_pts
+    f0 = 0.5 * (y + z)
+    f1 = x + f0 + 1.
+    f2 = f0 ** 2
+    if jacobian is not None:
+        dx, dy, dz = jacobian
+        df0 = 0.5 * (dy + dz)
+        df1 = dx + df0
+        df2 = 2 * f0 * df0
 
     # p = 1
     icur = idx(0)
     inext = idx(1)
     phi[inext] = f1
     if not skip_derivs:
-        dphi[inext] = df1
+        dphi[inext] = 0. * dphi[icur] + df1
     # general p by recurrence
     for p in range(1, n):
         iprev, icur = icur, inext
@@ -66,43 +69,43 @@ def recurrence(dim, n, factors, phi, dfactors=None, dphi=None):
         phi[inext] = a * f1 * phi[icur] - b * f2 * phi[iprev]
         if skip_derivs:
             continue
-        dphi[inext] = (a * f1 * dphi[icur] - b * f2 * dphi[iprev] +
-                       a * phi[icur] * df1 - b * phi[iprev] * df2)
+        dphi[inext] = (a * f1 * dphi[icur] + a * phi[icur] * df1 -
+                       b * (f2 * dphi[iprev] + phi[iprev] * df2))
     if dim < 2:
         return
 
+    f3 = 1. + y
+    f4 = 0.5 * (z - 1.)
     f5 = f4 ** 2
-    if dfactors is not None:
+    if jacobian is not None:
+        df3 = dy
+        df4 = 0.5 * dz
         df5 = 2 * f4 * df4
 
     for p in range(n):
         # q = 1
         icur = idx(p, 0)
         inext = idx(p, 1)
-        g = (p + 1.5) * f3 - f4
-        phi[inext] = g * phi[icur]
+        a = p + 1.5
+        qcoef = a * f3 + f4
+        phi[inext] = qcoef * phi[icur]
         if not skip_derivs:
-            dg = (p + 1.5) * df3 - df4
-            dphi[inext] = g * dphi[icur] + phi[icur] * dg
+            dqcoef = a * df3 + df4
+            dphi[inext] = qcoef * dphi[icur] + phi[icur] * dqcoef
         # general q by recurrence
         for q in range(1, n - p):
             iprev, icur = icur, inext
             inext = idx(p, q + 1)
             aq, bq, cq = jrc(2 * p + 1, 0, q)
-            g = aq * f3 + (bq - aq) * f4
-            h = cq * f5
-            phi[inext] = g * phi[icur] - h * phi[iprev]
+            qcoef = aq * f3 + (aq - bq) * f4
+            phi[inext] = qcoef * phi[icur] - cq*(f5 * phi[iprev])
             if skip_derivs:
                 continue
-            dg = aq * df3 + (bq - aq) * df4
-            dh = cq * df5
-            dphi[inext] = g * dphi[icur] + phi[icur] * dg - h * dphi[iprev] - phi[iprev] * dh
+            dqcoef = aq * df3 + (aq - bq) * df4
+            dphi[inext] = (qcoef * dphi[icur] + phi[icur] * dqcoef -
+                           cq * (f5 * dphi[iprev] + phi[iprev] * df5))
     if dim < 3:
         return
-
-    z = 1. - 2. * f4
-    if dfactors:
-        dz = -2. * df4
 
     for p in range(n):
         for q in range(n - p):
@@ -111,20 +114,20 @@ def recurrence(dim, n, factors, phi, dfactors=None, dphi=None):
             inext = idx(p, q, 1)
             a = 2.0 + p + q
             b = 1.0 + p + q
-            g = a * z + b
-            phi[inext] = g * phi[icur]
+            rcoef = a * z + b
+            phi[inext] = rcoef * phi[icur]
             if not skip_derivs:
-                dphi[inext] = g * dphi[icur] + a * phi[icur] * dz
+                dphi[inext] = rcoef * dphi[icur] + a * phi[icur] * dz
             # general r by recurrence
             for r in range(1, n - p - q):
                 iprev, icur = icur, inext
                 inext = idx(p, q, r + 1)
                 ar, br, cr = jrc(2 * p + 2 * q + 2, 0, r)
-                g = ar * z + br
-                phi[inext] = g * phi[icur] - cr * phi[iprev]
+                rcoef = ar * z + br
+                phi[inext] = rcoef * phi[icur] - cr * phi[iprev]
                 if skip_derivs:
                     continue
-                dphi[inext] = g * dphi[icur] + ar * phi[icur] * dz - cr * dphi[iprev]
+                dphi[inext] = rcoef * dphi[icur] + ar * phi[icur] * dz - cr * dphi[iprev]
 
 
 def _tabulate_dpts(tabulator, D, n, order, pts):
@@ -216,8 +219,6 @@ def xi_tetrahedron(eta):
 
 
 class ExpansionSet(object):
-    point_set = RecursivePointSet(lambda n: GaussLegendreQuadratureLineRule(UFCInterval(), n + 1).get_points())
-
     def __new__(cls, ref_el, *args, **kwargs):
         """Returns an ExpansionSet instance appopriate for the given
         reference element."""
@@ -260,6 +261,15 @@ class ExpansionSet(object):
             return [sum((self.A[i][j] * pts[j] for j in range(m2)), self.b[i])
                     for i in range(m1)]
 
+    def _pad_coordinates(self, ref_pts):
+        x, y, z = tuple(ref_pts) + (-1., )*(3 - len(ref_pts))
+        return x, y, z
+
+    def _pad_jacobian(self):
+        A = numpy.pad(self.A, [(0, 3 - self.A.shape[0]), (0, 0)])
+        dx, dy, dz = tuple(row[:, None] for row in A)
+        return dx, dy, dz
+
     def _tabulate(self, n, pts):
         """A version of tabulate() that also works for a single point.
         """
@@ -270,7 +280,7 @@ class ExpansionSet(object):
             return results
 
         ref_pts = self._mapping(pts)
-        recurrence(dim, n, self._make_factors(ref_pts), results)
+        recurrence(dim, n, self._pad_coordinates(ref_pts), results)
         self._normalize(n, results)
         return results
 
@@ -287,9 +297,8 @@ class ExpansionSet(object):
             return phi, dphi
 
         ref_pts = self._mapping(pts)
-        factors = self._make_factors(ref_pts)
-        dfactors = self._make_dfactors(ref_pts)
-        recurrence(dim, n, factors, phi, dfactors=dfactors, dphi=dphi)
+        recurrence(dim, n, self._pad_coordinates(ref_pts), phi,
+                   jacobian=self._pad_jacobian(), dphi=dphi)
         self._normalize(n, phi)
         self._normalize(n, dphi)
         return phi, dphi
@@ -330,8 +339,8 @@ class ExpansionSet(object):
             pass
         if degree == 0:
             return cache.setdefault(key, numpy.zeros((self.ref_el.get_spatial_dimension(), 1, 1), "d"))
-        pts = self.point_set.recursive_points(self.ref_el.get_vertices(), degree)
 
+        pts = reference_element.make_lattice(self.ref_el.get_vertices(), degree, family="gl")
         v, dv = self._tabulate_derivatives(degree, numpy.transpose(pts))
         dv = numpy.array(dv).transpose((1, 2, 0))
         dmats = numpy.linalg.solve(numpy.transpose(v), dv)
@@ -340,10 +349,21 @@ class ExpansionSet(object):
     def _tabulate_jet(self, degree, pts, order=0):
         from FIAT.polynomial_set import mis
         result = {}
-        base_vals = self.tabulate(degree, pts)
-        dmats = self.get_dmats(degree) if order > 0 else []
-        for i in range(order + 1):
-            alphas = mis(self.ref_el.get_spatial_dimension(), i)
+        D = self.ref_el.get_spatial_dimension()
+        if order == 0:
+            base_vals = self.tabulate(degree, pts)
+        else:
+            v, dv = self._tabulate_derivatives(degree, numpy.transpose(pts))
+            base_vals = numpy.array(v)
+            dtildes = numpy.array(dv).transpose((1, 0, 2))
+            alphas = mis(D, 1)
+            for alpha in alphas:
+                result[alpha] = next(dv for dv, ai in zip(dtildes, alpha) if ai > 0)
+
+        # Only use dmats if order > 1
+        dmats = self.get_dmats(degree) if order > 1 else []
+        for i in range(0, order + 1):
+            alphas = mis(D, i)
             for alpha in alphas:
                 beta = next((beta for beta in sorted(result, reverse=True)
                              if all(bj <= aj for bj, aj in zip(beta, alpha))), (0,) * len(alpha))
@@ -384,13 +404,6 @@ class LineExpansionSet(ExpansionSet):
         if ref_el.get_spatial_dimension() != 1:
             raise Exception("Must have a line")
         super(LineExpansionSet, self).__init__(ref_el)
-
-    def _make_factors(self, ref_pts):
-        return ref_pts[0], 1., 0., 0.
-
-    def _make_dfactors(self, ref_pts):
-        dx = ref_pts - ref_pts + self.A[0][:, None]
-        return dx, 0.*dx, 0.*dx, 0.*dx
 
     def _normalize(self, n, phi):
         for p in range(n + 1):
@@ -439,25 +452,6 @@ class TriangleExpansionSet(ExpansionSet):
             raise Exception("Must have a triangle")
         super(TriangleExpansionSet, self).__init__(ref_el)
 
-    def _make_factors(self, ref_pts):
-        x = ref_pts[0]
-        y = ref_pts[1]
-        factor1 = 0.5 * (1. + 2. * x + y)
-        factor2 = (0.5 * (1. - y)) ** 2
-        factor3 = 1. + y
-        factor4 = 1.
-        return factor1, factor2, factor3, factor4
-
-    def _make_dfactors(self, ref_pts):
-        y = ref_pts[1]
-        dx = ref_pts - ref_pts + self.A[0][:, None]
-        dy = ref_pts - ref_pts + self.A[1][:, None]
-        dfactor1 = dx + 0.5 * dy
-        dfactor2 = -0.5 * (1. - y) * dy
-        dfactor3 = dy
-        dfactor4 = 0. * dx
-        return dfactor1, dfactor2, dfactor3, dfactor4
-
     def _normalize(self, n, phi):
         idx = morton_index2
         for p in range(n + 1):
@@ -471,28 +465,6 @@ class TetrahedronExpansionSet(ExpansionSet):
         if ref_el.get_spatial_dimension() != 3:
             raise Exception("Must be a tetrahedron")
         super(TetrahedronExpansionSet, self).__init__(ref_el)
-
-    def _make_factors(self, ref_pts):
-        x = ref_pts[0]
-        y = ref_pts[1]
-        z = ref_pts[2]
-        factor1 = 0.5 * (2. + 2. * x + y + z)
-        factor2 = (0.5 * (y + z))**2
-        factor3 = 1. + y
-        factor4 = 0.5 * (1. - z)
-        return factor1, factor2, factor3, factor4
-
-    def _make_dfactors(self, ref_pts):
-        y = ref_pts[1]
-        z = ref_pts[2]
-        dx = ref_pts - ref_pts + self.A[0][:, None]
-        dy = ref_pts - ref_pts + self.A[1][:, None]
-        dz = ref_pts - ref_pts + self.A[2][:, None]
-        dfactor1 = 0.5 * (2. * dx + dy + dz)
-        dfactor2 = 0.5 * (y + z) * (dy + dz)
-        dfactor3 = dy
-        dfactor4 = -0.5 * dz
-        return dfactor1, dfactor2, dfactor3, dfactor4
 
     def _normalize(self, n, phi):
         idx = morton_index3

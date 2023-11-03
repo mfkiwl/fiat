@@ -53,6 +53,10 @@ class LagrangeLineExpansionSet(expansions.LineExpansionSet):
             results = numpy.array(list(map(simplify, results)))
         return results
 
+    def _tabulate_derivatives(self, n, pts):
+        results = self.tabulate(n, pts)
+        return results, numpy.dot(self.dmat, results)[:, None, :]
+
     def tabulate_derivatives(self, n, pts):
         return numpy.dot(self.dmat, self.tabulate(n, pts))
 
