@@ -116,7 +116,7 @@ def test_interpolation(dim, degree):
 
         alpha = (0,) * dim
         err = f_at_pts[alpha] - np.dot(coefficients, tab[alpha])
-        errorL2 = scaleL2 * np.sqrt(np.dot(weights, err**2))
+        errorL2 = scaleL2 * np.sqrt(np.dot(weights, err ** 2))
 
         err2 = sum((f_at_pts[alpha] - np.dot(coefficients, tab[alpha])) ** 2 for alpha in tab)
         errorH1 = scaleH1 * np.sqrt(np.dot(weights, err2))
