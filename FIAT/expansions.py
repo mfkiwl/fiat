@@ -30,9 +30,20 @@ def jrc(a, b, n):
     return an, bn, cn
 
 
+def pad_coordinates(ref_pts, embedded_dim):
+    """Pad reference coordinates by appending -1.0."""
+    return tuple(ref_pts) + (-1.0, )*(embedded_dim - len(ref_pts))
+
+
+def pad_jacobian(A, embedded_dim):
+    """Pad coordinate mapping Jacobian by appending zero rows."""
+    A = numpy.pad(A, [(0, embedded_dim - A.shape[0]), (0, 0)])
+    return tuple(row[:, None] for row in A)
+
+
 def recurrence(dim, n, ref_pts, phi, jacobian=None, dphi=None):
     """Dubiner recurrence from (Kirby 2010)"""
-    if dim == 0:
+    if dim == 0 or n == 0:
         return
     elif dim == 1:
         idx = lambda p: p
@@ -44,12 +55,12 @@ def recurrence(dim, n, ref_pts, phi, jacobian=None, dphi=None):
         raise ValueError("Invalid number of spatial dimensions")
 
     skip_derivs = dphi is None
-    x, y, z = ref_pts
+    x, y, z = pad_coordinates(ref_pts, 3)
     f0 = 0.5 * (y + z)
     f1 = x + f0 + 1.
     f2 = f0 ** 2
     if jacobian is not None:
-        dx, dy, dz = jacobian
+        dx, dy, dz = pad_jacobian(jacobian, 3)
         df0 = 0.5 * (dy + dz)
         df1 = dx + df0
         df2 = 2 * f0 * df0
@@ -69,7 +80,7 @@ def recurrence(dim, n, ref_pts, phi, jacobian=None, dphi=None):
         phi[inext] = a * f1 * phi[icur] - b * f2 * phi[iprev]
         if skip_derivs:
             continue
-        dphi[inext] = (a * f1 * dphi[icur] + a * phi[icur] * df1 -
+        dphi[inext] = (a * (f1 * dphi[icur] + phi[icur] * df1) -
                        b * (f2 * dphi[iprev] + phi[iprev] * df2))
     if dim < 2:
         return
@@ -261,44 +272,35 @@ class ExpansionSet(object):
             return [sum((self.A[i][j] * pts[j] for j in range(m2)), self.b[i])
                     for i in range(m1)]
 
-    def _pad_coordinates(self, ref_pts):
-        x, y, z = tuple(ref_pts) + (-1., )*(3 - len(ref_pts))
-        return x, y, z
-
-    def _pad_jacobian(self):
-        A = numpy.pad(self.A, [(0, 3 - self.A.shape[0]), (0, 0)])
-        dx, dy, dz = tuple(row[:, None] for row in A)
-        return dx, dy, dz
-
     def _tabulate(self, n, pts):
         """A version of tabulate() that also works for a single point.
         """
-        dim = self.ref_el.get_spatial_dimension()
+        D = self.ref_el.get_spatial_dimension()
         results = [None] * self.get_num_members(n)
-        results[0] = sum((pts[i] - pts[i] for i in range(dim)), 1.)
+        results[0] = sum((pts[i] - pts[i] for i in range(D)), 1.)
         if n == 0:
             return results
 
         ref_pts = self._mapping(pts)
-        recurrence(dim, n, self._pad_coordinates(ref_pts), results)
+        recurrence(D, n, ref_pts, results)
         self._normalize(n, results)
         return results
 
     def _tabulate_derivatives(self, n, pts):
         """A version of tabulate_derivatives() that also works for a single point.
         """
-        dim = self.ref_el.get_spatial_dimension()
+        D = self.ref_el.get_spatial_dimension()
         num_members = self.get_num_members(n)
         phi = [None] * num_members
         dphi = [None] * num_members
-        phi[0] = sum((pts[i] - pts[i] for i in range(dim)), 1.)
+        phi[0] = sum((pts[i] - pts[i] for i in range(D)), 1.)
         dphi[0] = pts - pts
         if n == 0:
             return phi, dphi
 
         ref_pts = self._mapping(pts)
-        recurrence(dim, n, self._pad_coordinates(ref_pts), phi,
-                   jacobian=self._pad_jacobian(), dphi=dphi)
+        recurrence(D, n, ref_pts, phi,
+                   jacobian=self.A, dphi=dphi)
         self._normalize(n, phi)
         self._normalize(n, dphi)
         return phi, dphi
@@ -306,21 +308,16 @@ class ExpansionSet(object):
     def tabulate(self, n, pts):
         if len(pts) == 0:
             return numpy.array([])
-        else:
-            return numpy.array(self._tabulate(n, numpy.array(pts).T))
+        return numpy.array(self._tabulate(n, numpy.transpose(pts)))
 
     def tabulate_derivatives(self, n, pts):
-        order = 1
         D = self.ref_el.get_spatial_dimension()
-        data = _tabulate_dpts(self._tabulate, D, n, order, numpy.array(pts))
-        # Put data in the required data structure, i.e.,
-        # k-tuples which contain the value, and the k-1 derivatives
-        # (gradient, Hessian, ...)
-        m, n = data[0].shape
-        data2 = [[tuple([data[r][i][j] for r in range(order+1)])
-                  for j in range(n)]
-                 for i in range(m)]
-        return data2
+        vals, deriv_vals = self._tabulate_derivatives(n, numpy.transpose(pts))
+        # Create the ordinary data structure.
+        data = [[(vals[i][j], [deriv_vals[i][r][j] for r in range(D)])
+                 for j in range(len(vals[0]))]
+                for i in range(len(vals))]
+        return data
 
     def tabulate_jet(self, n, pts, order=1):
         D = self.ref_el.get_spatial_dimension()
@@ -409,39 +406,27 @@ class LineExpansionSet(ExpansionSet):
         for p in range(n + 1):
             phi[p] *= math.sqrt(p + 0.5)
 
-    def tabulate(self, n, pts):
+    def _tabulate(self, n, pts):
         """Returns a numpy array A[i,j] = phi_i(pts[j])"""
         if len(pts) > 0:
-            ref_pts = numpy.array([self.mapping(pt) for pt in pts])
+            ref_pts = self._mapping(pts).T
             results = jacobi.eval_jacobi_batch(0, 0, n, ref_pts)
             self._normalize(n, results)
             return results
         else:
             return []
 
-    def tabulate_derivatives(self, n, pts):
-        """Returns a tuple of length one (A,) such that
-        A[i,j] = D phi_i(pts[j]).  The tuple is returned for
-        compatibility with the interfaces of the triangle and
-        tetrahedron expansions."""
-        ref_pts = numpy.array([self.mapping(pt) for pt in pts])
-        results = jacobi.eval_jacobi_deriv_batch(0, 0, n, ref_pts)
+    def _tabulate_derivatives(self, n, pts):
+        """Returns a tuple of (vals, derivs) such that
+        vals[i,j] = phi_i(pts[j]), derivs[i,j] = D vals[i,j]."""
+        ref_pts = self._mapping(pts).T
+        derivs = jacobi.eval_jacobi_deriv_batch(0, 0, n, ref_pts)
 
         # Jacobi polynomials defined on [-1, 1], first derivatives need scaling
-        results *= 2.0 / self.ref_el.volume()
-        self._normalize(n, results)
-
-        vals = self.tabulate(n, pts)
-        deriv_vals = (results,)
-
-        # Create the ordinary data structure.
-        dv = []
-        for i in range(vals.shape[0]):
-            dv.append([])
-            for j in range(vals.shape[1]):
-                dv[-1].append((vals[i][j], [deriv_vals[0][i][j]]))
-
-        return dv
+        derivs *= 2.0 / self.ref_el.volume()
+        self._normalize(n, derivs)
+        vals = self._tabulate(n, pts)
+        return vals, derivs[:, None, :]
 
 
 class TriangleExpansionSet(ExpansionSet):
