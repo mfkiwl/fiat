@@ -24,9 +24,11 @@ import numpy as np
 
 
 def symmetric_simplex(dim):
-    from FIAT.reference_element import default_simplex
-    s = default_simplex(dim)
-    if dim == 2:
+    from FIAT.reference_element import ufc_simplex
+    s = ufc_simplex(dim)
+    if dim == 1:
+        s.vertices = [(-1.,), (1.,)]
+    elif dim == 2:
         h = 3.**0.5 / dim
         s.vertices = [(0., 1.), (-h, -0.5), (h, -0.5)]
     elif dim == 3:
@@ -57,7 +59,7 @@ def test_gll_basis_values(dim, degree):
 @pytest.mark.parametrize("dim, degree", [(1, 4), (2, 4), (3, 4)])
 def test_symmetry(dim, degree):
     """ Ensure the dual basis has the right symmetry."""
-    from FIAT import GaussLobattoLegendre, quadrature, expansions, ufc_simplex
+    from FIAT import GaussLobattoLegendre, quadrature, expansions
 
     s = symmetric_simplex(dim)
     fe = GaussLobattoLegendre(s, degree)
@@ -69,7 +71,8 @@ def test_symmetry(dim, degree):
         points[i, :], = node.get_point_dict().keys()
 
     # Test that edge DOFs are located at the GLL quadrature points
-    lr = quadrature.GaussLobattoLegendreQuadratureLineRule(ufc_simplex(1), degree + 1)
+    line = s if dim == 1 else s.construct_subelement(1)
+    lr = quadrature.GaussLobattoLegendreQuadratureLineRule(line, degree + 1)
     # Edge DOFs are ordered with the two vertex DOFs followed by the interior DOFs
     quadrature_points = lr.pts[::degree] + lr.pts[1:-1]
 
@@ -107,7 +110,7 @@ def test_interpolation(dim, degree):
 
     print()
     scaleL2 = 1 / np.sqrt(np.dot(weights, f(points)**2))
-    scaleH1 = 1 / np.sqrt(sum(np.dot(weights, f_at_pts[alpha]**2) for alpha in f_at_pts))
+    scaleH1 = 1 / np.sqrt(np.dot(weights, sum(f_at_pts[alpha]**2 for alpha in f_at_pts)))
 
     k = 1
     while k <= degree:
