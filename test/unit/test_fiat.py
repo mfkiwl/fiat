@@ -517,6 +517,19 @@ def test_error_quadrature_degree(element):
         eval(element)
 
 
+@pytest.mark.parametrize('cell', [I, T, S])
+def test_expansion_orthonormality(cell):
+    from FIAT import expansions, quadrature
+    degree = 10
+    rule = quadrature.make_quadrature(cell, degree + 1)
+    U = expansions.ExpansionSet(cell)
+    phi = U.tabulate(degree, rule.pts)
+    w = rule.get_weights()
+    scale = 0.5 ** -cell.get_spatial_dimension()
+    results = scale * np.dot(phi, w[:, None] * phi.T)
+    assert np.allclose(results, np.eye(results.shape[0]))
+
+
 if __name__ == '__main__':
     import os
     pytest.main(os.path.abspath(__file__))

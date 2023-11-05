@@ -51,6 +51,7 @@ def recurrence(dim, n, ref_pts, phi, jacobian=None, dphi=None):
         return
     if dim > 3 or dim < 0:
         raise ValueError("Invalid number of spatial dimensions")
+
     idx = (lambda p: p, morton_index2, morton_index3)[dim-1]
     results = (phi, ) if skip_derivs else (phi, dphi)
     x, y, z = pad_coordinates(ref_pts, 3)
@@ -73,13 +74,12 @@ def recurrence(dim, n, ref_pts, phi, jacobian=None, dphi=None):
     for p in range(1, n):
         iprev, icur = icur, inext
         inext = idx(p + 1)
-        a = (2. * p + 1.) / (1. + p)
-        b = p / (1. + p)
-        phi[inext] = a * f1 * phi[icur] - b * f2 * phi[iprev]
+        a, b, c = jrc(0, 0, p)
+        phi[inext] = a * f1 * phi[icur] - c * f2 * phi[iprev]
         if skip_derivs:
             continue
         dphi[inext] = (a * (f1 * dphi[icur] + phi[icur] * df1) -
-                       b * (f2 * dphi[iprev] + phi[iprev] * df2))
+                       c * (f2 * dphi[iprev] + phi[iprev] * df2))
     # normalize in p
     for result in results:
         for p in range(n + 1):
@@ -87,36 +87,38 @@ def recurrence(dim, n, ref_pts, phi, jacobian=None, dphi=None):
     if dim < 2:
         return
 
-    f3 = 1. + y
-    f4 = 0.5 * (z - 1.)
+    f4 = 0.5 * (1. - z)
+    f3 = y - f4 + 1.
     f5 = f4 ** 2
     if jacobian is not None:
-        df3 = dy
-        df4 = 0.5 * dz
+        df4 = -0.5 * dz
+        df3 = dy - df4
         df5 = 2 * f4 * df4
 
     for p in range(n):
         # handle q = 1
         icur = idx(p, 0)
         inext = idx(p, 1)
-        a = p + 1.5
-        qcoef = a * f3 + f4
-        phi[inext] = qcoef * phi[icur]
+        alpha = 2 * p + 1
+        b = 0.5 * alpha
+        a = b + 1.
+        factor = a * f3 + b * f4
+        phi[inext] = factor * phi[icur]
         if not skip_derivs:
-            dqcoef = a * df3 + df4
-            dphi[inext] = qcoef * dphi[icur] + phi[icur] * dqcoef
+            dfactor = a * df3 + b * df4
+            dphi[inext] = factor * dphi[icur] + phi[icur] * dfactor
         # general q by recurrence
         for q in range(1, n - p):
             iprev, icur = icur, inext
             inext = idx(p, q + 1)
-            aq, bq, cq = jrc(2 * p + 1, 0, q)
-            qcoef = aq * f3 + (aq - bq) * f4
-            phi[inext] = qcoef * phi[icur] - cq*(f5 * phi[iprev])
+            a, b, c = jrc(alpha, 0, q)
+            factor = a * f3 + b * f4
+            phi[inext] = factor * phi[icur] - c * (f5 * phi[iprev])
             if skip_derivs:
                 continue
-            dqcoef = aq * df3 + (aq - bq) * df4
-            dphi[inext] = (qcoef * dphi[icur] + phi[icur] * dqcoef -
-                           cq * (f5 * dphi[iprev] + phi[iprev] * df5))
+            dfactor = a * df3 + b * df4
+            dphi[inext] = (factor * dphi[icur] + phi[icur] * dfactor -
+                           c * (f5 * dphi[iprev] + phi[iprev] * df5))
     # normalize in p + q
     for result in results:
         for p in range(n + 1):
@@ -130,22 +132,25 @@ def recurrence(dim, n, ref_pts, phi, jacobian=None, dphi=None):
             # handle r = 1
             icur = idx(p, q, 0)
             inext = idx(p, q, 1)
-            a = 2.0 + p + q
-            b = 1.0 + p + q
-            rcoef = a * z + b
-            phi[inext] = rcoef * phi[icur]
+            alpha = 2 * (p + q) + 2
+            b = 0.5 * alpha
+            a = b + 1.
+            factor = a * z + b
+            phi[inext] = factor * phi[icur]
             if not skip_derivs:
-                dphi[inext] = rcoef * dphi[icur] + a * phi[icur] * dz
+                dfactor = a * dz
+                dphi[inext] = factor * dphi[icur] + phi[icur] * dfactor
             # general r by recurrence
             for r in range(1, n - p - q):
                 iprev, icur = icur, inext
                 inext = idx(p, q, r + 1)
-                ar, br, cr = jrc(2 * p + 2 * q + 2, 0, r)
-                rcoef = ar * z + br
-                phi[inext] = rcoef * phi[icur] - cr * phi[iprev]
+                a, b, c = jrc(alpha, 0, r)
+                factor = a * z + b
+                phi[inext] = factor * phi[icur] - c * phi[iprev]
                 if skip_derivs:
                     continue
-                dphi[inext] = rcoef * dphi[icur] + ar * phi[icur] * dz - cr * dphi[iprev]
+                dfactor = a * dz
+                dphi[inext] = factor * dphi[icur] + phi[icur] * dfactor - c * dphi[iprev]
     # normalize in p + q + r
     for result in results:
         for p in range(n + 1):
@@ -278,11 +283,11 @@ class ExpansionSet(object):
         return num_members
 
     def _mapping(self, pts):
-        if isinstance(pts, numpy.ndarray):
+        if isinstance(pts, numpy.ndarray) and len(pts.shape) == 2:
             return numpy.dot(self.A, pts) + self.b[:, None]
         else:
             m1, m2 = self.A.shape
-            return [sum((self.A[i][j] * pts[j] for j in range(m2)), self.b[i])
+            return [sum((self.A[i, j] * pts[j] for j in range(m2)), self.b[i])
                     for i in range(m1)]
 
     def _tabulate(self, n, pts):
@@ -290,8 +295,7 @@ class ExpansionSet(object):
         """
         D = self.ref_el.get_spatial_dimension()
         results = [None] * self.get_num_members(n)
-        ref_pts = self._mapping(pts)
-        recurrence(D, n, ref_pts, results)
+        recurrence(D, n, self._mapping(pts), results)
         return results
 
     def _tabulate_derivatives(self, n, pts):
@@ -301,8 +305,7 @@ class ExpansionSet(object):
         num_members = self.get_num_members(n)
         phi = [None] * num_members
         dphi = [None] * num_members
-        ref_pts = self._mapping(pts)
-        recurrence(D, n, ref_pts, phi, jacobian=self.A, dphi=dphi)
+        recurrence(D, n, self._mapping(pts), phi, jacobian=self.A, dphi=dphi)
         return phi, dphi
 
     def tabulate(self, n, pts):
