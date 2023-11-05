@@ -55,6 +55,7 @@ def recurrence(dim, n, ref_pts, phi, jacobian=None, dphi=None):
         raise ValueError("Invalid number of spatial dimensions")
 
     skip_derivs = dphi is None
+    results = (phi, ) if skip_derivs else (phi, dphi)
     x, y, z = pad_coordinates(ref_pts, 3)
     f0 = 0.5 * (y + z)
     f1 = x + f0 + 1.
@@ -65,7 +66,7 @@ def recurrence(dim, n, ref_pts, phi, jacobian=None, dphi=None):
         df1 = dx + df0
         df2 = 2 * f0 * df0
 
-    # p = 1
+    # handle p = 1
     icur = idx(0)
     inext = idx(1)
     phi[inext] = f1
@@ -82,6 +83,10 @@ def recurrence(dim, n, ref_pts, phi, jacobian=None, dphi=None):
             continue
         dphi[inext] = (a * (f1 * dphi[icur] + phi[icur] * df1) -
                        b * (f2 * dphi[iprev] + phi[iprev] * df2))
+    # normalize in p
+    for result in results:
+        for p in range(n + 1):
+            result[idx(p)] *= math.sqrt(p + 0.5)
     if dim < 2:
         return
 
@@ -94,7 +99,7 @@ def recurrence(dim, n, ref_pts, phi, jacobian=None, dphi=None):
         df5 = 2 * f4 * df4
 
     for p in range(n):
-        # q = 1
+        # handle q = 1
         icur = idx(p, 0)
         inext = idx(p, 1)
         a = p + 1.5
@@ -115,12 +120,17 @@ def recurrence(dim, n, ref_pts, phi, jacobian=None, dphi=None):
             dqcoef = aq * df3 + (aq - bq) * df4
             dphi[inext] = (qcoef * dphi[icur] + phi[icur] * dqcoef -
                            cq * (f5 * dphi[iprev] + phi[iprev] * df5))
+    # normalize in p + q
+    for result in results:
+        for p in range(n + 1):
+            for q in range(n - p + 1):
+                result[idx(p, q)] *= math.sqrt(p + q + 1.0)
     if dim < 3:
         return
 
     for p in range(n):
         for q in range(n - p):
-            # r = 1
+            # handle r = 1
             icur = idx(p, q, 0)
             inext = idx(p, q, 1)
             a = 2.0 + p + q
@@ -139,6 +149,12 @@ def recurrence(dim, n, ref_pts, phi, jacobian=None, dphi=None):
                 if skip_derivs:
                     continue
                 dphi[inext] = rcoef * dphi[icur] + ar * phi[icur] * dz - cr * dphi[iprev]
+    # normalize in p + q + r
+    for result in results:
+        for p in range(n + 1):
+            for q in range(n - p + 1):
+                for r in range(n - p - q + 1):
+                    result[idx(p, q, r)] *= math.sqrt(p + q + r + 1.5)
 
 
 def _tabulate_dpts(tabulator, D, n, order, pts):
@@ -283,7 +299,6 @@ class ExpansionSet(object):
 
         ref_pts = self._mapping(pts)
         recurrence(D, n, ref_pts, results)
-        self._normalize(n, results)
         return results
 
     def _tabulate_derivatives(self, n, pts):
@@ -301,8 +316,6 @@ class ExpansionSet(object):
         ref_pts = self._mapping(pts)
         recurrence(D, n, ref_pts, phi,
                    jacobian=self.A, dphi=dphi)
-        self._normalize(n, phi)
-        self._normalize(n, dphi)
         return phi, dphi
 
     def tabulate(self, n, pts):
@@ -360,9 +373,9 @@ class ExpansionSet(object):
         def distance(alpha, beta):
             return sum(ai != bi for ai, bi in zip(alpha, beta))
 
-        base_alpha = (0,) * D
         # Only use dmats if order > 1
         dmats = self.get_dmats(degree) if order > 1 else []
+        base_alpha = (0,) * D
         for i in range(order + 1):
             alphas = mis(D, i)
             for alpha in alphas:
@@ -409,16 +422,13 @@ class LineExpansionSet(ExpansionSet):
             raise Exception("Must have a line")
         super(LineExpansionSet, self).__init__(ref_el)
 
-    def _normalize(self, n, phi):
-        for p in range(n + 1):
-            phi[p] *= math.sqrt(p + 0.5)
-
     def _tabulate(self, n, pts):
         """Returns a numpy array A[i,j] = phi_i(pts[j])"""
         if len(pts) > 0:
             ref_pts = self._mapping(pts).T
             results = jacobi.eval_jacobi_batch(0, 0, n, ref_pts)
-            self._normalize(n, results)
+            for p in range(n + 1):
+                results[p] *= math.sqrt(p + 0.5)
             return results
         else:
             return []
@@ -431,9 +441,9 @@ class LineExpansionSet(ExpansionSet):
 
         # Jacobi polynomials defined on [-1, 1], first derivatives need scaling
         derivs *= 2.0 / self.ref_el.volume()
-        self._normalize(n, derivs)
-        vals = self._tabulate(n, pts)
-        return vals, derivs[:, None, :]
+        for p in range(n + 1):
+            derivs[p] *= math.sqrt(p + 0.5)
+        return self._tabulate(n, pts), derivs[:, None, :]
 
 
 class TriangleExpansionSet(ExpansionSet):
@@ -444,12 +454,6 @@ class TriangleExpansionSet(ExpansionSet):
             raise Exception("Must have a triangle")
         super(TriangleExpansionSet, self).__init__(ref_el)
 
-    def _normalize(self, n, phi):
-        idx = morton_index2
-        for p in range(n + 1):
-            for q in range(n - p + 1):
-                phi[idx(p, q)] *= math.sqrt((p + 0.5) * (p + q + 1.0))
-
 
 class TetrahedronExpansionSet(ExpansionSet):
     """Collapsed orthonormal polynomial expansion on a tetrahedron."""
@@ -457,13 +461,6 @@ class TetrahedronExpansionSet(ExpansionSet):
         if ref_el.get_spatial_dimension() != 3:
             raise Exception("Must be a tetrahedron")
         super(TetrahedronExpansionSet, self).__init__(ref_el)
-
-    def _normalize(self, n, phi):
-        idx = morton_index3
-        for p in range(n + 1):
-            for q in range(n - p + 1):
-                for r in range(n - p - q + 1):
-                    phi[idx(p, q, r)] *= math.sqrt((p + 0.5) * (p + q + 1.0) * (p + q + r + 1.5))
 
 
 def polynomial_dimension(ref_el, degree):
