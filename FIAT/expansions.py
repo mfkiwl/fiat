@@ -43,18 +43,15 @@ def pad_jacobian(A, embedded_dim):
 
 def recurrence(dim, n, ref_pts, phi, jacobian=None, dphi=None):
     """Dubiner recurrence from (Kirby 2010)"""
+    skip_derivs = dphi is None
+    phi[0] = sum((ref_pts[i] - ref_pts[i] for i in range(dim)), 1.)
+    if not skip_derivs:
+        dphi[0] = ref_pts - ref_pts
     if dim == 0 or n == 0:
         return
-    elif dim == 1:
-        idx = lambda p: p
-    elif dim == 2:
-        idx = morton_index2
-    elif dim == 3:
-        idx = morton_index3
-    else:
+    if dim > 3 or dim < 0:
         raise ValueError("Invalid number of spatial dimensions")
-
-    skip_derivs = dphi is None
+    idx = (lambda p: p, morton_index2, morton_index3)[dim-1]
     results = (phi, ) if skip_derivs else (phi, dphi)
     x, y, z = pad_coordinates(ref_pts, 3)
     f0 = 0.5 * (y + z)
@@ -293,10 +290,6 @@ class ExpansionSet(object):
         """
         D = self.ref_el.get_spatial_dimension()
         results = [None] * self.get_num_members(n)
-        results[0] = sum((pts[i] - pts[i] for i in range(D)), 1.)
-        if n == 0:
-            return results
-
         ref_pts = self._mapping(pts)
         recurrence(D, n, ref_pts, results)
         return results
@@ -308,14 +301,8 @@ class ExpansionSet(object):
         num_members = self.get_num_members(n)
         phi = [None] * num_members
         dphi = [None] * num_members
-        phi[0] = sum((pts[i] - pts[i] for i in range(D)), 1.)
-        dphi[0] = pts - pts
-        if n == 0:
-            return phi, dphi
-
         ref_pts = self._mapping(pts)
-        recurrence(D, n, ref_pts, phi,
-                   jacobian=self.A, dphi=dphi)
+        recurrence(D, n, ref_pts, phi, jacobian=self.A, dphi=dphi)
         return phi, dphi
 
     def tabulate(self, n, pts):
