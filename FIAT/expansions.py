@@ -347,7 +347,7 @@ class ExpansionSet(object):
         from FIAT.polynomial_set import mis
         result = {}
         D = self.ref_el.get_spatial_dimension()
-        if order == 0 or degree == 0 or D == 0:
+        if order == 0:
             base_vals = self.tabulate(degree, pts)
         else:
             v, dv = self._tabulate_derivatives(degree, numpy.transpose(pts))
@@ -357,15 +357,22 @@ class ExpansionSet(object):
             for alpha in alphas:
                 result[alpha] = next(dv for dv, ai in zip(dtildes, alpha) if ai > 0)
 
+        def distance(alpha, beta):
+            return sum(ai != bi for ai, bi in zip(alpha, beta))
+
+        base_alpha = (0,) * D
         # Only use dmats if order > 1
         dmats = self.get_dmats(degree) if order > 1 else []
-        for i in range(0, order + 1):
+        for i in range(order + 1):
             alphas = mis(D, i)
             for alpha in alphas:
-                beta = next((beta for beta in sorted(result, reverse=True)
-                             if all(bj <= aj for bj, aj in zip(beta, alpha))), (0,) * len(alpha))
-                vals = base_vals if sum(beta) == 0 else result[beta]
-                for dmat, start, end in zip(dmats, beta, alpha):
+                if alpha in result:
+                    continue
+                if len(result) > 0 and i > 0:
+                    base_alpha = next(a for a in result if sum(a) == i-1 and distance(alpha, a) == 1)
+                    base_vals = result[base_alpha]
+                vals = base_vals
+                for dmat, start, end in zip(dmats, base_alpha, alpha):
                     for j in range(start, end):
                         vals = numpy.dot(dmat.T, vals)
                 result[alpha] = vals
@@ -445,7 +452,7 @@ class TriangleExpansionSet(ExpansionSet):
 
 
 class TetrahedronExpansionSet(ExpansionSet):
-    """Collapsed orthonormal polynomial expanion on a tetrahedron."""
+    """Collapsed orthonormal polynomial expansion on a tetrahedron."""
     def __init__(self, ref_el):
         if ref_el.get_spatial_dimension() != 3:
             raise Exception("Must be a tetrahedron")

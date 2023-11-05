@@ -69,9 +69,13 @@ class PolynomialSet(object):
 
     def tabulate(self, pts, jet_order=0):
         """Returns the values of the polynomial set."""
-        result = self.expansion_set._tabulate_jet(self.embedded_degree, pts, order=jet_order)
-        for alpha in result:
-            result[alpha] = numpy.dot(self.coeffs, result[alpha])
+        base_vals = self.expansion_set._tabulate_jet(self.embedded_degree, pts, order=jet_order)
+        D = self.ref_el.get_spatial_dimension()
+        result = {}
+        for i in range(jet_order + 1):
+            alphas = mis(D, i)
+            for alpha in alphas:
+                result[alpha] = numpy.dot(self.coeffs, base_vals[alpha])
         return result
 
     def get_expansion_set(self):
