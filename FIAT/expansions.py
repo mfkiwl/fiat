@@ -54,45 +54,52 @@ def recurrence(dim, n, ref_pts, phi, jacobian=None, dphi=None):
 
     idx = (lambda p: p, morton_index2, morton_index3)[dim-1]
 
-    def _recurrence1(n, fixed_indices, f1, f2, f3, df1, df2, df3):
+    def jacobi_factors(x, y, z, dx, dy, dz):
+        fb = 0.5 * (y + z)
+        fa = x + fb + 1.0
+        fc = fb ** 2
+        dfa = dfb = dfc = None
+        if dx is not None:
+            dfb = 0.5 * (dy + dz)
+            dfa = dx + dfb
+            dfc = 2 * fb * dfb
+        return fa, fb, fc, dfa, dfb, dfc
+
+    def jacobi_recurrence(n, fixed_indices, fa, fb, fc, dfa, dfb, dfc):
+        """Jacobi recurrence with variable coefficients"""
         # handle i = 1
         icur = idx(*fixed_indices, 0)
         inext = idx(*fixed_indices, 1)
         alpha = 2 * sum(fixed_indices) + len(fixed_indices)
         b = 0.5 * alpha
-        a = b + 1.
-        factor = a * f1 + b * f2
+        a = b + 1.0
+        factor = a * fa - b * fb
         phi[inext] = factor * phi[icur]
         if not skip_derivs:
-            dfactor = a * df1 + b * df2
+            dfactor = a * dfa - b * dfb
             dphi[inext] = factor * dphi[icur] + phi[icur] * dfactor
         # general i by recurrence
         for i in range(1, n - sum(fixed_indices)):
             iprev, icur, inext = icur, inext, idx(*fixed_indices, i + 1)
             a, b, c = jrc(alpha, 0, i)
-            factor = a * f1 + b * f2
-            phi[inext] = factor * phi[icur] - c * (f3 * phi[iprev])
+            factor = a * fa - b * fb
+            phi[inext] = factor * phi[icur] - c * (fc * phi[iprev])
             if skip_derivs:
                 continue
-            dfactor = a * df1 + b * df2
+            dfactor = a * dfa - b * dfb
             dphi[inext] = (factor * dphi[icur] + phi[icur] * dfactor -
-                           c * (f3 * dphi[iprev] + phi[iprev] * df3))
+                           c * (fc * dphi[iprev] + phi[iprev] * dfc))
 
     results = (phi, ) if skip_derivs else (phi, dphi)
-    x, y, z = pad_coordinates(ref_pts, 3)
+    x, y, z, w = pad_coordinates(ref_pts, 4)
+    if jacobian is None:
+        dx = dy = dz = dw = None
+    else:
+        dx, dy, dz, dw = pad_jacobian(jacobian, 4)
 
     # recurruence in p
-    f1 = 0.5 * (y + z)
-    f0 = x + f1 + 1.
-    f2 = f1 ** 2
-    if jacobian is not None:
-        dx, dy, dz = pad_jacobian(jacobian, 3)
-        df1 = 0.5 * (dy + dz)
-        df0 = dx + df1
-        df2 = 2 * f1 * df1
-    else:
-        df0 = df1 = df2 = None
-    _recurrence1(n, tuple(), f0, f1, f2, df0, df1, df2)
+    factors = jacobi_factors(x, y, z, dx, dy, dz)
+    jacobi_recurrence(n, tuple(), *factors)
 
     # normalize in p
     for result in results:
@@ -102,17 +109,9 @@ def recurrence(dim, n, ref_pts, phi, jacobian=None, dphi=None):
         return
 
     # recurrence in q
-    f4 = 0.5 * (1. - z)
-    f3 = y - f4 + 1.
-    f5 = f4 ** 2
-    if jacobian is not None:
-        df4 = -0.5 * dz
-        df3 = dy - df4
-        df5 = 2 * f4 * df4
-    else:
-        df3 = df4 = df5 = None
+    factors = jacobi_factors(y, z, w, dy, dz, dw)
     for p in range(n):
-        _recurrence1(n, (p,), f3, f4, f5, df3, df4, df5)
+        jacobi_recurrence(n, (p,), *factors)
 
     # normalize in p + q
     for result in results:
@@ -123,10 +122,10 @@ def recurrence(dim, n, ref_pts, phi, jacobian=None, dphi=None):
         return
 
     # recurrence in q
-    dfactors = (None,)*3 if skip_derivs else (dz, 0. * dz, 0. * dz)
+    factors = jacobi_factors(z, w, w, dz, dw, dw)
     for p in range(n):
         for q in range(n - p):
-            _recurrence1(n, (p, q), z, 1., 1., *dfactors)
+            jacobi_recurrence(n, (p, q), *factors)
 
     # normalize in p + q + r
     for result in results:
