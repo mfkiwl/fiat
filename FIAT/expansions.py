@@ -41,7 +41,7 @@ def pad_jacobian(A, embedded_dim):
     return tuple(row[:, None] for row in A)
 
 
-def recurrence(dim, n, ref_pts, phi, jacobian=None, dphi=None):
+def dubiner_recurrence(dim, n, ref_pts, phi, jacobian=None, dphi=None):
     """Dubiner recurrence from (Kirby 2010)"""
     skip_derivs = dphi is None
     phi[0] = sum((ref_pts[i] - ref_pts[i] for i in range(dim)), 1.)
@@ -252,11 +252,8 @@ class ExpansionSet(object):
         self._dmats_cache = {}
 
     def get_num_members(self, n):
-        dim = self.ref_el.get_spatial_dimension()
-        num_members = 1
-        for k in range(1, dim+1):
-            num_members = (num_members * (n + k)) // k
-        return num_members
+        D = self.ref_el.get_spatial_dimension()
+        return math.comb(n + D, D)
 
     def _mapping(self, pts):
         if isinstance(pts, numpy.ndarray) and len(pts.shape) == 2:
@@ -271,7 +268,7 @@ class ExpansionSet(object):
         """
         D = self.ref_el.get_spatial_dimension()
         results = [None] * self.get_num_members(n)
-        recurrence(D, n, self._mapping(pts), results)
+        dubiner_recurrence(D, n, self._mapping(pts), results)
         return results
 
     def _tabulate_derivatives(self, n, pts):
@@ -281,7 +278,7 @@ class ExpansionSet(object):
         num_members = self.get_num_members(n)
         phi = [None] * num_members
         dphi = [None] * num_members
-        recurrence(D, n, self._mapping(pts), phi, jacobian=self.A, dphi=dphi)
+        dubiner_recurrence(D, n, self._mapping(pts), phi, jacobian=self.A, dphi=dphi)
         return phi, dphi
 
     def tabulate(self, n, pts):

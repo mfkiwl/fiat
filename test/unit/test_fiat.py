@@ -520,14 +520,78 @@ def test_error_quadrature_degree(element):
 @pytest.mark.parametrize('cell', [I, T, S])
 def test_expansion_orthonormality(cell):
     from FIAT import expansions, quadrature
+    U = expansions.ExpansionSet(cell)
     degree = 10
     rule = quadrature.make_quadrature(cell, degree + 1)
-    U = expansions.ExpansionSet(cell)
     phi = U.tabulate(degree, rule.pts)
     w = rule.get_weights()
     scale = 0.5 ** -cell.get_spatial_dimension()
     results = scale * np.dot(phi, w[:, None] * phi.T)
     assert np.allclose(results, np.eye(results.shape[0]))
+
+
+@pytest.mark.parametrize('dim', range(1, 4))
+def test_expansion_values(dim):
+    import sympy
+    from FIAT import expansions, reference_element
+    half = sympy.Rational(1, 2)
+    cell = reference_element.default_simplex(dim)
+    U = expansions.ExpansionSet(cell)
+    dpoints = []
+    rpoints = []
+
+    npoints = 10
+    interior = 1
+    for alpha in reference_element.lattice_iter(interior, npoints+1-interior, dim):
+        dpoints.append(tuple(2*np.array(alpha, dtype="d")/npoints-1))
+        rpoints.append(tuple(2*sympy.Rational(a, npoints)-1 for a in alpha))
+
+    n = 48
+    eta = sympy.DeferredVector("eta")
+    Uvals = U.tabulate(n, dpoints)
+    if dim == 1:
+        for p in range(n + 1):
+            f = sympy.jacobi_poly(p, 0, 0, eta[0])
+            f *= sympy.sqrt((half + p))
+            vals = Uvals[p]
+            error = 0.0
+            for pt, val in zip(rpoints, vals):
+                fval = f.subs(eta[0], pt[0])
+                error = max(error, abs(val - float(fval)))
+            assert error < 1E-13
+    elif dim == 2:
+        idx = expansions.morton_index2
+        for p in range(n + 1):
+            q = n - p
+            f = (sympy.jacobi_poly(p, 0, 0, eta[0]) *
+                 sympy.jacobi_poly(q, 2*p+1, 0, eta[1]) * ((1 - eta[1])/2) ** p)
+            f *= sympy.sqrt((half + p) * (1 + p + q))
+            vals = Uvals[idx(p, q)]
+            error = 0.0
+            for pt, val in zip(rpoints, vals):
+                eta0 = 2 * (1 + pt[0]) / (1 - pt[1]) - 1
+                eta1 = pt[1]
+                fval = f.subs(eta[1], eta1).subs(eta[0], eta0)
+                error = max(error, abs(val - float(fval)))
+            assert error < 1E-13
+    elif dim == 3:
+        idx = expansions.morton_index3
+        for r in range(n + 1):
+            q = n - r
+            p = n - r - q
+            f = (sympy.jacobi_poly(p, 0, 0, eta[0]) *
+                 sympy.jacobi_poly(q, 2*p+1, 0, eta[1]) * ((1 - eta[1])/2) ** p *
+                 sympy.jacobi_poly(r, 2*p+2*q+2, 0, eta[2]) * ((1 - eta[2])/2) ** (p+q))
+            f *= sympy.sqrt((half + p) * (1 + p + q) * (1+half + p + q + r))
+            vals = Uvals[idx(p, q, r)]
+            error = 0.0
+            for pt, val in zip(rpoints, vals):
+                eta0 = 2 * (1 + pt[0]) / (-pt[1] - pt[2]) - 1
+                eta1 = 2 * (1 + pt[1]) / (1 - pt[2]) - 1
+                eta2 = pt[2]
+                fval = f.subs(eta[2], eta2).subs(eta[1], eta1).subs(eta[0], eta0)
+                error = max(error, abs(val - float(fval)))
+            assert error < 1E-13
 
 
 if __name__ == '__main__':
