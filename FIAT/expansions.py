@@ -270,10 +270,7 @@ class ExpansionSet(object):
         for r in range(1, order+1):
             v = numpy.zeros((D,)*r + v0.shape, dtype=v0.dtype)
             for index in zip(*[range(D) for k in range(r)]):
-                alpha = [0] * D
-                for i in index:
-                    alpha[i] += 1
-                v[index] = vals[tuple(alpha)]
+                v[index] = vals[tuple(map(index.count, range(D)))]
             data.append(v.transpose((r, r+1) + tuple(range(r))))
         return data
 
