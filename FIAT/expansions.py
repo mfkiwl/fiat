@@ -9,7 +9,6 @@ to allow users to get coordinates that they want."""
 
 import numpy
 import math
-import sympy
 from FIAT import reference_element
 from FIAT import jacobi
 
@@ -107,77 +106,6 @@ def dubiner_recurrence(dim, n, ref_pts, phi, jacobian=None, dphi=None):
             dphi[idx(*alpha)] *= scale
 
 
-def _tabulate_dpts(tabulator, D, n, order, pts):
-    X = sympy.DeferredVector('x')
-
-    def form_derivative(F):
-        '''Forms the derivative recursively, i.e.,
-        F               -> [F_x, F_y, F_z],
-        [F_x, F_y, F_z] -> [[F_xx, F_xy, F_xz],
-                            [F_yx, F_yy, F_yz],
-                            [F_zx, F_zy, F_zz]]
-        and so forth.
-        '''
-        out = []
-        try:
-            out = [sympy.diff(F, X[j]) for j in range(D)]
-        except (AttributeError, ValueError):
-            # Intercept errors like
-            #  AttributeError: 'list' object has no attribute
-            #  'free_symbols'
-            for f in F:
-                out.append(form_derivative(f))
-        return out
-
-    def numpy_lambdify(X, F):
-        '''Unfortunately, SymPy's own lambdify() doesn't work well with
-        NumPy in that simple functions like
-            lambda x: 1.0,
-        when evaluated with NumPy arrays, return just "1.0" instead of
-        an array of 1s with the same shape as x. This function does that.
-        '''
-        try:
-            lambda_x = [numpy_lambdify(X, f) for f in F]
-        except TypeError:  # 'function' object is not iterable
-            # SymPy's lambdify also works on functions that return arrays.
-            # However, use it componentwise here so we can add 0*x to each
-            # component individually. This is necessary to maintain shapes
-            # if evaluated with NumPy arrays.
-            lmbd_tmp = sympy.lambdify(X, F)
-            lambda_x = lambda x: lmbd_tmp(x) + 0 * x[0]
-        return lambda_x
-
-    def evaluate_lambda(lmbd, x):
-        '''Properly evaluate lambda expressions recursively for iterables.
-        '''
-        try:
-            values = [evaluate_lambda(l, x) for l in lmbd]
-        except TypeError:  # 'function' object is not iterable
-            values = lmbd(x)
-        return values
-
-    # Tabulate symbolically
-    symbolic_tab = tabulator(n, X)
-    # Make sure that the entries of symbolic_tab are lists so we can
-    # append derivatives
-    symbolic_tab = [[phi] for phi in symbolic_tab]
-    #
-    data = (order + 1) * [None]
-    for r in range(order + 1):
-        shape = [len(symbolic_tab), len(pts)] + r * [D]
-        data[r] = numpy.empty(shape)
-        for i, phi in enumerate(symbolic_tab):
-            # Evaluate the function numerically using lambda expressions
-            deriv_lambda = numpy_lambdify(X, phi[r])
-            data[r][i] = \
-                numpy.array(evaluate_lambda(deriv_lambda, pts.T)).T
-            # Symbolically compute the next derivative.
-            # This actually happens once too many here; never mind for
-            # now.
-            phi.append(form_derivative(phi[-1]))
-    return data
-
-
 def xi_triangle(eta):
     """Maps from [-1,1]^2 to the (-1,1) reference triangle."""
     eta1, eta2 = eta
@@ -253,24 +181,6 @@ class ExpansionSet(object):
         dubiner_recurrence(D, n, self._mapping(pts), phi, jacobian=self.A, dphi=dphi)
         return phi, dphi
 
-    def tabulate(self, n, pts):
-        if len(pts) == 0:
-            return numpy.array([])
-        return numpy.array(self._tabulate(n, numpy.transpose(pts)))
-
-    def tabulate_derivatives(self, n, pts):
-        D = self.ref_el.get_spatial_dimension()
-        vals, deriv_vals = self._tabulate_derivatives(n, numpy.transpose(pts))
-        # Create the ordinary data structure.
-        data = [[(vals[i][j], [deriv_vals[i][r][j] for r in range(D)])
-                 for j in range(len(vals[0]))]
-                for i in range(len(vals))]
-        return data
-
-    def tabulate_jet(self, n, pts, order=1):
-        D = self.ref_el.get_spatial_dimension()
-        return _tabulate_dpts(self._tabulate, D, n, order, numpy.array(pts))
-
     def get_dmats(self, degree):
         """Returns a numpy array with the expansion coefficients dmat[k, j, i]
         of the gradient of each member of the expansion set:
@@ -326,6 +236,36 @@ class ExpansionSet(object):
                 result[alpha] = vals
         return result
 
+    def tabulate(self, n, pts):
+        if len(pts) == 0:
+            return numpy.array([])
+        return numpy.array(self._tabulate(n, numpy.transpose(pts)))
+
+    def tabulate_derivatives(self, n, pts):
+        vals, deriv_vals = self._tabulate_derivatives(n, numpy.transpose(pts))
+        # Create the ordinary data structure.
+        D = self.ref_el.get_spatial_dimension()
+        data = [[(vals[i][j], [deriv_vals[i][r][j] for r in range(D)])
+                 for j in range(len(vals[0]))]
+                for i in range(len(vals))]
+        return data
+
+    def tabulate_jet(self, n, pts, order=1):
+        vals = self._tabulate_jet(n, pts, order=order)
+        # Create the ordinary data structure.
+        D = self.ref_el.get_spatial_dimension()
+        v0 = vals[(0,)*D]
+        data = [v0]
+        for r in range(1, order+1):
+            v = numpy.zeros((D,)*r + v0.shape, dtype=v0.dtype)
+            for index in zip(*[range(D) for k in range(r)]):
+                alpha = [0] * D
+                for i in index:
+                    alpha[i] += 1
+                v[index] = vals[tuple(alpha)]
+            data.append(v.transpose((r, r+1) + tuple(range(r))))
+        return data
+
 
 class PointExpansionSet(ExpansionSet):
     """Evaluates the point basis on a point reference element."""
@@ -338,16 +278,6 @@ class PointExpansionSet(ExpansionSet):
         """Returns a numpy array A[i,j] = phi_i(pts[j]) = 1.0."""
         assert n == 0
         return numpy.ones((1, len(pts)))
-
-    def tabulate_derivatives(self, n, pts):
-        """Returns a numpy array of size A where A[i,j] = phi_i(pts[j])
-        but where each element is an empty tuple (). This maintains
-        compatibility with the interfaces of the interval, triangle and
-        tetrahedron expansions."""
-        deriv_vals = numpy.empty_like(self.tabulate(n, pts), dtype=tuple)
-        deriv_vals.fill(())
-
-        return deriv_vals
 
 
 class LineExpansionSet(ExpansionSet):
