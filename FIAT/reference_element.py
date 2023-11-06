@@ -57,16 +57,13 @@ def multiindex_equal(d, isum, imin=0):
 def lattice_iter(start, finish, depth):
     """Generator iterating over the depth-dimensional lattice of
     integers between start and (finish-1).  This works on simplices in
-    1d, 2d, 3d, and beyond"""
+    0d, 1d, 2d, 3d, and beyond"""
     if depth == 0:
-        return
-    elif depth == 1:
-        for ii in range(start, finish):
-            yield [ii]
+        yield tuple()
     else:
         for ii in range(start, finish):
             for jj in lattice_iter(start, finish - ii, depth - 1):
-                yield jj + [ii]
+                yield jj + (ii,)
 
 
 def make_lattice(verts, n, interior=0, variant=None):

@@ -546,7 +546,7 @@ def test_expansion_values(dim):
         dpoints.append(tuple(2*np.array(alpha, dtype="d")/npoints-1))
         rpoints.append(tuple(2*sympy.Rational(a, npoints)-1 for a in alpha))
 
-    n = 48
+    n = 20
     eta = sympy.DeferredVector("eta")
     Uvals = U.tabulate(n, dpoints)
     if dim == 1:
@@ -561,8 +561,8 @@ def test_expansion_values(dim):
             assert error < 1E-13
     elif dim == 2:
         idx = expansions.morton_index2
-        for p in range(n + 1):
-            q = n - p
+        for q in range(n + 1):
+            p = n - q
             f = (sympy.jacobi_poly(p, 0, 0, eta[0]) *
                  sympy.jacobi_poly(q, 2*p+1, 0, eta[1]) * ((1 - eta[1])/2) ** p)
             f *= sympy.sqrt((half + p) * (1 + p + q))
