@@ -18,7 +18,7 @@ class GaussLobattoLegendre(finite_element.CiarletElement):
     def __init__(self, ref_el, degree):
         if ref_el.shape not in {LINE, TRIANGLE, TETRAHEDRON}:
             raise ValueError("Gauss-Lobatto-Legendre elements are only defined on simplices.")
-        dual = lagrange.LagrangeDualSet(ref_el, degree, family="lgl")
+        dual = lagrange.LagrangeDualSet(ref_el, degree, variant="gll")
         if ref_el.shape == LINE:
             points = []
             for node in dual.nodes:

@@ -75,9 +75,7 @@ def dubiner_recurrence(dim, n, ref_pts, phi, jacobian=None, dphi=None):
     for codim in range(dim):
         # Extend the basis from codim to codim + 1
         fa, fb, fc, dfa, dfb, dfc = jacobi_factors(*X[codim:codim+3], *dX[codim:codim+3])
-        # Get indices of low-dimensional basis
-        alphas = [tuple()] if codim == 0 else reference_element.lattice_iter(0, n, codim)
-        for sub_index in alphas:
+        for sub_index in reference_element.lattice_iter(0, n, codim):
             # handle i = 1
             icur = idx(*sub_index, 0)
             inext = idx(*sub_index, 1)

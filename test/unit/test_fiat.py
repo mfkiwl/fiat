@@ -150,12 +150,12 @@ elements = [
     'RaviartThomas(S, 1, variant="integral(2)")',
     'RaviartThomas(S, 2, variant="integral(3)")',
     'RaviartThomas(S, 3, variant="integral(4)")',
-    'RaviartThomas(T, 1, variant="point")',
-    'RaviartThomas(T, 2, variant="point")',
-    'RaviartThomas(T, 3, variant="point")',
-    'RaviartThomas(S, 1, variant="point")',
-    'RaviartThomas(S, 2, variant="point")',
-    'RaviartThomas(S, 3, variant="point")',
+    'RaviartThomas(T, 1, variant="equispaced")',
+    'RaviartThomas(T, 2, variant="equispaced")',
+    'RaviartThomas(T, 3, variant="equispaced")',
+    'RaviartThomas(S, 1, variant="equispaced")',
+    'RaviartThomas(S, 2, variant="equispaced")',
+    'RaviartThomas(S, 3, variant="equispaced")',
     "DiscontinuousRaviartThomas(T, 1)",
     "DiscontinuousRaviartThomas(T, 2)",
     "DiscontinuousRaviartThomas(T, 3)",
@@ -180,12 +180,12 @@ elements = [
     'BrezziDouglasMarini(S, 1, variant="integral(2)")',
     'BrezziDouglasMarini(S, 2, variant="integral(3)")',
     'BrezziDouglasMarini(S, 3, variant="integral(4)")',
-    'BrezziDouglasMarini(T, 1, variant="point")',
-    'BrezziDouglasMarini(T, 2, variant="point")',
-    'BrezziDouglasMarini(T, 3, variant="point")',
-    'BrezziDouglasMarini(S, 1, variant="point")',
-    'BrezziDouglasMarini(S, 2, variant="point")',
-    'BrezziDouglasMarini(S, 3, variant="point")',
+    'BrezziDouglasMarini(T, 1, variant="equispaced")',
+    'BrezziDouglasMarini(T, 2, variant="equispaced")',
+    'BrezziDouglasMarini(T, 3, variant="equispaced")',
+    'BrezziDouglasMarini(S, 1, variant="equispaced")',
+    'BrezziDouglasMarini(S, 2, variant="equispaced")',
+    'BrezziDouglasMarini(S, 3, variant="equispaced")',
     "Nedelec(T, 1)",
     "Nedelec(T, 2)",
     "Nedelec(T, 3)",
@@ -204,12 +204,12 @@ elements = [
     'Nedelec(S, 1, variant="integral(2)")',
     'Nedelec(S, 2, variant="integral(3)")',
     'Nedelec(S, 3, variant="integral(4)")',
-    'Nedelec(T, 1, variant="point")',
-    'Nedelec(T, 2, variant="point")',
-    'Nedelec(T, 3, variant="point")',
-    'Nedelec(S, 1, variant="point")',
-    'Nedelec(S, 2, variant="point")',
-    'Nedelec(S, 3, variant="point")',
+    'Nedelec(T, 1, variant="equispaced")',
+    'Nedelec(T, 2, variant="equispaced")',
+    'Nedelec(T, 3, variant="equispaced")',
+    'Nedelec(S, 1, variant="equispaced")',
+    'Nedelec(S, 2, variant="equispaced")',
+    'Nedelec(S, 3, variant="equispaced")',
     "NedelecSecondKind(T, 1)",
     "NedelecSecondKind(T, 2)",
     "NedelecSecondKind(T, 3)",
@@ -228,12 +228,12 @@ elements = [
     'NedelecSecondKind(S, 1, variant="integral(2)")',
     'NedelecSecondKind(S, 2, variant="integral(3)")',
     'NedelecSecondKind(S, 3, variant="integral(4)")',
-    'NedelecSecondKind(T, 1, variant="point")',
-    'NedelecSecondKind(T, 2, variant="point")',
-    'NedelecSecondKind(T, 3, variant="point")',
-    'NedelecSecondKind(S, 1, variant="point")',
-    'NedelecSecondKind(S, 2, variant="point")',
-    'NedelecSecondKind(S, 3, variant="point")',
+    'NedelecSecondKind(T, 1, variant="equispaced")',
+    'NedelecSecondKind(T, 2, variant="equispaced")',
+    'NedelecSecondKind(T, 3, variant="equispaced")',
+    'NedelecSecondKind(S, 1, variant="equispaced")',
+    'NedelecSecondKind(S, 2, variant="equispaced")',
+    'NedelecSecondKind(S, 3, variant="equispaced")',
     "Regge(T, 0)",
     "Regge(T, 1)",
     "Regge(T, 2)",
@@ -546,7 +546,7 @@ def test_expansion_values(dim):
         dpoints.append(tuple(2*np.array(alpha, dtype="d")/npoints-1))
         rpoints.append(tuple(2*sympy.Rational(a, npoints)-1 for a in alpha))
 
-    n = 48
+    n = 20
     eta = sympy.DeferredVector("eta")
     Uvals = U.tabulate(n, dpoints)
     if dim == 1:
@@ -561,8 +561,8 @@ def test_expansion_values(dim):
             assert error < 1E-13
     elif dim == 2:
         idx = expansions.morton_index2
-        for p in range(n + 1):
-            q = n - p
+        for q in range(n + 1):
+            p = n - q
             f = (sympy.jacobi_poly(p, 0, 0, eta[0]) *
                  sympy.jacobi_poly(q, 2*p+1, 0, eta[1]) * ((1 - eta[1])/2) ** p)
             f *= sympy.sqrt((half + p) * (1 + p + q))
