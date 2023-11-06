@@ -41,6 +41,18 @@ def pad_jacobian(A, embedded_dim):
     return tuple(row[:, None] for row in A)
 
 
+def jacobi_factors(x, y, z, dx, dy, dz):
+    fb = 0.5 * (y + z)
+    fa = x + fb + 1.0
+    fc = fb ** 2
+    dfa = dfb = dfc = None
+    if dx is not None:
+        dfb = 0.5 * (dy + dz)
+        dfa = dx + dfb
+        dfc = 2 * fb * dfb
+    return fa, fb, fc, dfa, dfb, dfc
+
+
 def dubiner_recurrence(dim, n, ref_pts, phi, jacobian=None, dphi=None):
     """Dubiner recurrence from (Kirby 2010)"""
     skip_derivs = dphi is None
@@ -53,86 +65,48 @@ def dubiner_recurrence(dim, n, ref_pts, phi, jacobian=None, dphi=None):
         raise ValueError("Invalid number of spatial dimensions")
 
     idx = (lambda p: p, morton_index2, morton_index3)[dim-1]
+    pad_dim = dim + 2
+    X = pad_coordinates(ref_pts, pad_dim)
+    if jacobian is None:
+        dX = (None,) * pad_dim
+    else:
+        dX = pad_jacobian(jacobian, pad_dim)
 
-    def jacobi_factors(x, y, z, dx, dy, dz):
-        fb = 0.5 * (y + z)
-        fa = x + fb + 1.0
-        fc = fb ** 2
-        dfa = dfb = dfc = None
-        if dx is not None:
-            dfb = 0.5 * (dy + dz)
-            dfa = dx + dfb
-            dfc = 2 * fb * dfb
-        return fa, fb, fc, dfa, dfb, dfc
-
-    def jacobi_recurrence(n, fixed_indices, fa, fb, fc, dfa, dfb, dfc):
-        """Jacobi recurrence with variable coefficients"""
-        # handle i = 1
-        icur = idx(*fixed_indices, 0)
-        inext = idx(*fixed_indices, 1)
-        alpha = 2 * sum(fixed_indices) + len(fixed_indices)
-        b = 0.5 * alpha
-        a = b + 1.0
-        factor = a * fa - b * fb
-        phi[inext] = factor * phi[icur]
-        if not skip_derivs:
-            dfactor = a * dfa - b * dfb
-            dphi[inext] = factor * dphi[icur] + phi[icur] * dfactor
-        # general i by recurrence
-        for i in range(1, n - sum(fixed_indices)):
-            iprev, icur, inext = icur, inext, idx(*fixed_indices, i + 1)
-            a, b, c = jrc(alpha, 0, i)
+    for codim in range(dim):
+        # Extend the basis from codim to codim + 1
+        fa, fb, fc, dfa, dfb, dfc = jacobi_factors(*X[codim:codim+3], *dX[codim:codim+3])
+        # Get indices of low-dimensional basis
+        alphas = [tuple()] if codim == 0 else reference_element.lattice_iter(0, n, codim)
+        for sub_index in alphas:
+            # handle i = 1
+            icur = idx(*sub_index, 0)
+            inext = idx(*sub_index, 1)
+            alpha = 2 * sum(sub_index) + len(sub_index)
+            b = 0.5 * alpha
+            a = b + 1.0
             factor = a * fa - b * fb
-            phi[inext] = factor * phi[icur] - c * (fc * phi[iprev])
+            phi[inext] = factor * phi[icur]
+            if not skip_derivs:
+                dfactor = a * dfa - b * dfb
+                dphi[inext] = factor * dphi[icur] + phi[icur] * dfactor
+            # general i by recurrence
+            for i in range(1, n - sum(sub_index)):
+                iprev, icur, inext = icur, inext, idx(*sub_index, i + 1)
+                a, b, c = jrc(alpha, 0, i)
+                factor = a * fa - b * fb
+                phi[inext] = factor * phi[icur] - c * (fc * phi[iprev])
+                if skip_derivs:
+                    continue
+                dfactor = a * dfa - b * dfb
+                dphi[inext] = (factor * dphi[icur] + phi[icur] * dfactor -
+                               c * (fc * dphi[iprev] + phi[iprev] * dfc))
+        # normalize
+        for alpha in reference_element.lattice_iter(0, n+1, codim+1):
+            scale = math.sqrt(sum(alpha) + 0.5 * len(alpha))
+            phi[idx(*alpha)] *= scale
             if skip_derivs:
                 continue
-            dfactor = a * dfa - b * dfb
-            dphi[inext] = (factor * dphi[icur] + phi[icur] * dfactor -
-                           c * (fc * dphi[iprev] + phi[iprev] * dfc))
-
-    results = (phi, ) if skip_derivs else (phi, dphi)
-    x, y, z, w = pad_coordinates(ref_pts, 4)
-    if jacobian is None:
-        dx = dy = dz = dw = None
-    else:
-        dx, dy, dz, dw = pad_jacobian(jacobian, 4)
-
-    # recurruence in p
-    factors = jacobi_factors(x, y, z, dx, dy, dz)
-    jacobi_recurrence(n, tuple(), *factors)
-
-    # normalize in p
-    for result in results:
-        for p in range(n + 1):
-            result[idx(p)] *= math.sqrt(p + 0.5)
-    if dim < 2:
-        return
-
-    # recurrence in q
-    factors = jacobi_factors(y, z, w, dy, dz, dw)
-    for p in range(n):
-        jacobi_recurrence(n, (p,), *factors)
-
-    # normalize in p + q
-    for result in results:
-        for p in range(n + 1):
-            for q in range(n - p + 1):
-                result[idx(p, q)] *= math.sqrt(p + q + 1.0)
-    if dim < 3:
-        return
-
-    # recurrence in q
-    factors = jacobi_factors(z, w, w, dz, dw, dw)
-    for p in range(n):
-        for q in range(n - p):
-            jacobi_recurrence(n, (p, q), *factors)
-
-    # normalize in p + q + r
-    for result in results:
-        for p in range(n + 1):
-            for q in range(n - p + 1):
-                for r in range(n - p - q + 1):
-                    result[idx(p, q, r)] *= math.sqrt(p + q + r + 1.5)
+            dphi[idx(*alpha)] *= scale
 
 
 def _tabulate_dpts(tabulator, D, n, order, pts):
@@ -313,7 +287,7 @@ class ExpansionSet(object):
         if degree == 0:
             return cache.setdefault(key, numpy.zeros((self.ref_el.get_spatial_dimension(), 1, 1), "d"))
 
-        pts = reference_element.make_lattice(self.ref_el.get_vertices(), degree, family="gl")
+        pts = reference_element.make_lattice(self.ref_el.get_vertices(), degree, variant="gl")
         v, dv = self._tabulate_derivatives(degree, numpy.transpose(pts))
         dv = numpy.array(dv).transpose((1, 2, 0))
         dmats = numpy.linalg.solve(numpy.transpose(v), dv)
