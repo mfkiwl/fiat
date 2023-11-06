@@ -37,7 +37,7 @@ def pad_coordinates(ref_pts, embedded_dim):
 def pad_jacobian(A, embedded_dim):
     """Pad coordinate mapping Jacobian by appending zero rows."""
     A = numpy.pad(A, [(0, embedded_dim - A.shape[0]), (0, 0)])
-    return tuple(row[:, None] for row in A)
+    return tuple(row[..., None] for row in A)
 
 
 def jacobi_factors(x, y, z, dx, dy, dz):
@@ -52,12 +52,14 @@ def jacobi_factors(x, y, z, dx, dy, dz):
     return fa, fb, fc, dfa, dfb, dfc
 
 
-def dubiner_recurrence(dim, n, ref_pts, phi, jacobian=None, dphi=None):
+def dubiner_recurrence(dim, n, ref_pts, phi, jacobian=None, dphi=None, ddphi=None):
     """Dubiner recurrence from (Kirby 2010)"""
-    skip_derivs = dphi is None
+    outer = lambda x, y: x * y[..., None]
     phi[0] = sum((ref_pts[i] - ref_pts[i] for i in range(dim)), 1.)
-    if not skip_derivs:
+    if dphi is not None:
         dphi[0] = ref_pts - ref_pts
+    if ddphi is not None:
+        ddphi[0] = outer(dphi[0], dphi[0])
     if dim == 0 or n == 0:
         return
     if dim > 3 or dim < 0:
@@ -83,27 +85,37 @@ def dubiner_recurrence(dim, n, ref_pts, phi, jacobian=None, dphi=None):
             a = b + 1.0
             factor = a * fa - b * fb
             phi[inext] = factor * phi[icur]
-            if not skip_derivs:
+            if dphi is not None:
                 dfactor = a * dfa - b * dfb
                 dphi[inext] = factor * dphi[icur] + phi[icur] * dfactor
+                if ddphi is not None:
+                    ddphi[inext] = factor * ddphi[icur] + 2 * outer(dphi[icur], dfactor)
+                    ddfc = 2 * outer(dfb, dfb)
+
             # general i by recurrence
             for i in range(1, n - sum(sub_index)):
                 iprev, icur, inext = icur, inext, idx(*sub_index, i + 1)
                 a, b, c = jrc(alpha, 0, i)
                 factor = a * fa - b * fb
                 phi[inext] = factor * phi[icur] - c * (fc * phi[iprev])
-                if skip_derivs:
+                if dphi is None:
                     continue
                 dfactor = a * dfa - b * dfb
                 dphi[inext] = (factor * dphi[icur] + phi[icur] * dfactor -
                                c * (fc * dphi[iprev] + phi[iprev] * dfc))
+                if ddphi is None:
+                    continue
+                ddphi[inext] = (factor * ddphi[icur] + 2 * outer(dphi[icur], dfactor) -
+                                c * (fc * ddphi[iprev] + 2 * outer(dphi[iprev], dfc) + phi[iprev] * ddfc))
+
         # normalize
         for alpha in reference_element.lattice_iter(0, n+1, codim+1):
             scale = math.sqrt(sum(alpha) + 0.5 * len(alpha))
             phi[idx(*alpha)] *= scale
-            if skip_derivs:
-                continue
-            dphi[idx(*alpha)] *= scale
+            if dphi is not None:
+                dphi[idx(*alpha)] *= scale
+                if ddphi is not None:
+                    ddphi[idx(*alpha)] *= scale
 
 
 def xi_triangle(eta):
@@ -175,9 +187,8 @@ class ExpansionSet(object):
         """A version of tabulate_derivatives() that also works for a single point.
         """
         D = self.ref_el.get_spatial_dimension()
-        num_members = self.get_num_members(n)
-        phi = [None] * num_members
-        dphi = [None] * num_members
+        phi = [None] * self.get_num_members(n)
+        dphi = [None] * len(phi)
         dubiner_recurrence(D, n, self._mapping(pts), phi, jacobian=self.A, dphi=dphi)
         return phi, dphi
 
