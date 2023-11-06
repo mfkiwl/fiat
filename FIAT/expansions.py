@@ -53,33 +53,47 @@ def recurrence(dim, n, ref_pts, phi, jacobian=None, dphi=None):
         raise ValueError("Invalid number of spatial dimensions")
 
     idx = (lambda p: p, morton_index2, morton_index3)[dim-1]
+
+    def _recurrence1(n, fixed_indices, f1, f2, f3, df1, df2, df3):
+        # handle i = 1
+        icur = idx(*fixed_indices, 0)
+        inext = idx(*fixed_indices, 1)
+        alpha = 2 * sum(fixed_indices) + len(fixed_indices)
+        b = 0.5 * alpha
+        a = b + 1.
+        factor = a * f1 + b * f2
+        phi[inext] = factor * phi[icur]
+        if not skip_derivs:
+            dfactor = a * df1 + b * df2
+            dphi[inext] = factor * dphi[icur] + phi[icur] * dfactor
+        # general i by recurrence
+        for i in range(1, n - sum(fixed_indices)):
+            iprev, icur, inext = icur, inext, idx(*fixed_indices, i + 1)
+            a, b, c = jrc(alpha, 0, i)
+            factor = a * f1 + b * f2
+            phi[inext] = factor * phi[icur] - c * (f3 * phi[iprev])
+            if skip_derivs:
+                continue
+            dfactor = a * df1 + b * df2
+            dphi[inext] = (factor * dphi[icur] + phi[icur] * dfactor -
+                           c * (f3 * dphi[iprev] + phi[iprev] * df3))
+
     results = (phi, ) if skip_derivs else (phi, dphi)
     x, y, z = pad_coordinates(ref_pts, 3)
-    f0 = 0.5 * (y + z)
-    f1 = x + f0 + 1.
-    f2 = f0 ** 2
+
+    # recurruence in p
+    f1 = 0.5 * (y + z)
+    f0 = x + f1 + 1.
+    f2 = f1 ** 2
     if jacobian is not None:
         dx, dy, dz = pad_jacobian(jacobian, 3)
-        df0 = 0.5 * (dy + dz)
-        df1 = dx + df0
-        df2 = 2 * f0 * df0
+        df1 = 0.5 * (dy + dz)
+        df0 = dx + df1
+        df2 = 2 * f1 * df1
+    else:
+        df0 = df1 = df2 = None
+    _recurrence1(n, tuple(), f0, f1, f2, df0, df1, df2)
 
-    # handle p = 1
-    icur = idx(0)
-    inext = idx(1)
-    phi[inext] = f1
-    if not skip_derivs:
-        dphi[inext] = 0. * dphi[icur] + df1
-    # general p by recurrence
-    for p in range(1, n):
-        iprev, icur = icur, inext
-        inext = idx(p + 1)
-        a, b, c = jrc(0, 0, p)
-        phi[inext] = a * f1 * phi[icur] - c * f2 * phi[iprev]
-        if skip_derivs:
-            continue
-        dphi[inext] = (a * (f1 * dphi[icur] + phi[icur] * df1) -
-                       c * (f2 * dphi[iprev] + phi[iprev] * df2))
     # normalize in p
     for result in results:
         for p in range(n + 1):
@@ -87,6 +101,7 @@ def recurrence(dim, n, ref_pts, phi, jacobian=None, dphi=None):
     if dim < 2:
         return
 
+    # recurrence in q
     f4 = 0.5 * (1. - z)
     f3 = y - f4 + 1.
     f5 = f4 ** 2
@@ -94,31 +109,11 @@ def recurrence(dim, n, ref_pts, phi, jacobian=None, dphi=None):
         df4 = -0.5 * dz
         df3 = dy - df4
         df5 = 2 * f4 * df4
-
+    else:
+        df3 = df4 = df5 = None
     for p in range(n):
-        # handle q = 1
-        icur = idx(p, 0)
-        inext = idx(p, 1)
-        alpha = 2 * p + 1
-        b = 0.5 * alpha
-        a = b + 1.
-        factor = a * f3 + b * f4
-        phi[inext] = factor * phi[icur]
-        if not skip_derivs:
-            dfactor = a * df3 + b * df4
-            dphi[inext] = factor * dphi[icur] + phi[icur] * dfactor
-        # general q by recurrence
-        for q in range(1, n - p):
-            iprev, icur = icur, inext
-            inext = idx(p, q + 1)
-            a, b, c = jrc(alpha, 0, q)
-            factor = a * f3 + b * f4
-            phi[inext] = factor * phi[icur] - c * (f5 * phi[iprev])
-            if skip_derivs:
-                continue
-            dfactor = a * df3 + b * df4
-            dphi[inext] = (factor * dphi[icur] + phi[icur] * dfactor -
-                           c * (f5 * dphi[iprev] + phi[iprev] * df5))
+        _recurrence1(n, (p,), f3, f4, f5, df3, df4, df5)
+
     # normalize in p + q
     for result in results:
         for p in range(n + 1):
@@ -127,30 +122,12 @@ def recurrence(dim, n, ref_pts, phi, jacobian=None, dphi=None):
     if dim < 3:
         return
 
+    # recurrence in q
+    dfactors = (None,)*3 if skip_derivs else (dz, 0. * dz, 0. * dz)
     for p in range(n):
         for q in range(n - p):
-            # handle r = 1
-            icur = idx(p, q, 0)
-            inext = idx(p, q, 1)
-            alpha = 2 * (p + q) + 2
-            b = 0.5 * alpha
-            a = b + 1.
-            factor = a * z + b
-            phi[inext] = factor * phi[icur]
-            if not skip_derivs:
-                dfactor = a * dz
-                dphi[inext] = factor * dphi[icur] + phi[icur] * dfactor
-            # general r by recurrence
-            for r in range(1, n - p - q):
-                iprev, icur = icur, inext
-                inext = idx(p, q, r + 1)
-                a, b, c = jrc(alpha, 0, r)
-                factor = a * z + b
-                phi[inext] = factor * phi[icur] - c * phi[iprev]
-                if skip_derivs:
-                    continue
-                dfactor = a * dz
-                dphi[inext] = factor * dphi[icur] + phi[icur] * dfactor - c * dphi[iprev]
+            _recurrence1(n, (p, q), z, 1., 1., *dfactors)
+
     # normalize in p + q + r
     for result in results:
         for p in range(n + 1):
