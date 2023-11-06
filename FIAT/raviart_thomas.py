@@ -98,10 +98,10 @@ class RTDualSet(dual_set.DualSet):
                         l_cur = functional.IntegralMoment(ref_el, Q, phi_cur, (d,), (sd,))
                         nodes.append(l_cur)
 
-        elif variant == "point":
+        else:
             # codimension 1 facets
             for i in range(len(t[sd - 1])):
-                pts_cur = ref_el.make_points(sd - 1, i, sd + degree)
+                pts_cur = ref_el.make_points(sd - 1, i, sd + degree, variant=variant)
                 for j in range(len(pts_cur)):
                     pt_cur = pts_cur[j]
                     f = functional.PointScaledNormalEvaluation(ref_el, i, pt_cur)
@@ -150,7 +150,7 @@ class RaviartThomas(finite_element.CiarletElement):
     :arg k: The degree.
     :arg variant: optional variant specifying the types of nodes.
 
-    variant can be chosen from ["point", "integral", "integral(quadrature_degree)"]
+    variant can be chosen from ["equispaced", "integral", "integral(quadrature_degree)"]
     "point" -> dofs are evaluated by point evaluation. Note that this variant has suboptimal
     convergence order in the H(div)-norm
     "integral" -> dofs are evaluated by quadrature rule of degree k.

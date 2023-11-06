@@ -109,11 +109,11 @@ class NedelecSecondKindDual(DualSet):
                 jj = Pq_at_qpts.shape[0] * e
                 ids[e] = list(range(offset + jj, offset + jj + Pq_at_qpts.shape[0]))
 
-        elif variant == "point":
+        else:
             for edge in range(len(cell.get_topology()[1])):
 
                 # Create points for evaluation of tangential components
-                points = cell.make_points(1, edge, degree + 2)
+                points = cell.make_points(1, edge, degree + 2, variant=variant)
 
                 # A tangential component evaluation for each point
                 dofs += [Tangent(cell, edge, point) for point in points]
@@ -224,8 +224,8 @@ class NedelecSecondKind(CiarletElement):
     :arg k: The degree.
     :arg variant: optional variant specifying the types of nodes.
 
-    variant can be chosen from ["point", "integral", "integral(quadrature_degree)"]
-    "point" -> dofs are evaluated by point evaluation. Note that this variant has suboptimal
+    variant can be chosen from ["equispaced", "integral", "integral(quadrature_degree)"]
+    "equispaced" -> dofs are evaluated by point evaluation. Note that this variant has suboptimal
     convergence order in the H(curl)-norm
     "integral" -> dofs are evaluated by quadrature rule of degree k.
     "integral(quadrature_degree)" -> dofs are evaluated by quadrature rule of degree quadrature_degree. You might
