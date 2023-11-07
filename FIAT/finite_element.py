@@ -10,9 +10,9 @@
 
 import numpy
 
+from FIAT.dual_set import DualSet
 from FIAT.polynomial_set import PolynomialSet
 from FIAT.quadrature_schemes import create_quadrature
-from FIAT.dual_set import DualSet
 
 
 class FiniteElement(object):
@@ -137,6 +137,9 @@ class CiarletElement(FiniteElement):
         self.V = V
 
         new_coeffs_flat = numpy.linalg.solve(numpy.transpose(V), B)
+        resid = numpy.linalg.norm(numpy.dot(numpy.transpose(V), new_coeffs_flat) - B, 1)
+        if resid > 1.e-10:
+            raise numpy.linalg.LinAlgError("nontrivial residual in linear system solution")
 
         new_shp = new_coeffs_flat.shape[:1] + shp[1:]
         new_coeffs = numpy.reshape(new_coeffs_flat, new_shp)
