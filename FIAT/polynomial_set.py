@@ -145,7 +145,7 @@ class ONPolynomialSet(PolynomialSet):
             for idx in index_iterator(shape):
                 n = expansions.polynomial_dimension(ref_el, embedded_degree)
                 for exp_bf in range(n):
-                    cur_idx = (cur_bf,) + idx + (exp_bf,)
+                    cur_idx = (cur_bf,) + tuple(idx) + (exp_bf,)
                     coeffs[cur_idx] = 1.0
                     cur_bf += 1
 
@@ -230,7 +230,7 @@ class ONSymTensorPolynomialSet(PolynomialSet):
         coeffs_shape = (num_members,) + shape + (num_exp_functions,)
         coeffs = numpy.zeros(coeffs_shape, "d")
         cur_bf = 0
-        for [i, j] in index_iterator(shape):
+        for i, j in index_iterator(shape):
             n = expansions.polynomial_dimension(ref_el, embedded_degree)
             if i == j:
                 for exp_bf in range(n):

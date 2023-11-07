@@ -138,7 +138,7 @@ class CiarletElement(FiniteElement):
 
         new_coeffs_flat = numpy.linalg.solve(numpy.transpose(V), B)
 
-        new_shp = tuple([new_coeffs_flat.shape[0]] + list(shp[1:]))
+        new_shp = new_coeffs_flat.shape[:1] + shp[1:]
         new_coeffs = numpy.reshape(new_coeffs_flat, new_shp)
 
         self.poly_set = PolynomialSet(ref_el,
