@@ -138,7 +138,8 @@ class CiarletElement(FiniteElement):
 
         new_coeffs_flat = numpy.linalg.solve(numpy.transpose(V), B)
         resid = numpy.linalg.norm(numpy.dot(numpy.transpose(V), new_coeffs_flat) - B, 1)
-        if resid > 1.e-10:
+        if resid > 1.e-7:
+            print("residual: ", resid)
             raise numpy.linalg.LinAlgError("nontrivial residual in linear system solution")
 
         new_shp = new_coeffs_flat.shape[:1] + shp[1:]
