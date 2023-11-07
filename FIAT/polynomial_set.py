@@ -133,7 +133,7 @@ class ONPolynomialSet(PolynomialSet):
         expansion_set = expansions.ExpansionSet(ref_el)
 
         # set up coefficients
-        coeffs_shape = tuple([num_members] + list(shape) + [num_exp_functions])
+        coeffs_shape = (num_members,) + shape + (num_exp_functions,)
         coeffs = numpy.zeros(coeffs_shape, "d")
 
         # use functional's index_iterator function
@@ -145,7 +145,7 @@ class ONPolynomialSet(PolynomialSet):
             for idx in index_iterator(shape):
                 n = expansions.polynomial_dimension(ref_el, embedded_degree)
                 for exp_bf in range(n):
-                    cur_idx = tuple([cur_bf] + list(idx) + [exp_bf])
+                    cur_idx = (cur_bf,) + idx + (exp_bf,)
                     coeffs[cur_idx] = 1.0
                     cur_bf += 1
 
@@ -198,7 +198,7 @@ def polynomial_set_union_normalized(A, B):
         (u, sig, vt) = numpy.linalg.svd(nc, 1)
         num_sv = len([s for s in sig if abs(s) > 1.e-10])
 
-        coeffs = numpy.reshape(vt[:num_sv], tuple([num_sv] + list(func_shape)))
+        coeffs = numpy.reshape(vt[:num_sv], (num_sv,) + func_shape)
 
     return PolynomialSet(A.get_reference_element(),
                          A.get_degree(),
@@ -227,22 +227,19 @@ class ONSymTensorPolynomialSet(PolynomialSet):
         expansion_set = expansions.ExpansionSet(ref_el)
 
         # set up coefficients for symmetric tensors
-        coeffs_shape = tuple([num_members] + list(shape) + [num_exp_functions])
+        coeffs_shape = (num_members,) + shape + (num_exp_functions,)
         coeffs = numpy.zeros(coeffs_shape, "d")
         cur_bf = 0
         for [i, j] in index_iterator(shape):
             n = expansions.polynomial_dimension(ref_el, embedded_degree)
             if i == j:
                 for exp_bf in range(n):
-                    cur_idx = tuple([cur_bf] + [i, j] + [exp_bf])
-                    coeffs[cur_idx] = 1.0
+                    coeffs[cur_bf, i, j, exp_bf] = 1.0
                     cur_bf += 1
             elif i < j:
                 for exp_bf in range(n):
-                    cur_idx = tuple([cur_bf] + [i, j] + [exp_bf])
-                    coeffs[cur_idx] = 1.0
-                    cur_idx = tuple([cur_bf] + [j, i] + [exp_bf])
-                    coeffs[cur_idx] = 1.0
+                    coeffs[cur_bf, i, j, exp_bf] = 1.0
+                    coeffs[cur_bf, j, i, exp_bf] = 1.0
                     cur_bf += 1
 
         # construct dmats. this is the same as ONPolynomialSet.
