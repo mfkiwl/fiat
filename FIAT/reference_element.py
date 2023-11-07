@@ -61,8 +61,8 @@ def lattice_iter(start, finish, depth):
     if depth == 0:
         yield tuple()
     elif depth == 1:
-         for ii in range(start, finish):
-             yield (ii,)
+        for ii in range(start, finish):
+            yield (ii,)
     else:
         for ii in range(start, finish):
             for jj in lattice_iter(start, finish - ii, depth - 1):
