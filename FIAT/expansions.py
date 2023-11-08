@@ -62,21 +62,22 @@ def dubiner_recurrence(dim, n, order, ref_pts, jacobian):
     results = tuple([None] * num_members for i in range(order+1))
     phi, dphi, ddphi = results + (None,) * (2-order)
 
+    outer = lambda x, y:  x[:, None, ...] * y[None, ...]
+    sym_outer = lambda x, y: outer(x, y) + outer(y, x)
+    pad_dim = dim + 2
+    dX = pad_jacobian(jacobian, pad_dim)
     phi[0] = sum((ref_pts[i] - ref_pts[i] for i in range(dim)), 1.)
     if dphi is not None:
-        dphi[0] = ref_pts - ref_pts
+        dphi[0] = (phi[0] - phi[0]) * dX[0]
     if ddphi is not None:
-        ddphi[0] = numpy.zeros((dim,) + ref_pts.shape, ref_pts.dtype)
+        ddphi[0] = outer(dphi[0], dX[0])
     if dim == 0 or n == 0:
         return results
     if dim > 3 or dim < 0:
         raise ValueError("Invalid number of spatial dimensions")
 
-    pad_dim = dim + 2
     X = pad_coordinates(ref_pts, pad_dim)
-    dX = pad_jacobian(jacobian, pad_dim)
     idx = (lambda p: p, morton_index2, morton_index3)[dim-1]
-    outer = lambda x, y: x * y[None, ...]
 
     for codim in range(dim):
         # Extend the basis from codim to codim + 1
@@ -94,7 +95,7 @@ def dubiner_recurrence(dim, n, order, ref_pts, jacobian):
                 dfactor = a * dfa - b * dfb
                 dphi[inext] = factor * dphi[icur] + phi[icur] * dfactor
                 if ddphi is not None:
-                    ddphi[inext] = factor * ddphi[icur] + 2 * outer(dphi[icur], dfactor)
+                    ddphi[inext] = factor * ddphi[icur] + sym_outer(dphi[icur], dfactor)
                     ddfc = 2 * outer(dfb, dfb)
 
             # general i by recurrence
@@ -110,17 +111,15 @@ def dubiner_recurrence(dim, n, order, ref_pts, jacobian):
                                c * (fc * dphi[iprev] + phi[iprev] * dfc))
                 if ddphi is None:
                     continue
-                ddphi[inext] = (factor * ddphi[icur] + 2 * outer(dphi[icur], dfactor) -
-                                c * (fc * ddphi[iprev] + 2 * outer(dphi[iprev], dfc) + phi[iprev] * ddfc))
+                ddphi[inext] = (factor * ddphi[icur] + sym_outer(dphi[icur], dfactor) -
+                                c * (fc * ddphi[iprev] + sym_outer(dphi[iprev], dfc) + phi[iprev] * ddfc))
 
         # normalize
         for alpha in reference_element.lattice_iter(0, n+1, codim+1):
+            icur = idx(*alpha)
             scale = math.sqrt(sum(alpha) + 0.5 * len(alpha))
-            phi[idx(*alpha)] *= scale
-            if dphi is not None:
-                dphi[idx(*alpha)] *= scale
-                if ddphi is not None:
-                    ddphi[idx(*alpha)] *= scale
+            for result in results:
+                result[icur] *= scale
     return results
 
 
@@ -174,7 +173,7 @@ class ExpansionSet(object):
         return math.comb(n + D, D)
 
     def _mapping(self, pts):
-        if isinstance(pts, numpy.ndarray) and len(pts.shape) == 2:
+        if isinstance(pts, numpy.ndarray) and len(pts.shape) == 2 and pts.dtype != object:
             return numpy.dot(self.A, pts) + self.b[:, None]
         else:
             m1, m2 = self.A.shape
@@ -203,7 +202,7 @@ class ExpansionSet(object):
 
         pts = reference_element.make_lattice(self.ref_el.get_vertices(), degree, variant="gl")
         v, dv = self._tabulate(degree, numpy.transpose(pts), order=1)
-        dv = numpy.array(dv).transpose((1, 2, 0))
+        dv = numpy.transpose(dv, (1, 2, 0))
         dmats = numpy.linalg.solve(numpy.transpose(v), dv)
         return cache.setdefault(key, dmats)
 
@@ -211,7 +210,7 @@ class ExpansionSet(object):
         from FIAT.polynomial_set import mis
         result = {}
         D = self.ref_el.get_spatial_dimension()
-        lorder = min(1, order)
+        lorder = min(2, order)
         vals = self._tabulate(degree, numpy.transpose(pts), order=lorder)
         base_vals = numpy.array(vals[0])
         base_alpha = (0,) * D
@@ -221,24 +220,18 @@ class ExpansionSet(object):
             for indices in product(range(D), repeat=r):
                 alpha = tuple(map(indices.count, range(D)))
                 if alpha not in result:
-                    result[alpha] = vr[indices]
-        if order == lorder:
-            return result
+                    result[alpha] = vr[indices].reshape(base_vals.shape)
 
         def distance(alpha, beta):
             return sum(ai != bi for ai, bi in zip(alpha, beta))
 
         # Only use dmats if order > lorder
-        dmats = self.get_dmats(degree)
-        for i in range(order + 1):
+        for i in range(lorder + 1, order + 1):
+            dmats = self.get_dmats(degree)
             alphas = mis(D, i)
             for alpha in alphas:
-                if alpha in result:
-                    continue
-                if len(result) > 0 and i > 0:
-                    base_alpha = next(a for a in result if sum(a) == i-1 and distance(alpha, a) == 1)
-                    base_vals = result[base_alpha]
-                vals = base_vals
+                base_alpha = next(a for a in result if sum(a) == i-1 and distance(alpha, a) == 1)
+                vals = result[base_alpha]
                 for dmat, start, end in zip(dmats, base_alpha, alpha):
                     for j in range(start, end):
                         vals = numpy.dot(dmat.T, vals)
