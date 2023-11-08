@@ -85,7 +85,7 @@ def test_symmetry(dim, degree):
 
 @pytest.mark.parametrize("dim, degree", [(1, 128), (2, 64), (3, 16)])
 def test_interpolation(dim, degree):
-    from FIAT import GaussLobattoLegendre, quadrature
+    from FIAT import GaussLegendre, quadrature
     from FIAT.polynomial_set import mis
 
     a = (1. + 0.5)
@@ -113,7 +113,7 @@ def test_interpolation(dim, degree):
 
     k = 1
     while k <= degree:
-        fe = GaussLobattoLegendre(s, k)
+        fe = GaussLegendre(s, k)
         tab = fe.tabulate(1, points)
         coefficients = np.array([v(f) for v in fe.dual_basis()])
 

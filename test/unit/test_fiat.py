@@ -533,65 +533,62 @@ def test_expansion_orthonormality(cell):
 @pytest.mark.parametrize('dim', range(1, 4))
 def test_expansion_values(dim):
     import sympy
-    from FIAT import expansions, reference_element
-    half = sympy.Rational(1, 2)
+    from FIAT import expansions, polynomial_set, reference_element
     cell = reference_element.default_simplex(dim)
     U = expansions.ExpansionSet(cell)
     dpoints = []
     rpoints = []
 
-    npoints = 10
+    npoints = 4
     interior = 1
     for alpha in reference_element.lattice_iter(interior, npoints+1-interior, dim):
         dpoints.append(tuple(2*np.array(alpha, dtype="d")/npoints-1))
         rpoints.append(tuple(2*sympy.Rational(a, npoints)-1 for a in alpha))
 
     n = 20
-    eta = sympy.DeferredVector("eta")
     Uvals = U.tabulate(n, dpoints)
-    if dim == 1:
-        for p in range(n + 1):
-            f = sympy.jacobi_poly(p, 0, 0, eta[0])
-            f *= sympy.sqrt((half + p))
-            vals = Uvals[p]
-            error = 0.0
-            for pt, val in zip(rpoints, vals):
-                fval = f.subs(eta[0], pt[0])
-                error = max(error, abs(val - float(fval)))
-            assert error < 1E-13
-    elif dim == 2:
-        idx = expansions.morton_index2
-        for q in range(n + 1):
-            p = n - q
-            f = (sympy.jacobi_poly(p, 0, 0, eta[0]) *
-                 sympy.jacobi_poly(q, 2*p+1, 0, eta[1]) * ((1 - eta[1])/2) ** p)
-            f *= sympy.sqrt((half + p) * (1 + p + q))
-            vals = Uvals[idx(p, q)]
-            error = 0.0
-            for pt, val in zip(rpoints, vals):
-                eta0 = 2 * (1 + pt[0]) / (1 - pt[1]) - 1
-                eta1 = pt[1]
-                fval = f.subs(eta[1], eta1).subs(eta[0], eta0)
-                error = max(error, abs(val - float(fval)))
-            assert error < 1E-13
-    elif dim == 3:
-        idx = expansions.morton_index3
-        for r in range(n + 1):
-            q = n - r
-            p = n - r - q
-            f = (sympy.jacobi_poly(p, 0, 0, eta[0]) *
-                 sympy.jacobi_poly(q, 2*p+1, 0, eta[1]) * ((1 - eta[1])/2) ** p *
-                 sympy.jacobi_poly(r, 2*p+2*q+2, 0, eta[2]) * ((1 - eta[2])/2) ** (p+q))
-            f *= sympy.sqrt((half + p) * (1 + p + q) * (1+half + p + q + r))
-            vals = Uvals[idx(p, q, r)]
-            error = 0.0
-            for pt, val in zip(rpoints, vals):
-                eta0 = 2 * (1 + pt[0]) / (-pt[1] - pt[2]) - 1
-                eta1 = 2 * (1 + pt[1]) / (1 - pt[2]) - 1
-                eta2 = pt[2]
-                fval = f.subs(eta[2], eta2).subs(eta[1], eta1).subs(eta[0], eta0)
-                error = max(error, abs(val - float(fval)))
-            assert error < 1E-13
+    idx = (lambda p: p, expansions.morton_index2, expansions.morton_index3)[dim-1]
+    eta = sympy.DeferredVector("eta")
+    half = sympy.Rational(1, 2)
+
+    def duffy_coords(pt):
+        if len(pt) == 1:
+            return pt
+        elif len(pt) == 2:
+            eta0 = 2 * (1 + pt[0]) / (1 - pt[1]) - 1
+            eta1 = pt[1]
+            return eta0, eta1
+        else:
+            eta0 = 2 * (1 + pt[0]) / (-pt[1] - pt[2]) - 1
+            eta1 = 2 * (1 + pt[1]) / (1 - pt[2]) - 1
+            eta2 = pt[2]
+            return eta0, eta1, eta2
+
+    def basis(dim, p, q=0, r=0):
+        if dim >= 1:
+            f = sympy.jacobi(p, 0, 0, eta[0])
+            f *= sympy.sqrt(half + p)
+        if dim >= 2:
+            f *= sympy.jacobi(q, 2*p+1, 0, eta[1]) * ((1 - eta[1])/2) ** p
+            f *= sympy.sqrt(1 + p + q)
+        if dim >= 3:
+            f *= sympy.jacobi(r, 2*p+2*q+2, 0, eta[2]) * ((1 - eta[2])/2) ** (p+q)
+            f *= sympy.sqrt(1 + half + p + q + r)
+        return f
+
+    def eval_basis(f, pt):
+        fval = f
+        for coord, pval in zip(eta, duffy_coords(pt)):
+            fval = fval.subs(coord, pval)
+        fval = float(fval)
+        return fval
+
+    for i in range(n + 1):
+        for indices in polynomial_set.mis(dim, i):
+            phi = basis(dim, *indices)
+            exact = np.array([eval_basis(phi, r) for r in rpoints])
+            uh = Uvals[idx(*indices)]
+            assert np.allclose(uh, exact, atol=1E-14)
 
 
 if __name__ == '__main__':
