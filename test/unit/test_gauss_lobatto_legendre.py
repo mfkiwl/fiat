@@ -57,8 +57,8 @@ def test_gll_basis_values(dim, degree):
 
 
 @pytest.mark.parametrize("dim, degree", [(1, 4), (2, 4), (3, 4)])
-def test_symmetry(dim, degree):
-    """ Ensure the dual basis has the right symmetry."""
+def test_edge_dofs(dim, degree):
+    """ Ensure edge DOFs are point evaluations at GL points."""
     from FIAT import GaussLobattoLegendre, quadrature, expansions
 
     s = symmetric_simplex(dim)
@@ -84,12 +84,12 @@ def test_symmetry(dim, degree):
             assert np.allclose(points[edge_dofs[entity]], np.array(list(map(transform, quadrature_points))))
 
 
-@pytest.mark.parametrize("dim, degree", [(1, 128), (2, 64), (3, 16)])
+@pytest.mark.parametrize("dim, degree", [(1, 128), (2, 32), (3, 16)])
 def test_interpolation(dim, degree):
     from FIAT import GaussLobattoLegendre, quadrature
     from FIAT.polynomial_set import mis
 
-    a = (1. + 0.5)
+    a = 1. + 0.5
     a = 0.5 * a**2
     r2 = lambda x: 0.5 * np.linalg.norm(x, axis=-1)**2
     f = lambda x: np.exp(a / (r2(x) - a))
@@ -108,7 +108,6 @@ def test_interpolation(dim, degree):
         i = next(j for j, aj in enumerate(alpha) if aj > 0)
         f_at_pts[alpha] = df_at_pts[i]
 
-    print()
     scaleL2 = 1 / np.sqrt(np.dot(weights, f(points)**2))
     scaleH1 = 1 / np.sqrt(np.dot(weights, sum(f_at_pts[alpha]**2 for alpha in f_at_pts)))
 
@@ -124,7 +123,9 @@ def test_interpolation(dim, degree):
 
         err2 = sum((f_at_pts[alpha] - np.dot(coefficients, tab[alpha])) ** 2 for alpha in tab)
         errorH1 = scaleH1 * np.sqrt(np.dot(weights, err2))
-        print("dim = %d, degree = %2d, L2-error = %.4E, H1-error = %.4E" % (dim, k, errorL2, errorH1))
+
+        assert errorL2 < max(3*np.exp(-k), 1E-15)
+        assert errorH1 < max(3*np.exp(-k+1), 1E-13 if dim == 1 else 1E-11)
         k = min(k * 2, k + 16)
 
 
