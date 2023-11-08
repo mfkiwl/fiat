@@ -53,12 +53,15 @@ class LagrangeLineExpansionSet(expansions.LineExpansionSet):
             results = numpy.array(list(map(simplify, results)))
         return results
 
-    def _tabulate_derivatives(self, n, pts):
-        results = self.tabulate(n, pts)
-        return results, numpy.dot(self.dmat, results)[:, None, :]
-
-    def tabulate_derivatives(self, n, pts):
-        return numpy.dot(self.dmat, self.tabulate(n, pts))
+    def _tabulate(self, n, pts, order=0):
+        results = [self.tabulate(n, pts)]
+        for r in range(order):
+            results.append(numpy.dot(self.dmat, results[-1]))
+        for r in range(order+1):
+            shape = results[r].shape
+            shape = shape[:1] + (1,)*r + shape[1:]
+            results[r] = numpy.reshape(results[r], shape)
+        return results
 
 
 class LagrangePolynomialSet(polynomial_set.PolynomialSet):

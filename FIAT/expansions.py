@@ -53,26 +53,30 @@ def jacobi_factors(x, y, z, dx, dy, dz):
     return fa, fb, fc, dfa, dfb, dfc
 
 
-def dubiner_recurrence(dim, n, ref_pts, phi, jacobian=None, dphi=None, ddphi=None):
+def dubiner_recurrence(dim, n, order, ref_pts, jacobian):
     """Dubiner recurrence from (Kirby 2010)"""
-    outer = lambda x, y: x * y[..., None]
+    if order > 2:
+        raise ValueError("Higher order derivatives not supported")
+
+    num_members = math.comb(n + dim, dim)
+    results = tuple([None] * num_members for i in range(order+1))
+    phi, dphi, ddphi = results + (None,) * (2-order)
+
     phi[0] = sum((ref_pts[i] - ref_pts[i] for i in range(dim)), 1.)
     if dphi is not None:
         dphi[0] = ref_pts - ref_pts
     if ddphi is not None:
-        ddphi[0] = outer(dphi[0], dphi[0])
+        ddphi[0] = numpy.zeros((dim,) + ref_pts.shape, ref_pts.dtype)
     if dim == 0 or n == 0:
-        return
+        return results
     if dim > 3 or dim < 0:
         raise ValueError("Invalid number of spatial dimensions")
 
-    idx = (lambda p: p, morton_index2, morton_index3)[dim-1]
     pad_dim = dim + 2
     X = pad_coordinates(ref_pts, pad_dim)
-    if jacobian is None:
-        dX = (None,) * pad_dim
-    else:
-        dX = pad_jacobian(jacobian, pad_dim)
+    dX = pad_jacobian(jacobian, pad_dim)
+    idx = (lambda p: p, morton_index2, morton_index3)[dim-1]
+    outer = lambda x, y: x * y[None, ...]
 
     for codim in range(dim):
         # Extend the basis from codim to codim + 1
@@ -117,6 +121,7 @@ def dubiner_recurrence(dim, n, ref_pts, phi, jacobian=None, dphi=None, ddphi=Non
                 dphi[idx(*alpha)] *= scale
                 if ddphi is not None:
                     ddphi[idx(*alpha)] *= scale
+    return results
 
 
 def xi_triangle(eta):
@@ -176,22 +181,11 @@ class ExpansionSet(object):
             return [sum((self.A[i, j] * pts[j] for j in range(m2)), self.b[i])
                     for i in range(m1)]
 
-    def _tabulate(self, n, pts):
+    def _tabulate(self, n, pts, order=0):
         """A version of tabulate() that also works for a single point.
         """
         D = self.ref_el.get_spatial_dimension()
-        results = [None] * self.get_num_members(n)
-        dubiner_recurrence(D, n, self._mapping(pts), results)
-        return results
-
-    def _tabulate_derivatives(self, n, pts):
-        """A version of tabulate_derivatives() that also works for a single point.
-        """
-        D = self.ref_el.get_spatial_dimension()
-        phi = [None] * self.get_num_members(n)
-        dphi = [None] * len(phi)
-        dubiner_recurrence(D, n, self._mapping(pts), phi, jacobian=self.A, dphi=dphi)
-        return phi, dphi
+        return dubiner_recurrence(D, n, order, self._mapping(pts), self.A)
 
     def get_dmats(self, degree):
         """Returns a numpy array with the expansion coefficients dmat[k, j, i]
@@ -208,7 +202,7 @@ class ExpansionSet(object):
             return cache.setdefault(key, numpy.zeros((self.ref_el.get_spatial_dimension(), 1, 1), "d"))
 
         pts = reference_element.make_lattice(self.ref_el.get_vertices(), degree, variant="gl")
-        v, dv = self._tabulate_derivatives(degree, numpy.transpose(pts))
+        v, dv = self._tabulate(degree, numpy.transpose(pts), order=1)
         dv = numpy.array(dv).transpose((1, 2, 0))
         dmats = numpy.linalg.solve(numpy.transpose(v), dv)
         return cache.setdefault(key, dmats)
@@ -217,22 +211,25 @@ class ExpansionSet(object):
         from FIAT.polynomial_set import mis
         result = {}
         D = self.ref_el.get_spatial_dimension()
-        if order == 0:
-            base_vals = self.tabulate(degree, pts)
-        else:
-            v, dv = self._tabulate_derivatives(degree, numpy.transpose(pts))
-            base_vals = numpy.array(v)
-            dtildes = numpy.array(dv).transpose((1, 0, 2))
-            alphas = mis(D, 1)
-            for alpha in alphas:
-                result[alpha] = next(dv for dv, ai in zip(dtildes, alpha) if ai > 0)
+        lorder = min(1, order)
+        vals = self._tabulate(degree, numpy.transpose(pts), order=lorder)
+        base_vals = numpy.array(vals[0])
+        base_alpha = (0,) * D
+        result[base_alpha] = base_vals
+        for r in range(1, 1+lorder):
+            vr = numpy.transpose(vals[r], tuple(range(1, r+1)) + (0, r+1))
+            for indices in product(range(D), repeat=r):
+                alpha = tuple(map(indices.count, range(D)))
+                if alpha not in result:
+                    result[alpha] = vr[indices]
+        if order == lorder:
+            return result
 
         def distance(alpha, beta):
             return sum(ai != bi for ai, bi in zip(alpha, beta))
 
-        # Only use dmats if order > 1
-        dmats = self.get_dmats(degree) if order > 1 else []
-        base_alpha = (0,) * D
+        # Only use dmats if order > lorder
+        dmats = self.get_dmats(degree)
         for i in range(order + 1):
             alphas = mis(D, i)
             for alpha in alphas:
@@ -251,10 +248,11 @@ class ExpansionSet(object):
     def tabulate(self, n, pts):
         if len(pts) == 0:
             return numpy.array([])
-        return numpy.array(self._tabulate(n, numpy.transpose(pts)))
+        results, = self._tabulate(n, numpy.transpose(pts))
+        return numpy.array(results)
 
     def tabulate_derivatives(self, n, pts):
-        vals, deriv_vals = self._tabulate_derivatives(n, numpy.transpose(pts))
+        vals, deriv_vals = self._tabulate(n, numpy.transpose(pts), order=1)
         # Create the ordinary data structure.
         D = self.ref_el.get_spatial_dimension()
         data = [[(vals[i][j], [deriv_vals[i][r][j] for r in range(D)])
@@ -296,28 +294,23 @@ class LineExpansionSet(ExpansionSet):
             raise Exception("Must have a line")
         super(LineExpansionSet, self).__init__(ref_el)
 
-    def _tabulate(self, n, pts):
-        """Returns a numpy array A[i,j] = phi_i(pts[j])"""
-        if len(pts) > 0:
-            ref_pts = self._mapping(pts).T
-            results = jacobi.eval_jacobi_batch(0, 0, n, ref_pts)
-            for p in range(n + 1):
-                results[p] *= math.sqrt(p + 0.5)
-            return results
-        else:
-            return []
-
-    def _tabulate_derivatives(self, n, pts):
+    def _tabulate(self, n, pts, order=0):
         """Returns a tuple of (vals, derivs) such that
         vals[i,j] = phi_i(pts[j]), derivs[i,j] = D vals[i,j]."""
-        ref_pts = self._mapping(pts).T
-        derivs = jacobi.eval_jacobi_deriv_batch(0, 0, n, ref_pts)
-
-        # Jacobi polynomials defined on [-1, 1], first derivatives need scaling
-        derivs *= 2.0 / self.ref_el.volume()
-        for p in range(n + 1):
-            derivs[p] *= math.sqrt(p + 0.5)
-        return self._tabulate(n, pts), derivs[:, None, :]
+        xs = self._mapping(pts).T
+        results = []
+        scale = numpy.sqrt(0.5 + numpy.arange(n+1))
+        for k in range(order+1):
+            v = numpy.zeros((n + 1, len(xs)), xs.dtype)
+            if n >= k:
+                v[k:] = jacobi.eval_jacobi_batch(k, k, n-k, xs)
+            for p in range(n + 1):
+                v[p] *= scale[p]
+                scale[p] *= 0.5 * (p + k + 1) * self.A[0, 0]
+            shape = v.shape
+            shape = shape[:1] + (1,) * k + shape[1:]
+            results.append(v.reshape(shape))
+        return tuple(results)
 
 
 class TriangleExpansionSet(ExpansionSet):
