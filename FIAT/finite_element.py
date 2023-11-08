@@ -124,30 +124,18 @@ class CiarletElement(FiniteElement):
         dualmat = dual.to_riesz(poly_set)
 
         shp = dualmat.shape
-        if len(shp) > 2:
-            num_cols = numpy.prod(shp[1:])
-
-            A = numpy.reshape(dualmat, (dualmat.shape[0], num_cols))
-            B = numpy.reshape(old_coeffs, (old_coeffs.shape[0], num_cols))
-        else:
-            A = dualmat
-            B = old_coeffs
-
+        A = dualmat.reshape((shp[0], -1))
+        B = old_coeffs.reshape((shp[0], -1))
         V = numpy.dot(A, numpy.transpose(B))
         self.V = V
-        # new_coeffs_flat = numpy.linalg.solve(numpy.transpose(V), B)
 
-        QA, RA = numpy.linalg.qr(A)
-        VT = numpy.dot(B, numpy.transpose(RA))
-        X = numpy.linalg.solve(VT, B)
-        new_coeffs_flat = numpy.dot(QA, X)
-
-        relres = numpy.linalg.norm(numpy.dot(VT, X) - B, "fro") / numpy.linalg.norm(B, "fro")
-        if relres > 1.E-7:
-            raise numpy.linalg.LinAlgError("Nontrivial residual in linear system solution")
+        # new_coeffs_flat = numpy.linalg.solve(V.T, B)
+        Q, R = numpy.linalg.qr(A)
+        BR = numpy.dot(B, numpy.transpose(R))
+        new_coeffs_flat = numpy.dot(Q, numpy.linalg.solve(BR, B))
 
         new_shp = new_coeffs_flat.shape[:1] + shp[1:]
-        new_coeffs = numpy.reshape(new_coeffs_flat, new_shp)
+        new_coeffs = new_coeffs_flat.reshape(new_shp)
 
         self.poly_set = PolynomialSet(ref_el,
                                       poly_set.get_degree(),
