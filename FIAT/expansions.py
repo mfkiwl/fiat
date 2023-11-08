@@ -62,8 +62,9 @@ def dubiner_recurrence(dim, n, order, ref_pts, jacobian):
     results = tuple([None] * num_members for i in range(order+1))
     phi, dphi, ddphi = results + (None,) * (2-order)
 
-    outer = lambda x, y:  x[:, None, ...] * y[None, ...]
+    outer = lambda x, y: x[:, None, ...] * y[None, ...]
     sym_outer = lambda x, y: outer(x, y) + outer(y, x)
+
     pad_dim = dim + 2
     dX = pad_jacobian(jacobian, pad_dim)
     phi[0] = sum((ref_pts[i] - ref_pts[i] for i in range(dim)), 1.)
