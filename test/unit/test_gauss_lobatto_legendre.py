@@ -33,7 +33,7 @@ def symmetric_simplex(dim):
         s.vertices = [(0., 1.), (-h, -0.5), (h, -0.5)]
     elif dim == 3:
         h = 3.**0.5 / dim
-        s.vertices = [(-h, h, h), (h, -h, h), (h, h, -h), (h, h, h)]
+        s.vertices = [(h, -h, -h), (-h, h, -h), (-h, -h, h), (h, h, h)]
     return s
 
 
@@ -84,49 +84,68 @@ def test_edge_dofs(dim, degree):
             assert np.allclose(points[edge_dofs[entity]], np.array(list(map(transform, quadrature_points))))
 
 
-@pytest.mark.parametrize("dim, degree", [(1, 128), (2, 32), (3, 16)])
+@pytest.mark.parametrize("dim, degree", [(1, 64), (2, 16), (3, 16)])
 def test_interpolation(dim, degree):
     from FIAT import GaussLobattoLegendre, quadrature
-    from FIAT.polynomial_set import mis
 
-    a = 1. + 0.5
-    a = 0.5 * a**2
-    r2 = lambda x: 0.5 * np.linalg.norm(x, axis=-1)**2
-    f = lambda x: np.exp(a / (r2(x) - a))
-    df = lambda x: f(x) * (-a*(r2(x) - a)**-2)
+    # f = Runge radial function
+    A = 25
+    r2 = lambda x: np.linalg.norm(x, axis=-1)**2
+    f = lambda x: 1/(1 + A*r2(x))
+
+    s = symmetric_simplex(dim)
+    rule = quadrature.make_quadrature(s, 2*degree+1)
+    points = rule.get_points()
+    f_at_pts = f(points)
+
+    k = 1
+    errors = []
+    degrees = []
+    while k <= degree:
+        fe = GaussLobattoLegendre(s, k)
+        # interpolate f onto FE space: dual evaluation
+        coefficients = np.array([v(f) for v in fe.dual_basis()])
+        # interpolate FE space onto quadrature points
+        tab = fe.tabulate(0, points)[(0,)*dim]
+        # compute max error
+        errors.append(max(abs(f_at_pts - np.dot(coefficients, tab))))
+        degrees.append(k)
+        k *= 2
+
+    errors = np.array(errors)
+    degrees = np.array(degrees)
+
+    # Test for exponential convergence
+    C = np.sqrt(1/A) + np.sqrt(1+1/A)
+    assert all(errors < 1.5 * C**-degrees)
+
+
+@pytest.mark.parametrize("degree", [4, 8, 12, 16])
+@pytest.mark.parametrize("dim", [1, 2, 3])
+def test_conditioning(dim, degree):
+    from FIAT import GaussLobattoLegendre, quadrature
 
     s = symmetric_simplex(dim)
     rule = quadrature.make_quadrature(s, degree + 1)
     points = rule.get_points()
     weights = rule.get_weights()
 
-    f_at_pts = {}
-    f_at_pts[(0,) * dim] = f(points)
-    df_at_pts = df(points) * points.T
-    alphas = mis(dim, 1)
-    for alpha in alphas:
-        i = next(j for j, aj in enumerate(alpha) if aj > 0)
-        f_at_pts[alpha] = df_at_pts[i]
+    fe = GaussLobattoLegendre(s, degree)
+    phi = fe.tabulate(1, points)
+    v = phi[(0,) * dim]
+    grads = [phi[alpha] for alpha in phi if sum(alpha) == 1]
+    M = np.dot(v, weights[:, None] * v.T)
+    K = sum(np.dot(dv, weights[:, None] * dv.T) for dv in grads)
 
-    scaleL2 = 1 / np.sqrt(np.dot(weights, f(points)**2))
-    scaleH1 = 1 / np.sqrt(np.dot(weights, sum(f_at_pts[alpha]**2 for alpha in f_at_pts)))
+    def cond(A):
+        a = np.linalg.eigvalsh(A)
+        a = a[abs(a) > 1E-12]
+        return max(a) / min(a)
 
-    k = 1
-    while k <= degree:
-        fe = GaussLobattoLegendre(s, k)
-        tab = fe.tabulate(1, points)
-        coefficients = np.array([v(f) for v in fe.dual_basis()])
-
-        alpha = (0,) * dim
-        err = f_at_pts[alpha] - np.dot(coefficients, tab[alpha])
-        errorL2 = scaleL2 * np.sqrt(np.dot(weights, err ** 2))
-
-        err2 = sum((f_at_pts[alpha] - np.dot(coefficients, tab[alpha])) ** 2 for alpha in tab)
-        errorH1 = scaleH1 * np.sqrt(np.dot(weights, err2))
-
-        assert errorL2 < max(3*np.exp(-k), 1E-15)
-        assert errorH1 < max(3*np.exp(-k+1), 1E-13 if dim == 1 else 1E-11)
-        k = min(k * 2, k + 16)
+    kappaM = cond(M)
+    kappaK = cond(K)
+    assert kappaM ** (1/degree) < dim + 1
+    assert kappaK ** (1/degree) < dim + 2
 
 
 if __name__ == '__main__':
