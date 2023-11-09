@@ -20,6 +20,8 @@ class GaussLobattoLegendre(finite_element.CiarletElement):
             raise ValueError("Gauss-Lobatto-Legendre elements are only defined on simplices.")
         dual = lagrange.LagrangeDualSet(ref_el, degree, variant="gll")
         if ref_el.shape == LINE:
+            # In 1D we can use the primal basis as the expansion set,
+            # avoiding any round-off coming from a basis transformation
             points = []
             for node in dual.nodes:
                 # Assert singleton point for each node.
