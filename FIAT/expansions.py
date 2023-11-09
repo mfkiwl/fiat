@@ -83,6 +83,7 @@ def dubiner_recurrence(dim, n, order, ref_pts, jacobian):
     for codim in range(dim):
         # Extend the basis from codim to codim + 1
         fa, fb, fc, dfa, dfb, dfc = jacobi_factors(*X[codim:codim+3], *dX[codim:codim+3])
+        ddfc = 2 * outer(dfb, dfb)
         for sub_index in reference_element.lattice_iter(0, n, codim):
             # handle i = 1
             icur = idx(*sub_index, 0)
@@ -97,7 +98,6 @@ def dubiner_recurrence(dim, n, order, ref_pts, jacobian):
                 dphi[inext] = factor * dphi[icur] + phi[icur] * dfactor
                 if ddphi is not None:
                     ddphi[inext] = factor * ddphi[icur] + sym_outer(dphi[icur], dfactor)
-                    ddfc = 2 * outer(dfb, dfb)
 
             # general i by recurrence
             for i in range(1, n - sum(sub_index)):
@@ -174,7 +174,7 @@ class ExpansionSet(object):
         return math.comb(n + D, D)
 
     def _mapping(self, pts):
-        if isinstance(pts, numpy.ndarray) and len(pts.shape) == 2 and pts.dtype != object:
+        if isinstance(pts, numpy.ndarray) and len(pts.shape) == 2:
             return numpy.dot(self.A, pts) + self.b[:, None]
         else:
             m1, m2 = self.A.shape

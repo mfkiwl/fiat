@@ -127,25 +127,24 @@ class ONPolynomialSet(PolynomialSet):
         else:
             flat_shape = numpy.ravel(shape)
             num_components = numpy.prod(flat_shape)
-        num_exp_functions = expansions.polynomial_dimension(ref_el, degree)
+        expansion_set = expansions.ExpansionSet(ref_el)
+        num_exp_functions = expansion_set.get_num_members(degree)
         num_members = num_components * num_exp_functions
         embedded_degree = degree
-        expansion_set = expansions.ExpansionSet(ref_el)
-
-        # set up coefficients
-        coeffs_shape = (num_members,) + shape + (num_exp_functions,)
-        coeffs = numpy.zeros(coeffs_shape, "d")
-
-        # use functional's index_iterator function
-        cur_bf = 0
 
         if shape == tuple():
             coeffs = numpy.eye(num_members)
         else:
+            # set up coefficients
+            coeffs_shape = (num_members, *shape, num_exp_functions)
+            coeffs = numpy.zeros(coeffs_shape, "d")
+
+            # use functional's index_iterator function
+            cur_bf = 0
             for idx in index_iterator(shape):
                 n = expansions.polynomial_dimension(ref_el, embedded_degree)
                 for exp_bf in range(n):
-                    cur_idx = (cur_bf,) + tuple(idx) + (exp_bf,)
+                    cur_idx = (cur_bf, *idx, exp_bf)
                     coeffs[cur_idx] = 1.0
                     cur_bf += 1
 
@@ -220,24 +219,23 @@ class ONSymTensorPolynomialSet(PolynomialSet):
             size = sd
 
         shape = (size, size)
-        num_exp_functions = expansions.polynomial_dimension(ref_el, degree)
+        expansion_set = expansions.ExpansionSet(ref_el)
+        num_exp_functions = expansion_set.get_num_members(degree)
         num_components = size * (size + 1) // 2
         num_members = num_components * num_exp_functions
         embedded_degree = degree
-        expansion_set = expansions.ExpansionSet(ref_el)
 
         # set up coefficients for symmetric tensors
-        coeffs_shape = (num_members,) + shape + (num_exp_functions,)
+        coeffs_shape = (num_members, *shape, num_exp_functions)
         coeffs = numpy.zeros(coeffs_shape, "d")
         cur_bf = 0
         for i, j in index_iterator(shape):
-            n = expansions.polynomial_dimension(ref_el, embedded_degree)
             if i == j:
-                for exp_bf in range(n):
+                for exp_bf in range(num_exp_functions):
                     coeffs[cur_bf, i, j, exp_bf] = 1.0
                     cur_bf += 1
             elif i < j:
-                for exp_bf in range(n):
+                for exp_bf in range(num_exp_functions):
                     coeffs[cur_bf, i, j, exp_bf] = 1.0
                     coeffs[cur_bf, j, i, exp_bf] = 1.0
                     cur_bf += 1
