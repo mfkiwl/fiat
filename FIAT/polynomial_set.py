@@ -127,10 +127,10 @@ class ONPolynomialSet(PolynomialSet):
         else:
             flat_shape = numpy.ravel(shape)
             num_components = numpy.prod(flat_shape)
-        expansion_set = expansions.ExpansionSet(ref_el)
-        num_exp_functions = expansion_set.get_num_members(degree)
+        num_exp_functions = expansions.polynomial_dimension(ref_el, degree)
         num_members = num_components * num_exp_functions
         embedded_degree = degree
+        expansion_set = expansions.ExpansionSet(ref_el)
 
         if shape == tuple():
             coeffs = numpy.eye(num_members)
@@ -219,11 +219,11 @@ class ONSymTensorPolynomialSet(PolynomialSet):
             size = sd
 
         shape = (size, size)
-        expansion_set = expansions.ExpansionSet(ref_el)
-        num_exp_functions = expansion_set.get_num_members(degree)
+        num_exp_functions = expansions.polynomial_dimension(ref_el, degree)
         num_components = size * (size + 1) // 2
         num_members = num_components * num_exp_functions
         embedded_degree = degree
+        expansion_set = expansions.ExpansionSet(ref_el)
 
         # set up coefficients for symmetric tensors
         coeffs_shape = (num_members, *shape, num_exp_functions)
