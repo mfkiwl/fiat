@@ -177,12 +177,12 @@ class NedelecDual2D(dual_set.DualSet):
                         l_cur = functional.IntegralMoment(ref_el, Q, phi_cur, (d,), (sd,))
                         nodes.append(l_cur)
 
-        else:
+        elif variant == "point":
             num_edges = len(t[1])
 
             # edge tangents
             for i in range(num_edges):
-                pts_cur = ref_el.make_points(1, i, degree + 2, variant=variant)
+                pts_cur = ref_el.make_points(1, i, degree + 2)
                 for j in range(len(pts_cur)):
                     pt_cur = pts_cur[j]
                     f = functional.PointEdgeTangentEvaluation(ref_el, i, pt_cur)
@@ -284,12 +284,12 @@ class NedelecDual3D(dual_set.DualSet):
                         l_cur = functional.IntegralMoment(ref_el, Q, phi_cur, (d,), (sd,))
                         nodes.append(l_cur)
 
-        else:
+        elif variant == "point":
             num_edges = len(t[1])
 
             for i in range(num_edges):
                 # points to specify P_k on each edge
-                pts_cur = ref_el.make_points(1, i, degree + 2, variant=variant)
+                pts_cur = ref_el.make_points(1, i, degree + 2)
                 for j in range(len(pts_cur)):
                     pt_cur = pts_cur[j]
                     f = functional.PointEdgeTangentEvaluation(ref_el, i, pt_cur)
@@ -298,7 +298,7 @@ class NedelecDual3D(dual_set.DualSet):
             if degree > 0:  # face tangents
                 num_faces = len(t[2])
                 for i in range(num_faces):  # loop over faces
-                    pts_cur = ref_el.make_points(2, i, degree + 2, variant=variant)
+                    pts_cur = ref_el.make_points(2, i, degree + 2)
                     for j in range(len(pts_cur)):  # loop over points
                         pt_cur = pts_cur[j]
                         for k in range(2):  # loop over tangents
@@ -355,8 +355,8 @@ class Nedelec(finite_element.CiarletElement):
     :arg k: The degree.
     :arg variant: optional variant specifying the types of nodes.
 
-    variant can be chosen from ["equispaced", "integral", "integral(quadrature_degree)"]
-    "equispaced" -> dofs are evaluated by point evaluation. Note that this variant has suboptimal
+    variant can be chosen from ["point", "integral", "integral(quadrature_degree)"]
+    "point" -> dofs are evaluated by point evaluation. Note that this variant has suboptimal
     convergence order in the H(curl)-norm
     "integral" -> dofs are evaluated by quadrature rule of degree k.
     "integral(quadrature_degree)" -> dofs are evaluated by quadrature rule of degree quadrature_degree. You might

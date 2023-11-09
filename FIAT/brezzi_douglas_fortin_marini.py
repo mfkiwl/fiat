@@ -5,7 +5,7 @@ import numpy
 
 
 class BDFMDualSet(dual_set.DualSet):
-    def __init__(self, ref_el, degree, variant=None):
+    def __init__(self, ref_el, degree):
 
         # Initialize containers for map: mesh_entity -> dof number and
         # dual basis
@@ -19,7 +19,7 @@ class BDFMDualSet(dual_set.DualSet):
         # codimension 1 facet normals.
         # note this will die for degree greater than 1.
         for i in range(len(t[sd - 1])):
-            pts_cur = ref_el.make_points(sd - 1, i, sd + degree, variant=variant)
+            pts_cur = ref_el.make_points(sd - 1, i, sd + degree)
             for j in range(len(pts_cur)):
                 pt_cur = pts_cur[j]
                 f = functional.PointScaledNormalEvaluation(ref_el, i, pt_cur)
@@ -30,7 +30,7 @@ class BDFMDualSet(dual_set.DualSet):
         # count as internal nodes.
         tangent_count = 0
         for i in range(len(t[sd - 1])):
-            pts_cur = ref_el.make_points(sd - 1, i, sd + degree - 1, variant=variant)
+            pts_cur = ref_el.make_points(sd - 1, i, sd + degree - 1)
             tangent_count += len(pts_cur)
             for j in range(len(pts_cur)):
                 pt_cur = pts_cur[j]
@@ -46,7 +46,8 @@ class BDFMDualSet(dual_set.DualSet):
         cur = 0
 
         # set codimension 1 (edges 2d, faces 3d) dof
-        pts_per_facet = len(ref_el.make_points(sd - 1, 0, sd + degree))
+        pts_facet_0 = ref_el.make_points(sd - 1, 0, sd + degree)
+        pts_per_facet = len(pts_facet_0)
 
         entity_ids[sd - 1] = {}
         for i in range(len(t[sd - 1])):
@@ -103,13 +104,13 @@ def BDFMSpace(ref_el, order):
 class BrezziDouglasFortinMarini(finite_element.CiarletElement):
     """The BDFM element"""
 
-    def __init__(self, ref_el, degree, variant=None):
+    def __init__(self, ref_el, degree):
 
         if degree != 2:
             raise Exception("BDFM_k elements only valid for k == 2")
 
         poly_set = BDFMSpace(ref_el, degree)
-        dual = BDFMDualSet(ref_el, degree - 1, variant=variant)
+        dual = BDFMDualSet(ref_el, degree - 1)
         formdegree = ref_el.get_spatial_dimension() - 1
         super(BrezziDouglasFortinMarini, self).__init__(poly_set, dual, degree, formdegree,
                                                         mapping="contravariant piola")

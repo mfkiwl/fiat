@@ -47,11 +47,11 @@ class BDMDualSet(dual_set.DualSet):
                     l_cur = functional.FrobeniusIntegralMoment(ref_el, Q, phi_cur)
                     nodes.append(l_cur)
 
-        else:
+        elif variant == "point":
             # Define each functional for the dual set
             # codimension 1 facets
             for i in range(len(t[sd - 1])):
-                pts_cur = ref_el.make_points(sd - 1, i, sd + degree, variant=variant)
+                pts_cur = ref_el.make_points(sd - 1, i, sd + degree)
                 for j in range(len(pts_cur)):
                     pt_cur = pts_cur[j]
                     f = functional.PointScaledNormalEvaluation(ref_el, i, pt_cur)
@@ -80,7 +80,8 @@ class BDMDualSet(dual_set.DualSet):
         cur = 0
 
         # set codimension 1 (edges 2d, faces 3d) dof
-        pts_per_facet = len(ref_el.make_points(sd - 1, 0, sd + degree))
+        pts_facet_0 = ref_el.make_points(sd - 1, 0, sd + degree)
+        pts_per_facet = len(pts_facet_0)
 
         entity_ids[sd - 1] = {}
         for i in range(len(t[sd - 1])):
@@ -105,8 +106,8 @@ class BrezziDouglasMarini(finite_element.CiarletElement):
     :arg k: The degree.
     :arg variant: optional variant specifying the types of nodes.
 
-    variant can be chosen from ["equispaced", "integral", "integral(quadrature_degree)"]
-    "equispaced" -> dofs are evaluated by point evaluation. Note that this variant has suboptimal
+    variant can be chosen from ["point", "integral", "integral(quadrature_degree)"]
+    "point" -> dofs are evaluated by point evaluation. Note that this variant has suboptimal
     convergence order in the H(div)-norm
     "integral" -> dofs are evaluated by quadrature rule of degree k.
     "integral(quadrature_degree)" -> dofs are evaluated by quadrature rule of degree quadrature_degree. You might
