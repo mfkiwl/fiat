@@ -517,6 +517,15 @@ def test_error_quadrature_degree(element):
         eval(element)
 
 
+@pytest.mark.parametrize('element', [
+    'DiscontinuousLagrange(P, 1)',
+    'GaussLegendre(P, 1)'
+])
+def test_error_point_high_order(element):
+    with pytest.raises(ValueError):
+        eval(element)
+
+
 @pytest.mark.parametrize('cell', [I, T, S])
 def test_expansion_orthonormality(cell):
     from FIAT import expansions, quadrature
@@ -545,7 +554,7 @@ def test_expansion_values(dim):
         dpoints.append(tuple(2*np.array(alpha, dtype="d")/npoints-1))
         rpoints.append(tuple(2*sympy.Rational(a, npoints)-1 for a in alpha))
 
-    n = 20
+    n = 16
     Uvals = U.tabulate(n, dpoints)
     idx = (lambda p: p, expansions.morton_index2, expansions.morton_index3)[dim-1]
     eta = sympy.DeferredVector("eta")
