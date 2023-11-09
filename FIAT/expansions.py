@@ -43,7 +43,7 @@ def pad_jacobian(A, embedded_dim):
 
 def jacobi_factors(x, y, z, dx, dy, dz):
     fb = 0.5 * (y + z)
-    fa = x + fb + 1.0
+    fa = x + (fb + 1.0)
     fc = fb ** 2
     dfa = dfb = dfc = None
     if dx is not None:
