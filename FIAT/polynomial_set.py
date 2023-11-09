@@ -18,6 +18,7 @@
 import numpy
 from FIAT import expansions
 from FIAT.functional import index_iterator
+from FIAT.reference_element import make_lattice
 
 
 def mis(m, n):
@@ -155,23 +156,20 @@ class ONPolynomialSet(PolynomialSet):
                     cur_idx = tuple([cur_bf] + list(idx) + [exp_bf])
                     coeffs[cur_idx] = 1.0
                     cur_bf += 1
-
         # construct dmats
         if degree == 0:
             dmats = [numpy.array([[0.0]], "d") for i in range(sd)]
         else:
-            pts = ref_el.make_points(sd, 0, degree + sd + 1)
+            pts = make_lattice(ref_el.get_vertices(), degree, variant="gl")
 
             v = numpy.transpose(expansion_set.tabulate(degree, pts))
-            vinv = numpy.linalg.inv(v)
 
             dv = expansion_set.tabulate_derivatives(degree, pts)
             dtildes = [[[a[1][i] for a in dvrow] for dvrow in dv]
                        for i in range(sd)]
 
-            dmats = [numpy.dot(vinv, numpy.transpose(dtilde))
+            dmats = [numpy.linalg.solve(v, numpy.transpose(dtilde))
                      for dtilde in dtildes]
-
         PolynomialSet.__init__(self, ref_el, degree, embedded_degree,
                                expansion_set, coeffs, dmats)
 

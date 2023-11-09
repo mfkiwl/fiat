@@ -23,23 +23,64 @@ import pytest
 import numpy as np
 
 
-@pytest.mark.parametrize("degree", range(1, 7))
-def test_gl_basis_values(degree):
+def symmetric_simplex(dim):
+    from FIAT.reference_element import ufc_simplex
+    s = ufc_simplex(dim)
+    if dim == 1:
+        s.vertices = [(-1.,), (1.,)]
+    elif dim == 2:
+        h = 3.**0.5 / dim
+        s.vertices = [(0., 1.), (-h, -0.5), (h, -0.5)]
+    elif dim == 3:
+        h = 3.**0.5 / dim
+        s.vertices = [(-h, h, h), (h, -h, h), (h, h, -h), (h, h, h)]
+    return s
+
+
+@pytest.mark.parametrize("degree", range(0, 8))
+@pytest.mark.parametrize("dim", (1, 2, 3))
+def test_gl_basis_values(dim, degree):
     """Ensure that integrating a simple monomial produces the expected results."""
-    from FIAT import ufc_simplex, GaussLegendre, make_quadrature
+    from FIAT import GaussLegendre, make_quadrature
 
-    s = ufc_simplex(1)
+    s = symmetric_simplex(dim)
     q = make_quadrature(s, degree + 1)
-
     fe = GaussLegendre(s, degree)
-    tab = fe.tabulate(0, q.pts)[(0,)]
+    tab = fe.tabulate(0, q.pts)[(0,)*dim]
 
     for test_degree in range(degree + 1):
-        coefs = [n(lambda x: x[0]**test_degree) for n in fe.dual.nodes]
+        v = lambda x: sum(x)**test_degree
+        coefs = [n(v) for n in fe.dual.nodes]
         integral = np.dot(coefs, np.dot(tab, q.wts))
-        reference = np.dot([x[0]**test_degree
-                            for x in q.pts], q.wts)
+        reference = np.dot([v(x) for x in q.pts], q.wts)
         assert np.allclose(integral, reference, rtol=1e-14)
+
+
+@pytest.mark.parametrize("dim, degree", [(1, 4), (2, 4), (3, 4)])
+def test_edge_dofs(dim, degree):
+    """ Ensure edge DOFs are point evaluations at GL points."""
+    from FIAT import GaussLegendre, quadrature, expansions
+
+    s = symmetric_simplex(dim)
+    fe = GaussLegendre(s, degree)
+    ndof = fe.space_dimension()
+    assert ndof == expansions.polynomial_dimension(s, degree)
+
+    points = np.zeros((ndof, dim), "d")
+    for i, node in enumerate(fe.dual_basis()):
+        points[i, :], = node.get_point_dict().keys()
+
+    # Test that edge DOFs are located at the GL quadrature points
+    line = s if dim == 1 else s.construct_subelement(1)
+    lr = quadrature.GaussLegendreQuadratureLineRule(line, degree + 1)
+    quadrature_points = lr.pts
+
+    entity_dofs = fe.entity_dofs()
+    edge_dofs = entity_dofs[1]
+    for entity in edge_dofs:
+        if len(edge_dofs[entity]) > 0:
+            transform = s.get_entity_transform(1, entity)
+            assert np.allclose(points[edge_dofs[entity]], np.array(list(map(transform, quadrature_points))))
 
 
 if __name__ == '__main__':
