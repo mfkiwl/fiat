@@ -160,7 +160,7 @@ class ONPolynomialSet(PolynomialSet):
         if degree == 0:
             dmats = [numpy.array([[0.0]], "d") for i in range(sd)]
         else:
-            pts = make_lattice(ref_el.get_vertices(), degree, family="gl")
+            pts = make_lattice(ref_el.get_vertices(), degree, variant="gl")
 
             v = numpy.transpose(expansion_set.tabulate(degree, pts))
 

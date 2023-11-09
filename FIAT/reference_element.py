@@ -57,19 +57,19 @@ def multiindex_equal(d, isum, imin=0):
 def lattice_iter(start, finish, depth):
     """Generator iterating over the depth-dimensional lattice of
     integers between start and (finish-1).  This works on simplices in
-    1d, 2d, 3d, and beyond"""
+    0d, 1d, 2d, 3d, and beyond"""
     if depth == 0:
-        return
+        yield tuple()
     elif depth == 1:
         for ii in range(start, finish):
-            yield [ii]
+            yield (ii,)
     else:
         for ii in range(start, finish):
             for jj in lattice_iter(start, finish - ii, depth - 1):
-                yield jj + [ii]
+                yield jj + (ii,)
 
 
-def make_lattice(verts, n, interior=0, family=None):
+def make_lattice(verts, n, interior=0, variant=None):
     """Constructs a lattice of points on the simplex defined by verts.
     For example, the 1:st order lattice will be just the vertices.
     The optional argument interior specifies how many points from
@@ -77,9 +77,11 @@ def make_lattice(verts, n, interior=0, family=None):
     and interior = 0, this function will return the vertices and
     midpoint, but with interior = 1, it will only return the
     midpoint."""
-    if family is None or family == "equispaced":
-        family = "equi"
-    family = _decode_family(family)
+    if variant is None or variant == "equispaced":
+        variant = "equi"
+    elif variant == "gll":
+        variant = "lgl"
+    family = _decode_family(variant)
     D = len(verts)
     X = numpy.array(verts)
     get_point = lambda alpha: tuple(numpy.dot(_recursive(D - 1, n, alpha, family), X))
@@ -406,7 +408,7 @@ class Simplex(Cell):
                 edge_ts.append(vert_coords[dest] - vert_coords[source])
         return edge_ts
 
-    def make_points(self, dim, entity_id, order, family=None):
+    def make_points(self, dim, entity_id, order, variant=None):
         """Constructs a lattice of points on the entity_id:th
         facet of dimension dim.  Order indicates how many points to
         include in each direction."""
@@ -416,9 +418,9 @@ class Simplex(Cell):
             entity_verts = \
                 self.get_vertices_of_subcomplex(
                     self.get_topology()[dim][entity_id])
-            return make_lattice(entity_verts, order, 1, family=family)
+            return make_lattice(entity_verts, order, 1, variant=variant)
         elif dim == self.get_spatial_dimension():
-            return make_lattice(self.get_vertices(), order, 1, family=family)
+            return make_lattice(self.get_vertices(), order, 1, variant=variant)
         else:
             raise ValueError("illegal dimension")
 
@@ -1279,7 +1281,9 @@ def make_affine_mapping(xs, ys):
 def default_simplex(spatial_dim):
     """Factory function that maps spatial dimension to an instance of
     the default reference simplex of that dimension."""
-    if spatial_dim == 1:
+    if spatial_dim == 0:
+        return Point()
+    elif spatial_dim == 1:
         return DefaultLine()
     elif spatial_dim == 2:
         return DefaultTriangle()
