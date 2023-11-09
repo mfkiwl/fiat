@@ -242,6 +242,5 @@ class ONSymTensorPolynomialSet(PolynomialSet):
                     coeffs[cur_bf, j, i, exp_bf] = 1.0
                     cur_bf += 1
 
-        # construct dmats. this is the same as ONPolynomialSet.
         PolynomialSet.__init__(self, ref_el, degree, embedded_degree,
                                expansion_set, coeffs)
