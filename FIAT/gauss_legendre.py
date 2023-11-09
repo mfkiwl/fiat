@@ -45,6 +45,8 @@ class GaussLegendre(finite_element.CiarletElement):
             raise ValueError("Gauss-Legendre elements are only defined on simplices.")
         dual = GaussLegendreDualSet(ref_el, degree)
         if ref_el.shape == LINE:
+            # In 1D we can use the primal basis as the expansion set,
+            # avoiding any round-off coming from a basis transformation
             points = []
             for node in dual.nodes:
                 # Assert singleton point for each node.
