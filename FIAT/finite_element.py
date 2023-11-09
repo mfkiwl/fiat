@@ -9,6 +9,8 @@
 # Modified by Thomas H. Gibson (t.gibson15@imperial.ac.uk), 2016
 
 import numpy
+import scipy
+import warnings
 
 from FIAT.dual_set import DualSet
 from FIAT.polynomial_set import PolynomialSet
@@ -130,10 +132,13 @@ class CiarletElement(FiniteElement):
         self.V = V
 
         # new_coeffs_flat = numpy.linalg.solve(V.T, B)
-        Q, R = numpy.linalg.qr(V)
-        if any(abs(numpy.diag(R)) < 1E-14):
+        warnings.filterwarnings("error")
+        try:
+            LU, piv = scipy.linalg.lu_factor(V)
+            new_coeffs_flat = scipy.linalg.lu_solve((LU, piv), B, trans=1)
+        except scipy.linalg.LinAlgWarning:
             raise numpy.linalg.LinAlgError("Singular Vandermonde matrix")
-        new_coeffs_flat = numpy.dot(Q, numpy.linalg.solve(R.T, B))
+        warnings.resetwarnings()
 
         new_shp = new_coeffs_flat.shape[:1] + shp[1:]
         new_coeffs = new_coeffs_flat.reshape(new_shp)
