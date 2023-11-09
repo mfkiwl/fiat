@@ -85,7 +85,7 @@ def test_edge_dofs(dim, degree):
 
 @pytest.mark.parametrize("dim, degree", [(1, 64), (2, 16), (3, 16)])
 def test_interpolation(dim, degree):
-    from FIAT import GaussLegendre, quadrature
+    from FIAT import GaussLegendre, reference_element
 
     # f = Runge radial function
     A = 25
@@ -93,8 +93,8 @@ def test_interpolation(dim, degree):
     f = lambda x: 1/(1 + A*r2(x))
 
     s = symmetric_simplex(dim)
-    rule = quadrature.make_quadrature(s, 2*degree+1)
-    points = rule.get_points()
+    points = reference_element.make_lattice(s.get_vertices(), 2*degree+1, variant="gl")
+    points = np.array(points)
     f_at_pts = f(points)
 
     k = 1

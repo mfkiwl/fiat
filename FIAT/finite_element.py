@@ -130,9 +130,10 @@ class CiarletElement(FiniteElement):
         self.V = V
 
         # new_coeffs_flat = numpy.linalg.solve(V.T, B)
-        Q, R = numpy.linalg.qr(A)
-        VTQ = numpy.dot(B, numpy.transpose(R))
-        new_coeffs_flat = numpy.dot(Q, numpy.linalg.solve(VTQ, B))
+        Q, R = numpy.linalg.qr(V)
+        if any(abs(numpy.diag(R)) < 1E-14):
+            raise numpy.linalg.LinAlgError("Singular Vandermonde matrix")
+        new_coeffs_flat = numpy.dot(Q, numpy.linalg.solve(R.T, B))
 
         new_shp = new_coeffs_flat.shape[:1] + shp[1:]
         new_coeffs = new_coeffs_flat.reshape(new_shp)
