@@ -57,13 +57,11 @@ class NodalEnrichedElement(CiarletElement):
 
         # Merge polynomial sets
         coeffs = _merge_coeffs([e.get_coeffs() for e in elements])
-        dmats = _merge_dmats([e.dmats() for e in elements])
         poly_set = PolynomialSet(ref_el,
                                  degree,
                                  embedded_degree,
                                  expansion_set,
-                                 coeffs,
-                                 dmats)
+                                 coeffs)
 
         # Renumber dof numbers
         offsets = np.cumsum([0] + [e.space_dimension() for e in elements[:-1]])
@@ -102,19 +100,6 @@ def _merge_coeffs(coeffss):
         counter += dim
     assert counter == total_dim
     return new_coeffs
-
-
-def _merge_dmats(dmatss):
-    shape, arg = max((dmats[0].shape, args) for args, dmats in enumerate(dmatss))
-    assert len(shape) == 2 and shape[0] == shape[1]
-    new_dmats = []
-    for dim in range(len(dmatss[arg])):
-        new_dmats.append(dmatss[arg][dim].copy())
-        for dmats in dmatss:
-            sl = slice(0, dmats[dim].shape[0]), slice(0, dmats[dim].shape[1])
-            assert np.allclose(dmats[dim], new_dmats[dim][sl]), \
-                "dmats of elements to be directly summed are not matching!"
-    return new_dmats
 
 
 def _merge_entity_ids(entity_ids, offsets):

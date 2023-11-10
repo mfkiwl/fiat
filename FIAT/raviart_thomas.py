@@ -55,8 +55,7 @@ def RTSpace(ref_el, deg):
                                         deg,
                                         deg + 1,
                                         vec_Pkp1.get_expansion_set(),
-                                        PkHx_coeffs,
-                                        vec_Pkp1.get_dmats())
+                                        PkHx_coeffs)
 
     return polynomial_set.polynomial_set_union_normalized(vec_Pk_from_Pkp1, PkHx)
 
