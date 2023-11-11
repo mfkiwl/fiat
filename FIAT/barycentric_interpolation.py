@@ -29,19 +29,23 @@ class LagrangeLineExpansionSet(expansions.LineExpansionSet):
     https://doi.org/10.1137/S0036144502417715 Eq. (4.2) & (9.4)
     """
     def __init__(self, ref_el, pts):
-        self.nodes = numpy.array(pts).flatten()
-        self.dmat, self.weights = make_dmat(self.nodes)
+        self.points = pts
+        self.x = numpy.array(pts).flatten()
+        self.dmat, self.weights = make_dmat(self.x)
         super(LagrangeLineExpansionSet, self).__init__(ref_el)
 
     def get_num_members(self, n):
-        return len(self.nodes)
+        return len(self.points)
+
+    def get_points(self):
+        return self.points
 
     def get_dmats(self, degree):
         return [self.dmat.T]
 
     def tabulate(self, n, pts):
-        assert n == len(self.nodes)-1
-        results = numpy.add.outer(-self.nodes, numpy.array(pts).flatten())
+        assert n == len(self.points)-1
+        results = numpy.add.outer(-self.x, numpy.array(pts).flatten())
         with numpy.errstate(divide='ignore', invalid='ignore'):
             numpy.reciprocal(results, out=results)
             numpy.multiply(results, self.weights[:, None], out=results)

@@ -9,6 +9,7 @@ import numpy as np
 from FIAT.polynomial_set import PolynomialSet
 from FIAT.dual_set import DualSet
 from FIAT.finite_element import CiarletElement
+from FIAT.barycentric_interpolation import LagrangeLineExpansionSet
 
 __all__ = ['NodalEnrichedElement']
 
@@ -41,7 +42,7 @@ class NodalEnrichedElement(CiarletElement):
         order = max(e.get_order() for e in elements)
         formdegree = None if any(e.get_formdegree() is None for e in elements) \
             else max(e.get_formdegree() for e in elements)
-        # LagrangeExpansionSet set has fixed degree, ensure we grab the embedding one
+        # LagrangeExpansionSet has fixed degree, ensure we grab the embedding one
         elem = next(e for e in elements
                     if e.get_nodal_basis().get_embedded_degree() == embedded_degree)
         ref_el = elem.get_reference_element()
@@ -52,14 +53,21 @@ class NodalEnrichedElement(CiarletElement):
         # Sanity check
         assert all(e.get_nodal_basis().get_reference_element() ==
                    ref_el for e in elements)
-        assert all(type(e.get_nodal_basis().get_expansion_set()) ==
-                   type(expansion_set) for e in elements)
         assert all(e_mapping == mapping for e in elements
                    for e_mapping in e.mapping())
         assert all(e.value_shape() == value_shape for e in elements)
 
         # Merge polynomial sets
-        coeffs = _merge_coeffs([e.get_coeffs() for e in elements])
+        if isinstance(expansion_set, LagrangeLineExpansionSet):
+            # Obtain coefficients via interpolation
+            points = expansion_set.get_points()
+            coeffs = [e.tabulate(0, points)[(0,)] for e in elements]
+        else:
+            assert all(type(e.get_nodal_basis().get_expansion_set()) ==
+                       type(expansion_set) for e in elements)
+            coeffs = [e.get_coeffs() for e in elements]
+
+        coeffs = _merge_coeffs(coeffs)
         poly_set = PolynomialSet(ref_el,
                                  degree,
                                  embedded_degree,
