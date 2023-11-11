@@ -209,19 +209,16 @@ class ExpansionSet(object):
 
     def _tabulate_jet(self, degree, pts, order=0):
         from FIAT.polynomial_set import mis
-        result = {}
         D = self.ref_el.get_spatial_dimension()
         lorder = min(2, order)
         vals = self._tabulate(degree, numpy.transpose(pts), order=lorder)
-        base_vals = numpy.array(vals[0])
-        base_alpha = (0,) * D
-        result[base_alpha] = base_vals
+        result = {(0,) * D: numpy.array(vals[0])}
         for r in range(1, 1+lorder):
             vr = numpy.transpose(vals[r], tuple(range(1, r+1)) + (0, r+1))
             for indices in product(range(D), repeat=r):
                 alpha = tuple(map(indices.count, range(D)))
                 if alpha not in result:
-                    result[alpha] = vr[indices].reshape(base_vals.shape)
+                    result[alpha] = vr[indices]
 
         def distance(alpha, beta):
             return sum(ai != bi for ai, bi in zip(alpha, beta))

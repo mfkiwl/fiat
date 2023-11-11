@@ -85,14 +85,14 @@ class LagrangePolynomialSet(polynomial_set.PolynomialSet):
         if shape == tuple():
             coeffs = numpy.eye(num_members)
         else:
-            coeffs_shape = tuple([num_members] + list(shape) + [num_exp_functions])
+            coeffs_shape = (num_members, *shape, num_exp_functions)
             coeffs = numpy.zeros(coeffs_shape, "d")
             # use functional's index_iterator function
             cur_bf = 0
             for idx in index_iterator(shape):
                 n = expansions.polynomial_dimension(ref_el, embedded_degree)
                 for exp_bf in range(n):
-                    cur_idx = tuple([cur_bf] + list(idx) + [exp_bf])
+                    cur_idx = (cur_bf, *idx, exp_bf)
                     coeffs[cur_idx] = 1.0
                     cur_bf += 1
 

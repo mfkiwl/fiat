@@ -132,13 +132,12 @@ class ONPolynomialSet(PolynomialSet):
         embedded_degree = degree
         expansion_set = expansions.ExpansionSet(ref_el)
 
+        # set up coefficients
         if shape == tuple():
             coeffs = numpy.eye(num_members)
         else:
-            # set up coefficients
             coeffs_shape = (num_members, *shape, num_exp_functions)
             coeffs = numpy.zeros(coeffs_shape, "d")
-
             # use functional's index_iterator function
             cur_bf = 0
             for idx in index_iterator(shape):
@@ -148,8 +147,8 @@ class ONPolynomialSet(PolynomialSet):
                     coeffs[cur_idx] = 1.0
                     cur_bf += 1
 
-        PolynomialSet.__init__(self, ref_el, degree, embedded_degree,
-                               expansion_set, coeffs)
+        super(ONPolynomialSet, self).__init__(ref_el, degree, embedded_degree,
+                                              expansion_set, coeffs)
 
 
 def project(f, U, Q):
@@ -240,5 +239,5 @@ class ONSymTensorPolynomialSet(PolynomialSet):
                     coeffs[cur_bf, j, i, exp_bf] = 1.0
                     cur_bf += 1
 
-        PolynomialSet.__init__(self, ref_el, degree, embedded_degree,
-                               expansion_set, coeffs)
+        super(ONSymTensorPolynomialSet, self).__init__(ref_el, degree, embedded_degree,
+                                                       expansion_set, coeffs)
