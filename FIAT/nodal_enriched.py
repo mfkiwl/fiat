@@ -35,16 +35,19 @@ class NodalEnrichedElement(CiarletElement):
                              "of NodalEnrichedElement are nodal")
 
         # Extract common data
-        ref_el = elements[0].get_reference_element()
-        expansion_set = elements[0].get_nodal_basis().get_expansion_set()
         degree = min(e.get_nodal_basis().get_degree() for e in elements)
         embedded_degree = max(e.get_nodal_basis().get_embedded_degree()
                               for e in elements)
         order = max(e.get_order() for e in elements)
-        mapping = elements[0].mapping()[0]
         formdegree = None if any(e.get_formdegree() is None for e in elements) \
             else max(e.get_formdegree() for e in elements)
-        value_shape = elements[0].value_shape()
+        # LagrangeExpansionSet set has fixed degree, ensure we grab the embedding one
+        elem = next(e for e in elements
+                    if e.get_nodal_basis().get_embedded_degree() == embedded_degree)
+        ref_el = elem.get_reference_element()
+        expansion_set = elem.get_nodal_basis().get_expansion_set()
+        mapping = elem.mapping()[0]
+        value_shape = elem.value_shape()
 
         # Sanity check
         assert all(e.get_nodal_basis().get_reference_element() ==
