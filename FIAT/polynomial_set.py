@@ -95,7 +95,7 @@ class PolynomialSet(object):
 
     def get_dmats(self):
         if len(self.dmats) == 0:
-            self.dmats = self.expansion_set.get_dmats(self.degree)
+            self.dmats = self.expansion_set.get_dmats(self.embedded_degree)
         return self.dmats
 
     def get_reference_element(self):

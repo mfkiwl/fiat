@@ -379,17 +379,21 @@ def test_empty_bubble():
         Bubble(S, 3)
 
 
-def test_nodal_enriched_implementation():
+@pytest.mark.parametrize('elements', [
+    (Lagrange(I, 2), Lagrange(I, 1), Bubble(I, 2)),
+    (GaussLobattoLegendre(I, 3), Lagrange(I, 1),
+     RestrictedElement(GaussLobattoLegendre(I, 3), restriction_domain="interior")),
+    (RaviartThomas(T, 2),
+     RestrictedElement(RaviartThomas(T, 2), restriction_domain='facet'),
+     RestrictedElement(RaviartThomas(T, 2), restriction_domain='interior')),
+])
+def test_nodal_enriched_implementation(elements):
     """Following element pair should be the same.
     This might be fragile to dof reordering but works now.
     """
 
-    e0 = RaviartThomas(T, 2)
-
-    e1 = NodalEnrichedElement(
-        RestrictedElement(RaviartThomas(T, 2), restriction_domain='facet'),
-        RestrictedElement(RaviartThomas(T, 2), restriction_domain='interior')
-    )
+    e0 = elements[0]
+    e1 = NodalEnrichedElement(*elements[1:])
 
     for attr in ["degree",
                  "get_reference_element",
