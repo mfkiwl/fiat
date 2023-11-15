@@ -9,7 +9,6 @@ to allow users to get coordinates that they want."""
 
 import numpy
 import math
-from itertools import product
 from FIAT import reference_element
 from FIAT import jacobi
 
@@ -215,7 +214,7 @@ class ExpansionSet(object):
         result = {(0,) * D: numpy.array(vals[0])}
         for r in range(1, 1+lorder):
             vr = numpy.transpose(vals[r], tuple(range(1, r+1)) + (0, r+1))
-            for indices in product(range(D), repeat=r):
+            for indices in numpy.ndindex(vr.shape[:r]):
                 alpha = tuple(map(indices.count, range(D)))
                 if alpha not in result:
                     result[alpha] = vr[indices]
@@ -258,10 +257,10 @@ class ExpansionSet(object):
         v0 = vals[(0,)*D]
         data = [v0]
         for r in range(1, order+1):
-            v = numpy.zeros((D,)*r + v0.shape, dtype=v0.dtype)
-            for index in product(range(D), repeat=r):
-                v[index] = vals[tuple(map(index.count, range(D)))]
-            data.append(v.transpose((r, r+1) + tuple(range(r))))
+            vr = numpy.zeros((D,)*r + v0.shape, dtype=v0.dtype)
+            for index in numpy.ndindex(vr.shape[:r]):
+                vr[index] = vals[tuple(map(index.count, range(D)))]
+            data.append(vr.transpose((r, r+1) + tuple(range(r))))
         return data
 
 
