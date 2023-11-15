@@ -36,7 +36,7 @@ class NodalEnrichedElement(CiarletElement):
                              "of NodalEnrichedElement are nodal")
 
         # Extract common data
-        degree = min(e.get_nodal_basis().get_degree() for e in elements)
+        degree = max(e.get_nodal_basis().get_degree() for e in elements)
         embedded_degree = max(e.get_nodal_basis().get_embedded_degree()
                               for e in elements)
         order = max(e.get_order() for e in elements)
