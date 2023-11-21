@@ -11,11 +11,16 @@ from FIAT.bernstein import Bernstein
 from FIAT.bell import Bell
 from FIAT.argyris import QuinticArgyris
 from FIAT.brezzi_douglas_marini import BrezziDouglasMarini
+from FIAT.Sminus import TrimmedSerendipityEdge  # noqa: F401
+from FIAT.Sminus import TrimmedSerendipityFace  # noqa: F401
+from FIAT.SminusDiv import TrimmedSerendipityDiv  # noqa: F401
+from FIAT.SminusCurl import TrimmedSerendipityCurl  # noqa: F401
 from FIAT.brezzi_douglas_fortin_marini import BrezziDouglasFortinMarini
 from FIAT.discontinuous_lagrange import DiscontinuousLagrange
 from FIAT.discontinuous_taylor import DiscontinuousTaylor
 from FIAT.discontinuous_raviart_thomas import DiscontinuousRaviartThomas
 from FIAT.serendipity import Serendipity
+from FIAT.brezzi_douglas_marini_cube import BrezziDouglasMariniCubeEdge, BrezziDouglasMariniCubeFace
 from FIAT.discontinuous_pc import DPC
 from FIAT.hermite import CubicHermite
 from FIAT.lagrange import Lagrange
@@ -43,6 +48,8 @@ from FIAT.mixed import MixedElement                       # noqa: F401
 from FIAT.restricted import RestrictedElement             # noqa: F401
 from FIAT.quadrature_element import QuadratureElement     # noqa: F401
 from FIAT.kong_mulder_veldhuizen import KongMulderVeldhuizen  # noqa: F401
+from FIAT.hierarchical import Legendre, IntegratedLegendre  # noqa: F401
+from FIAT.fdm_element import FDMLagrange, FDMDiscontinuousLagrange, FDMQuadrature, FDMBrokenH1, FDMBrokenL2, FDMHermite  # noqa: F401
 
 # Important functionality
 from FIAT.quadrature import make_quadrature               # noqa: F401
@@ -63,6 +70,8 @@ supported_elements = {"Argyris": Argyris,
                       "Crouzeix-Raviart": CrouzeixRaviart,
                       "Discontinuous Lagrange": DiscontinuousLagrange,
                       "S": Serendipity,
+                      "Brezzi-Douglas-Marini Cube Face": BrezziDouglasMariniCubeFace,
+                      "Brezzi-Douglas-Marini Cube Edge": BrezziDouglasMariniCubeEdge,
                       "DPC": DPC,
                       "Discontinuous Taylor": DiscontinuousTaylor,
                       "Discontinuous Raviart-Thomas": DiscontinuousRaviartThomas,

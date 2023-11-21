@@ -8,49 +8,52 @@
 #
 # Modified by Pablo D. Brubeck (brubeck@protonmail.com), 2021
 
-import numpy
-
-from FIAT import finite_element, polynomial_set, dual_set, functional, quadrature
-from FIAT.reference_element import LINE
-from FIAT.barycentric_interpolation import barycentric_interpolation
+from FIAT import finite_element, polynomial_set, dual_set, functional
+from FIAT.reference_element import POINT, LINE, TRIANGLE, TETRAHEDRON
+from FIAT.orientation_utils import make_entity_permutations_simplex
+from FIAT.barycentric_interpolation import LagrangePolynomialSet
+from FIAT.reference_element import make_lattice
 
 
 class GaussLegendreDualSet(dual_set.DualSet):
-    """The dual basis for 1D discontinuous elements with nodes at the
-    Gauss-Legendre points."""
-    def __init__(self, ref_el, degree):
-        entity_ids = {0: {0: [], 1: []},
-                      1: {0: list(range(0, degree+1))}}
-        lr = quadrature.GaussLegendreQuadratureLineRule(ref_el, degree+1)
-        nodes = [functional.PointEvaluation(ref_el, x) for x in lr.pts]
+    """The dual basis for discontinuous elements with nodes at the
+    (recursive) Gauss-Legendre points."""
 
-        super(GaussLegendreDualSet, self).__init__(nodes, ref_el, entity_ids)
+    def __init__(self, ref_el, degree):
+        entity_ids = {}
+        entity_permutations = {}
+        top = ref_el.get_topology()
+        for dim in sorted(top):
+            entity_ids[dim] = {}
+            entity_permutations[dim] = {}
+            perms = make_entity_permutations_simplex(dim, degree + 1 if dim == len(top)-1 else -1)
+            for entity in sorted(top[dim]):
+                entity_ids[dim][entity] = []
+                entity_permutations[dim][entity] = perms
+
+        # make nodes by getting points
+        pts = make_lattice(ref_el.get_vertices(), degree, variant="gl")
+        nodes = [functional.PointEvaluation(ref_el, x) for x in pts]
+        entity_ids[dim][0] = list(range(len(nodes)))
+        super(GaussLegendreDualSet, self).__init__(nodes, ref_el, entity_ids, entity_permutations)
 
 
 class GaussLegendre(finite_element.CiarletElement):
-    """1D discontinuous element with nodes at the Gauss-Legendre points."""
+    """Simplicial discontinuous element with nodes at the (recursive) Gauss-Legendre points."""
     def __init__(self, ref_el, degree):
-        if ref_el.shape != LINE:
-            raise ValueError("Gauss-Legendre elements are only defined in one dimension.")
-        poly_set = polynomial_set.ONPolynomialSet(ref_el, degree)
+        if ref_el.shape not in {POINT, LINE, TRIANGLE, TETRAHEDRON}:
+            raise ValueError("Gauss-Legendre elements are only defined on simplices.")
         dual = GaussLegendreDualSet(ref_el, degree)
+        if ref_el.shape == LINE:
+            # In 1D we can use the primal basis as the expansion set,
+            # avoiding any round-off coming from a basis transformation
+            points = []
+            for node in dual.nodes:
+                # Assert singleton point for each node.
+                pt, = node.get_point_dict().keys()
+                points.append(pt)
+            poly_set = LagrangePolynomialSet(ref_el, points)
+        else:
+            poly_set = polynomial_set.ONPolynomialSet(ref_el, degree)
         formdegree = ref_el.get_spatial_dimension()  # n-form
         super(GaussLegendre, self).__init__(poly_set, dual, degree, formdegree)
-
-    def tabulate(self, order, points, entity=None):
-        # This overrides the default with a more numerically stable algorithm
-
-        if entity is None:
-            entity = (self.ref_el.get_dimension(), 0)
-
-        entity_dim, entity_id = entity
-        transform = self.ref_el.get_entity_transform(entity_dim, entity_id)
-
-        xsrc = []
-        for node in self.dual.nodes:
-            # Assert singleton point for each node.
-            (pt,), = node.get_point_dict().keys()
-            xsrc.append(pt)
-        xsrc = numpy.asarray(xsrc)
-        xdst = numpy.array(list(map(transform, points))).flatten()
-        return barycentric_interpolation(xsrc, xdst, order=order)

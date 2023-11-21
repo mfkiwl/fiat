@@ -8,10 +8,10 @@
 # Modified by David A. Ham (david.ham@imperial.ac.uk), 2015
 
 import itertools
-import math
 import numpy
+from recursivenodes.quadrature import gaussjacobi
 
-from FIAT import reference_element, expansions, jacobi, orthopoly
+from FIAT import reference_element, expansions, orthopoly
 
 
 class QuadratureRule(object):
@@ -33,7 +33,7 @@ class QuadratureRule(object):
         return numpy.array(self.wts)
 
     def integrate(self, f):
-        return sum([w * f(x) for (x, w) in zip(self.pts, self.wts)])
+        return sum(w * f(x) for x, w in zip(self.pts, self.wts))
 
 
 class GaussJacobiQuadratureLineRule(QuadratureRule):
@@ -42,8 +42,8 @@ class GaussJacobiQuadratureLineRule(QuadratureRule):
 
     def __init__(self, ref_el, m):
         # this gives roots on the default (-1,1) reference element
-        #        (xs_ref, ws_ref) = compute_gauss_jacobi_rule(a, b, m)
-        (xs_ref, ws_ref) = compute_gauss_jacobi_rule(0., 0., m)
+        #        (xs_ref, ws_ref) = gaussjacobi(m, a, b)
+        (xs_ref, ws_ref) = gaussjacobi(m, 0., 0.)
 
         Ref1 = reference_element.DefaultLine()
         A, b = reference_element.make_affine_mapping(Ref1.get_vertices(),
@@ -186,8 +186,8 @@ class CollapsedQuadratureTriangleRule(QuadratureRule):
     from the square to the triangle."""
 
     def __init__(self, ref_el, m):
-        ptx, wx = compute_gauss_jacobi_rule(0., 0., m)
-        pty, wy = compute_gauss_jacobi_rule(1., 0., m)
+        ptx, wx = gaussjacobi(m, 0., 0.)
+        pty, wy = gaussjacobi(m, 1., 0.)
 
         # map ptx , pty
         pts_ref = [expansions.xi_triangle((x, y))
@@ -213,9 +213,9 @@ class CollapsedQuadratureTetrahedronRule(QuadratureRule):
     from the cube to the tetrahedron."""
 
     def __init__(self, ref_el, m):
-        ptx, wx = compute_gauss_jacobi_rule(0., 0., m)
-        pty, wy = compute_gauss_jacobi_rule(1., 0., m)
-        ptz, wz = compute_gauss_jacobi_rule(2., 0., m)
+        ptx, wx = gaussjacobi(m, 0., 0.)
+        pty, wy = gaussjacobi(m, 1., 0.)
+        ptz, wz = gaussjacobi(m, 2., 0.)
 
         # map ptx , pty
         pts_ref = [expansions.xi_tetrahedron((x, y, z))
@@ -319,53 +319,3 @@ def make_tensor_product_quadrature(*quad_rules):
     wts = [numpy.prod(wt_tuple)
            for wt_tuple in itertools.product(*[q.wts for q in quad_rules])]
     return QuadratureRule(ref_el, pts, wts)
-
-
-# rule to get Gauss-Jacobi points
-def compute_gauss_jacobi_points(a, b, m):
-    """Computes the m roots of P_{m}^{a,b} on [-1,1] by Newton's method.
-    The initial guesses are the Chebyshev points.  Algorithm
-    implemented in Python from the pseudocode given by Karniadakis and
-    Sherwin"""
-    x = []
-    eps = 1.e-8
-    max_iter = 100
-    for k in range(0, m):
-        r = -math.cos((2.0 * k + 1.0) * math.pi / (2.0 * m))
-        if k > 0:
-            r = 0.5 * (r + x[k - 1])
-        j = 0
-        delta = 2 * eps
-        while j < max_iter:
-            s = 0
-            for i in range(0, k):
-                s = s + 1.0 / (r - x[i])
-            f = jacobi.eval_jacobi(a, b, m, r)
-            fp = jacobi.eval_jacobi_deriv(a, b, m, r)
-            delta = f / (fp - f * s)
-
-            r = r - delta
-
-            if math.fabs(delta) < eps:
-                break
-            else:
-                j = j + 1
-
-        x.append(r)
-    return x
-
-
-def compute_gauss_jacobi_rule(a, b, m):
-    xs = compute_gauss_jacobi_points(a, b, m)
-
-    a1 = math.pow(2, a + b + 1)
-    a2 = math.gamma(a + m + 1)
-    a3 = math.gamma(b + m + 1)
-    a4 = math.gamma(a + b + m + 1)
-    a5 = math.factorial(m)
-    a6 = a1 * a2 * a3 / a4 / a5
-
-    ws = [a6 / (1.0 - x**2.0) / jacobi.eval_jacobi_deriv(a, b, m, x)**2.0
-          for x in xs]
-
-    return xs, ws

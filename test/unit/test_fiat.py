@@ -247,9 +247,21 @@ elements = [
     "GaussLegendre(I, 0)",
     "GaussLegendre(I, 1)",
     "GaussLegendre(I, 2)",
+    "GaussLegendre(T, 0)",
+    "GaussLegendre(T, 1)",
+    "GaussLegendre(T, 2)",
+    "GaussLegendre(S, 0)",
+    "GaussLegendre(S, 1)",
+    "GaussLegendre(S, 2)",
     "GaussLobattoLegendre(I, 1)",
     "GaussLobattoLegendre(I, 2)",
     "GaussLobattoLegendre(I, 3)",
+    "GaussLobattoLegendre(T, 1)",
+    "GaussLobattoLegendre(T, 2)",
+    "GaussLobattoLegendre(T, 3)",
+    "GaussLobattoLegendre(S, 1)",
+    "GaussLobattoLegendre(S, 2)",
+    "GaussLobattoLegendre(S, 3)",
     "Bubble(I, 2)",
     "Bubble(T, 3)",
     "Bubble(S, 4)",
@@ -367,17 +379,21 @@ def test_empty_bubble():
         Bubble(S, 3)
 
 
-def test_nodal_enriched_implementation():
+@pytest.mark.parametrize('elements', [
+    (Lagrange(I, 2), Lagrange(I, 1), Bubble(I, 2)),
+    (GaussLobattoLegendre(I, 3), Lagrange(I, 1),
+     RestrictedElement(GaussLobattoLegendre(I, 3), restriction_domain="interior")),
+    (RaviartThomas(T, 2),
+     RestrictedElement(RaviartThomas(T, 2), restriction_domain='facet'),
+     RestrictedElement(RaviartThomas(T, 2), restriction_domain='interior')),
+])
+def test_nodal_enriched_implementation(elements):
     """Following element pair should be the same.
     This might be fragile to dof reordering but works now.
     """
 
-    e0 = RaviartThomas(T, 2)
-
-    e1 = NodalEnrichedElement(
-        RestrictedElement(RaviartThomas(T, 2), restriction_domain='facet'),
-        RestrictedElement(RaviartThomas(T, 2), restriction_domain='interior')
-    )
+    e0 = elements[0]
+    e1 = NodalEnrichedElement(*elements[1:])
 
     for attr in ["degree",
                  "get_reference_element",
@@ -503,6 +519,89 @@ def test_facet_nodality_tabulate(element):
 def test_error_quadrature_degree(element):
     with pytest.raises(ValueError):
         eval(element)
+
+
+@pytest.mark.parametrize('element', [
+    'DiscontinuousLagrange(P, 1)',
+    'GaussLegendre(P, 1)'
+])
+def test_error_point_high_order(element):
+    with pytest.raises(ValueError):
+        eval(element)
+
+
+@pytest.mark.parametrize('cell', [I, T, S])
+def test_expansion_orthonormality(cell):
+    from FIAT import expansions, quadrature
+    U = expansions.ExpansionSet(cell)
+    degree = 10
+    rule = quadrature.make_quadrature(cell, degree + 1)
+    phi = U.tabulate(degree, rule.pts)
+    w = rule.get_weights()
+    scale = 0.5 ** -cell.get_spatial_dimension()
+    results = scale * np.dot(phi, w[:, None] * phi.T)
+    assert np.allclose(results, np.eye(results.shape[0]))
+
+
+@pytest.mark.parametrize('dim', range(1, 4))
+def test_expansion_values(dim):
+    import sympy
+    from FIAT import expansions, polynomial_set, reference_element
+    cell = reference_element.default_simplex(dim)
+    U = expansions.ExpansionSet(cell)
+    dpoints = []
+    rpoints = []
+
+    npoints = 4
+    interior = 1
+    for alpha in reference_element.lattice_iter(interior, npoints+1-interior, dim):
+        dpoints.append(tuple(2*np.array(alpha, dtype="d")/npoints-1))
+        rpoints.append(tuple(2*sympy.Rational(a, npoints)-1 for a in alpha))
+
+    n = 16
+    Uvals = U.tabulate(n, dpoints)
+    idx = (lambda p: p, expansions.morton_index2, expansions.morton_index3)[dim-1]
+    eta = sympy.DeferredVector("eta")
+    half = sympy.Rational(1, 2)
+
+    def duffy_coords(pt):
+        if len(pt) == 1:
+            return pt
+        elif len(pt) == 2:
+            eta0 = 2 * (1 + pt[0]) / (1 - pt[1]) - 1
+            eta1 = pt[1]
+            return eta0, eta1
+        else:
+            eta0 = 2 * (1 + pt[0]) / (-pt[1] - pt[2]) - 1
+            eta1 = 2 * (1 + pt[1]) / (1 - pt[2]) - 1
+            eta2 = pt[2]
+            return eta0, eta1, eta2
+
+    def basis(dim, p, q=0, r=0):
+        if dim >= 1:
+            f = sympy.jacobi(p, 0, 0, eta[0])
+            f *= sympy.sqrt(half + p)
+        if dim >= 2:
+            f *= sympy.jacobi(q, 2*p+1, 0, eta[1]) * ((1 - eta[1])/2) ** p
+            f *= sympy.sqrt(1 + p + q)
+        if dim >= 3:
+            f *= sympy.jacobi(r, 2*p+2*q+2, 0, eta[2]) * ((1 - eta[2])/2) ** (p+q)
+            f *= sympy.sqrt(1 + half + p + q + r)
+        return f
+
+    def eval_basis(f, pt):
+        fval = f
+        for coord, pval in zip(eta, duffy_coords(pt)):
+            fval = fval.subs(coord, pval)
+        fval = float(fval)
+        return fval
+
+    for i in range(n + 1):
+        for indices in polynomial_set.mis(dim, i):
+            phi = basis(dim, *indices)
+            exact = np.array([eval_basis(phi, r) for r in rpoints])
+            uh = Uvals[idx(*indices)]
+            assert np.allclose(uh, exact, atol=1E-14)
 
 
 if __name__ == '__main__':
