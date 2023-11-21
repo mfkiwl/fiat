@@ -54,7 +54,7 @@ class LagrangeLineExpansionSet(expansions.LineExpansionSet):
         results[results != results] = 1.0
         if results.dtype == object:
             from sympy import simplify
-            results = numpy.array(list(map(simplify, results)))
+            results = numpy.vectorize(simplify)(results)
         return results
 
     def _tabulate(self, n, pts, order=0):
@@ -64,7 +64,7 @@ class LagrangeLineExpansionSet(expansions.LineExpansionSet):
             vals = numpy.dot(self.dmat, vals)
             if vals.dtype == object:
                 from sympy import simplify
-                vals = numpy.array(list(map(simplify, vals)))
+                vals = numpy.vectorize(simplify)(vals)
             results.append(vals)
         for r in range(order+1):
             shape = results[r].shape
