@@ -42,19 +42,17 @@ class GaussJacobiQuadratureLineRule(QuadratureRule):
 
     def __init__(self, ref_el, m, a=0, b=0):
         # this gives roots on the default (-1,1) reference element
-        #        (xs_ref, ws_ref) = gaussjacobi(m, a, b)
-        xs_ref, ws_ref = gaussjacobi(m, a, b)
+        xs_ref, wts = gaussjacobi(m, a, b)
         xs_ref = xs_ref.reshape((-1, 1))
 
         Ref1 = reference_element.DefaultLine()
         A, b = reference_element.make_affine_mapping(Ref1.get_vertices(),
                                                      ref_el.get_vertices())
         mapping = lambda x: numpy.dot(x, A.T) + b[None, :]
-        ws_ref *= numpy.linalg.det(A)
-        xs = tuple(map(tuple, mapping(xs_ref)))
-        ws = tuple(ws_ref)
+        pts = tuple(map(tuple, mapping(xs_ref)))
+        wts *= numpy.linalg.det(A)
 
-        QuadratureRule.__init__(self, ref_el, xs, ws)
+        QuadratureRule.__init__(self, ref_el, pts, tuple(wts.flat))
 
 
 class GaussLobattoLegendreQuadratureLineRule(QuadratureRule):
@@ -86,6 +84,7 @@ class GaussLobattoLegendreQuadratureLineRule(QuadratureRule):
         w0 = 0.5*(volume - sum(wts))
         xs = (verts[0], *pts, verts[1])
         ws = (w0, *wts, w0)
+
         QuadratureRule.__init__(self, ref_el, xs, ws)
 
 
@@ -128,6 +127,7 @@ class RadauQuadratureLineRule(QuadratureRule):
         w0 = volume - sum(wts)
         xs = (*pts, x0) if right else (x0, *pts)
         ws = (*wts, w0) if right else (w0, *wts)
+
         QuadratureRule.__init__(self, ref_el, xs, ws)
 
 
@@ -140,7 +140,6 @@ class CollapsedQuadratureSimplexRule(QuadratureRule):
         dim = ref_el.get_spatial_dimension()
         pts_ref, wts = simplexgausslegendre(dim, m)
         pts_ref = pts_ref.reshape((-1, dim))
-        wts = wts.reshape((-1,))
 
         Ref1 = reference_element.default_simplex(dim)
         A, b = reference_element.make_affine_mapping(Ref1.get_vertices(),
@@ -148,7 +147,8 @@ class CollapsedQuadratureSimplexRule(QuadratureRule):
         mapping = lambda x: numpy.dot(x, A.T) + b[None, :]
         pts = tuple(map(tuple, mapping(pts_ref)))
         wts *= numpy.linalg.det(A)
-        QuadratureRule.__init__(self, ref_el, pts, tuple(wts))
+
+        QuadratureRule.__init__(self, ref_el, pts, tuple(wts.flat))
 
 
 class CollapsedQuadratureTriangleRule(CollapsedQuadratureSimplexRule):
