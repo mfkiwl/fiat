@@ -44,17 +44,15 @@ class GaussJacobiQuadratureLineRule(QuadratureRule):
         # this gives roots on the default (-1,1) reference element
         #        (xs_ref, ws_ref) = gaussjacobi(m, a, b)
         xs_ref, ws_ref = gaussjacobi(m, a, b)
+        xs_ref = xs_ref.reshape((-1, 1))
 
         Ref1 = reference_element.DefaultLine()
         A, b = reference_element.make_affine_mapping(Ref1.get_vertices(),
                                                      ref_el.get_vertices())
-
-        mapping = lambda x: numpy.dot(A, x) + b
-
-        scale = numpy.linalg.det(A)
-
-        xs = tuple([tuple(mapping(x_ref)[0]) for x_ref in xs_ref])
-        ws = tuple([scale * w for w in ws_ref])
+        mapping = lambda x: numpy.dot(x, A.T) + b[None, :]
+        ws_ref *= numpy.linalg.det(A)
+        xs = tuple(map(tuple, mapping(xs_ref)))
+        ws = tuple(ws_ref)
 
         QuadratureRule.__init__(self, ref_el, xs, ws)
 
@@ -101,59 +99,35 @@ class GaussLegendreQuadratureLineRule(GaussJacobiQuadratureLineRule):
 
 
 class RadauQuadratureLineRule(QuadratureRule):
-    """Produce the Gauss--Radau quadrature rules on the interval using
-    an adaptation of Winkel's Matlab code.
+    """Gauss--Radau quadrature rule on the interval.
 
     The quadrature rule uses m points for a degree of precision of 2m-1.
     """
     def __init__(self, ref_el, m, right=True):
-        assert m >= 1
-        N = m - 1
-        # Use Chebyshev-Gauss-Radau nodes as initial guess for LGR nodes
-        x = -numpy.cos(2 * numpy.pi * numpy.linspace(0, N, m) / (2 * N + 1))
+        if m < 1:
+            raise ValueError(
+                "Gauss-Radau quadrature invalid for fewer than 1 points")
 
-        P = numpy.zeros((N + 1, N + 2))
+        right = int(right)
+        x0 = ref_el.vertices[right]
+        volume = ref_el.volume()
+        if m > 1:
+            # Make the interior points and weights
+            rule = GaussJacobiQuadratureLineRule(ref_el, m-1, right, 1-right)
+            # Remove the hat weight from the quadrature weights
+            x = rule.get_points().reshape((-1,))
+            hat = (2.0 / volume) * abs(x0[0] - x)
+            wts = rule.get_weights() / hat
+            pts = rule.pts
+        else:
+            # Special case for lowest order.
+            wts = ()
+            pts = ()
 
-        xold = 2
-
-        free = numpy.arange(1, N + 1, dtype='int')
-
-        while numpy.max(numpy.abs(x - xold)) > 5e-16:
-            xold = x.copy()
-
-            P[0, :] = (-1) ** numpy.arange(0, N + 2)
-            P[free, 0] = 1
-            P[free, 1] = x[free]
-
-            for k in range(2, N + 2):
-                P[free, k] = ((2 * k - 1) * x[free] * P[free, k - 1] - (k - 1) * P[free, k - 2]) / k
-
-            x[free] = xold[free] - ((1 - xold[free]) / (N + 1)) * (P[free, N] + P[free, N + 1]) / (P[free, N] - P[free, N + 1])
-
-        # The Legendre-Gauss-Radau Vandermonde
-        P = P[:, :-1]
-        # Compute the weights
-        w = numpy.zeros(N + 1)
-        w[0] = 2 / (N + 1) ** 2
-        w[free] = (1 - x[free])/((N + 1) * P[free, -1])**2
-
-        if right:
-            x = numpy.flip(-x)
-            w = numpy.flip(w)
-
-        xs_ref = x
-        ws_ref = w
-
-        A, b = reference_element.make_affine_mapping(((-1.,), (1.)),
-                                                     ref_el.get_vertices())
-
-        mapping = lambda x: numpy.dot(A, x) + b
-
-        scale = numpy.linalg.det(A)
-
-        xs = tuple([tuple(mapping(x_ref)[0]) for x_ref in xs_ref])
-        ws = tuple([scale * w for w in ws_ref])
-
+        # Get the weight at the endpoint via sum(ws) == volume
+        w0 = volume - sum(wts)
+        xs = (*pts, x0) if right else (x0, *pts)
+        ws = (*wts, w0) if right else (w0, *wts)
         QuadratureRule.__init__(self, ref_el, xs, ws)
 
 
@@ -171,10 +145,10 @@ class CollapsedQuadratureSimplexRule(QuadratureRule):
         Ref1 = reference_element.default_simplex(dim)
         A, b = reference_element.make_affine_mapping(Ref1.get_vertices(),
                                                      ref_el.get_vertices())
-        mapping = lambda x: tuple(numpy.dot(A, x) + b)
-        pts = list(map(mapping, pts_ref))
+        mapping = lambda x: numpy.dot(x, A.T) + b[None, :]
+        pts = tuple(map(tuple, mapping(pts_ref)))
         wts *= numpy.linalg.det(A)
-        QuadratureRule.__init__(self, ref_el, tuple(pts), tuple(wts))
+        QuadratureRule.__init__(self, ref_el, pts, tuple(wts))
 
 
 class CollapsedQuadratureTriangleRule(CollapsedQuadratureSimplexRule):
