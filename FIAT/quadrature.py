@@ -9,9 +9,9 @@
 
 import itertools
 import numpy
-from recursivenodes.quadrature import gaussjacobi
+from recursivenodes.quadrature import gaussjacobi, simplexgausslegendre
 
-from FIAT import reference_element, expansions
+from FIAT import reference_element
 
 
 class QuadratureRule(object):
@@ -157,60 +157,38 @@ class RadauQuadratureLineRule(QuadratureRule):
         QuadratureRule.__init__(self, ref_el, xs, ws)
 
 
-class CollapsedQuadratureTriangleRule(QuadratureRule):
+class CollapsedQuadratureSimplexRule(QuadratureRule):
+    """Implements the collapsed quadrature rules defined in
+    Karniadakis & Sherwin by mapping products of Gauss-Jacobi rules
+    from the hypercube to the simplex."""
+
+    def __init__(self, ref_el, m):
+        dim = ref_el.get_spatial_dimension()
+        pts_ref, wts = simplexgausslegendre(dim, m)
+        pts_ref = pts_ref.reshape((-1, dim))
+        wts = wts.reshape((-1,))
+
+        Ref1 = reference_element.default_simplex(dim)
+        A, b = reference_element.make_affine_mapping(Ref1.get_vertices(),
+                                                     ref_el.get_vertices())
+        mapping = lambda x: tuple(numpy.dot(A, x) + b)
+        pts = list(map(mapping, pts_ref))
+        wts *= numpy.linalg.det(A)
+        QuadratureRule.__init__(self, ref_el, tuple(pts), tuple(wts))
+
+
+class CollapsedQuadratureTriangleRule(CollapsedQuadratureSimplexRule):
     """Implements the collapsed quadrature rules defined in
     Karniadakis & Sherwin by mapping products of Gauss-Jacobi rules
     from the square to the triangle."""
-
-    def __init__(self, ref_el, m):
-        ptx, wx = gaussjacobi(m, 0., 0.)
-        pty, wy = gaussjacobi(m, 1., 0.)
-
-        # map ptx , pty
-        pts_ref = [expansions.xi_triangle((x, y))
-                   for x in ptx for y in pty]
-
-        Ref1 = reference_element.DefaultTriangle()
-        A, b = reference_element.make_affine_mapping(Ref1.get_vertices(),
-                                                     ref_el.get_vertices())
-        mapping = lambda x: numpy.dot(A, x) + b
-
-        scale = numpy.linalg.det(A)
-
-        pts = tuple([tuple(mapping(x)) for x in pts_ref])
-
-        wts = [0.5 * scale * w1 * w2 for w1 in wx for w2 in wy]
-
-        QuadratureRule.__init__(self, ref_el, tuple(pts), tuple(wts))
+    pass
 
 
-class CollapsedQuadratureTetrahedronRule(QuadratureRule):
+class CollapsedQuadratureTetrahedronRule(CollapsedQuadratureSimplexRule):
     """Implements the collapsed quadrature rules defined in
     Karniadakis & Sherwin by mapping products of Gauss-Jacobi rules
     from the cube to the tetrahedron."""
-
-    def __init__(self, ref_el, m):
-        ptx, wx = gaussjacobi(m, 0., 0.)
-        pty, wy = gaussjacobi(m, 1., 0.)
-        ptz, wz = gaussjacobi(m, 2., 0.)
-
-        # map ptx , pty
-        pts_ref = [expansions.xi_tetrahedron((x, y, z))
-                   for x in ptx for y in pty for z in ptz]
-
-        Ref1 = reference_element.DefaultTetrahedron()
-        A, b = reference_element.make_affine_mapping(Ref1.get_vertices(),
-                                                     ref_el.get_vertices())
-        mapping = lambda x: numpy.dot(A, x) + b
-
-        scale = numpy.linalg.det(A)
-
-        pts = tuple([tuple(mapping(x)) for x in pts_ref])
-
-        wts = [scale * 0.125 * w1 * w2 * w3
-               for w1 in wx for w2 in wy for w3 in wz]
-
-        QuadratureRule.__init__(self, ref_el, tuple(pts), tuple(wts))
+    pass
 
 
 class UFCTetrahedronFaceQuadratureRule(QuadratureRule):
