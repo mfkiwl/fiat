@@ -40,10 +40,10 @@ class GaussJacobiQuadratureLineRule(QuadratureRule):
     """Gauss-Jacobi quadature rule determined by Jacobi weights a and b
     using m roots of m:th order Jacobi polynomial."""
 
-    def __init__(self, ref_el, m):
+    def __init__(self, ref_el, m, a=0, b=0):
         # this gives roots on the default (-1,1) reference element
         #        (xs_ref, ws_ref) = gaussjacobi(m, a, b)
-        (xs_ref, ws_ref) = gaussjacobi(m, 0., 0.)
+        xs_ref, ws_ref = gaussjacobi(m, a, b)
 
         Ref1 = reference_element.DefaultLine()
         A, b = reference_element.make_affine_mapping(Ref1.get_vertices(),
@@ -96,7 +96,7 @@ class GaussLobattoLegendreQuadratureLineRule(QuadratureRule):
         QuadratureRule.__init__(self, ref_el, xs, ws)
 
 
-class GaussLegendreQuadratureLineRule(QuadratureRule):
+class GaussLegendreQuadratureLineRule(GaussJacobiQuadratureLineRule):
     """Produce the Gauss--Legendre quadrature rules on the interval using
     the implementation in numpy. This facilitates implementing
     discontinuous spectral elements.
@@ -104,23 +104,7 @@ class GaussLegendreQuadratureLineRule(QuadratureRule):
     The quadrature rule uses m points for a degree of precision of 2m-1.
     """
     def __init__(self, ref_el, m):
-        if m < 1:
-            raise ValueError(
-                "Gauss-Legendre quadrature invalid for fewer than 2 points")
-
-        xs_ref, ws_ref = numpy.polynomial.legendre.leggauss(m)
-
-        A, b = reference_element.make_affine_mapping(((-1.,), (1.)),
-                                                     ref_el.get_vertices())
-
-        mapping = lambda x: numpy.dot(A, x) + b
-
-        scale = numpy.linalg.det(A)
-
-        xs = tuple([tuple(mapping(x_ref)[0]) for x_ref in xs_ref])
-        ws = tuple([scale * w for w in ws_ref])
-
-        QuadratureRule.__init__(self, ref_el, xs, ws)
+        super(GaussLegendreQuadratureLineRule, self).__init__(ref_el, m)
 
 
 class RadauQuadratureLineRule(QuadratureRule):
