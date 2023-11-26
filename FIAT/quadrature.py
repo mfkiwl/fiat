@@ -11,7 +11,7 @@ import itertools
 import numpy
 from recursivenodes.quadrature import gaussjacobi
 
-from FIAT import reference_element, expansions, orthopoly
+from FIAT import reference_element, expansions
 
 
 class QuadratureRule(object):
@@ -60,9 +60,7 @@ class GaussJacobiQuadratureLineRule(QuadratureRule):
 
 
 class GaussLobattoLegendreQuadratureLineRule(QuadratureRule):
-    """Implement the Gauss-Lobatto-Legendre quadrature rules on the interval using
-    Greg von Winckel's implementation. This facilitates implementing
-    spectral elements.
+    """Gauss-Lobatto-Legendre quadrature rule on the interval.
 
     The quadrature rule uses m points for a degree of precision of 2m-3.
     """
@@ -71,35 +69,30 @@ class GaussLobattoLegendreQuadratureLineRule(QuadratureRule):
             raise ValueError(
                 "Gauss-Labotto-Legendre quadrature invalid for fewer than 2 points")
 
-        Ref1 = reference_element.DefaultLine()
-        verts = Ref1.get_vertices()
-
+        verts = ref_el.vertices
+        volume = ref_el.volume()
         if m > 2:
-            # Calculate the recursion coefficients.
-            alpha, beta = orthopoly.rec_jacobi(m, 0, 0)
-            xs_ref, ws_ref = orthopoly.lobatto(alpha, beta, verts[0][0], verts[1][0])
+            # Make the interior points and weights
+            rule = GaussJacobiQuadratureLineRule(ref_el, m-2, 1, 1)
+            # Remove the bubble weight from the quadrature weights
+            x = rule.get_points().reshape((-1,))
+            bubble = (2.0 / volume)**2 * (x - verts[0][0]) * (verts[1][0] - x)
+            wts = rule.get_weights() / bubble
+            pts = rule.pts
         else:
             # Special case for lowest order.
-            xs_ref = [v[0] for v in verts[:]]
-            ws_ref = (0.5 * (xs_ref[1] - xs_ref[0]), ) * 2
+            wts = ()
+            pts = ()
 
-        A, b = reference_element.make_affine_mapping(Ref1.get_vertices(),
-                                                     ref_el.get_vertices())
-
-        mapping = lambda x: numpy.dot(A, x) + b
-
-        scale = numpy.linalg.det(A)
-
-        xs = tuple([tuple(mapping(x_ref)[0]) for x_ref in xs_ref])
-        ws = tuple([scale * w for w in ws_ref])
-
+        # Get the weight at the endpoints via sum(ws) == volume
+        w0 = 0.5*(volume - sum(wts))
+        xs = (verts[0], *pts, verts[1])
+        ws = (w0, *wts, w0)
         QuadratureRule.__init__(self, ref_el, xs, ws)
 
 
 class GaussLegendreQuadratureLineRule(GaussJacobiQuadratureLineRule):
-    """Produce the Gauss--Legendre quadrature rules on the interval using
-    the implementation in numpy. This facilitates implementing
-    discontinuous spectral elements.
+    """Gauss--Legendre quadrature rule on the interval.
 
     The quadrature rule uses m points for a degree of precision of 2m-1.
     """
