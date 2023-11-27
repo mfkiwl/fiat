@@ -5,9 +5,10 @@
 #
 # SPDX-License-Identifier:    LGPL-3.0-or-later
 
-from FIAT import (finite_element, quadrature, functional, dual_set,
+from FIAT import (finite_element, functional, dual_set,
                   polynomial_set, nedelec)
 from FIAT.check_format_variant import check_format_variant
+from FIAT.quadrature_schemes import create_quadrature
 
 
 class BDMDualSet(dual_set.DualSet):
@@ -25,9 +26,9 @@ class BDMDualSet(dual_set.DualSet):
             facet = ref_el.get_facet_element()
             # Facet nodes are \int_F v\cdot n p ds where p \in P_{q-1}
             # degree is q - 1
-            Q = quadrature.make_quadrature(facet, quad_deg)
+            Q = create_quadrature(facet, 2 * quad_deg - 2)
             Pq = polynomial_set.ONPolynomialSet(facet, degree)
-            Pq_at_qpts = Pq.tabulate(Q.get_points())[tuple([0]*(sd - 1))]
+            Pq_at_qpts = Pq.tabulate(Q.get_points())[(0,)*(sd - 1)]
             for f in range(len(t[sd - 1])):
                 for i in range(Pq_at_qpts.shape[0]):
                     phi = Pq_at_qpts[i, :]
@@ -35,11 +36,11 @@ class BDMDualSet(dual_set.DualSet):
 
             # internal nodes
             if degree > 1:
-                Q = quadrature.make_quadrature(ref_el, quad_deg)
+                Q = create_quadrature(ref_el, 2 * quad_deg - 2)
                 qpts = Q.get_points()
                 Nedel = nedelec.Nedelec(ref_el, degree - 1, variant)
                 Nedfs = Nedel.get_nodal_basis()
-                zero_index = tuple([0 for i in range(sd)])
+                zero_index = (0,)*sd
                 Ned_at_qpts = Nedfs.tabulate(qpts)[zero_index]
 
                 for i in range(len(Ned_at_qpts)):
@@ -59,7 +60,7 @@ class BDMDualSet(dual_set.DualSet):
 
             # internal nodes
             if degree > 1:
-                Q = quadrature.make_quadrature(ref_el, 2 * (degree + 1))
+                Q = create_quadrature(ref_el, 2 * (degree + 1))
                 qpts = Q.get_points()
                 Nedel = nedelec.Nedelec(ref_el, degree - 1, variant)
                 Nedfs = Nedel.get_nodal_basis()

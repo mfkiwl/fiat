@@ -13,11 +13,12 @@ from FIAT.polynomial_set import ONPolynomialSet
 from FIAT.functional import PointEdgeTangentEvaluation as Tangent
 from FIAT.functional import FrobeniusIntegralMoment as IntegralMoment
 from FIAT.raviart_thomas import RaviartThomas
-from FIAT.quadrature import make_quadrature, UFCTetrahedronFaceQuadratureRule
+from FIAT.quadrature import UFCTetrahedronFaceQuadratureRule
+from FIAT.quadrature_schemes import create_quadrature
 from FIAT.reference_element import UFCTetrahedron
 from FIAT.check_format_variant import check_format_variant
 
-from FIAT import polynomial_set, quadrature, functional
+from FIAT import polynomial_set, functional
 
 
 class NedelecSecondKindDual(DualSet):
@@ -99,7 +100,7 @@ class NedelecSecondKindDual(DualSet):
 
         if variant == "integral":
             edge = cell.construct_subelement(1)
-            Q = quadrature.make_quadrature(edge, quad_deg)
+            Q = create_quadrature(edge, 2 * quad_deg - 2)
             Pq = polynomial_set.ONPolynomialSet(edge, degree)
             Pq_at_qpts = Pq.tabulate(Q.get_points())[tuple([0]*(1))]
             for e in range(len(cell.get_topology()[1])):
@@ -194,7 +195,7 @@ class NedelecSecondKindDual(DualSet):
             return ([], {0: []})
 
         # Create quadrature points
-        Q = make_quadrature(cell, 2 * (degree + 1))
+        Q = create_quadrature(cell, 2 * (degree + 1))
         qs = Q.get_points()
 
         # Create Raviart-Thomas nodal basis

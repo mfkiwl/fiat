@@ -5,11 +5,12 @@
 #
 # SPDX-License-Identifier:    LGPL-3.0-or-later
 
-from FIAT import (polynomial_set, expansions, quadrature, dual_set,
+from FIAT import (polynomial_set, expansions, dual_set,
                   finite_element, functional)
 from itertools import chain
 import numpy
 from FIAT.check_format_variant import check_format_variant
+from FIAT.quadrature_schemes import create_quadrature
 
 
 def NedelecSpace2D(ref_el, k):
@@ -32,7 +33,7 @@ def NedelecSpace2D(ref_el, k):
     Pkp1 = polynomial_set.ONPolynomialSet(ref_el, k + 1)
     PkH = Pkp1.take(list(range(dimPkm1, dimPk)))
 
-    Q = quadrature.make_quadrature(ref_el, 2 * k + 2)
+    Q = create_quadrature(ref_el, 2 * k + 2)
 
     Qpts = numpy.array(Q.get_points())
     Qwts = numpy.array(Q.get_weights())
@@ -100,7 +101,7 @@ def NedelecSpace3D(ref_el, k):
 
     Pkp1 = polynomial_set.ONPolynomialSet(ref_el, k + 1)
 
-    Q = quadrature.make_quadrature(ref_el, 2 * (k + 1))
+    Q = create_quadrature(ref_el, 2 * (k + 1))
 
     Qpts = numpy.array(Q.get_points())
     Qwts = numpy.array(Q.get_weights())
@@ -155,7 +156,7 @@ class NedelecDual2D(dual_set.DualSet):
             # edge nodes are \int_F v\cdot t p ds where p \in P_{q-1}(edge)
             # degree is q - 1
             edge = ref_el.get_facet_element()
-            Q = quadrature.make_quadrature(edge, quad_deg)
+            Q = create_quadrature(edge, 2 * quad_deg - 2)
             Pq = polynomial_set.ONPolynomialSet(edge, degree)
             Pq_at_qpts = Pq.tabulate(Q.get_points())[tuple([0]*(sd - 1))]
             for e in range(len(t[sd - 1])):
@@ -165,7 +166,7 @@ class NedelecDual2D(dual_set.DualSet):
 
             # internal nodes. These are \int_T v \cdot p dx where p \in P_{q-2}^2
             if degree > 0:
-                Q = quadrature.make_quadrature(ref_el, quad_deg)
+                Q = create_quadrature(ref_el, 2 * quad_deg - 2)
                 qpts = Q.get_points()
                 Pkm1 = polynomial_set.ONPolynomialSet(ref_el, degree - 1)
                 zero_index = tuple([0 for i in range(sd)])
@@ -190,7 +191,7 @@ class NedelecDual2D(dual_set.DualSet):
 
             # internal moments
             if degree > 0:
-                Q = quadrature.make_quadrature(ref_el, 2 * (degree + 1))
+                Q = create_quadrature(ref_el, 2 * (degree + 1))
                 qpts = Q.get_points()
                 Pkm1 = polynomial_set.ONPolynomialSet(ref_el, degree - 1)
                 zero_index = tuple([0 for i in range(sd)])
@@ -243,7 +244,7 @@ class NedelecDual3D(dual_set.DualSet):
             # edge nodes are \int_F v\cdot t p ds where p \in P_{q-1}(edge)
             # degree is q - 1
             edge = ref_el.get_facet_element().get_facet_element()
-            Q = quadrature.make_quadrature(edge, quad_deg)
+            Q = create_quadrature(edge, 2 * quad_deg - 2)
             Pq = polynomial_set.ONPolynomialSet(edge, degree)
             Pq_at_qpts = Pq.tabulate(Q.get_points())[tuple([0]*(1))]
             for e in range(len(t[1])):
@@ -256,7 +257,7 @@ class NedelecDual3D(dual_set.DualSet):
             # \int_F v\times n \cdot p ds where p \in P_{q-2}(f)^2
             if degree > 0:
                 facet = ref_el.get_facet_element()
-                Q = quadrature.make_quadrature(facet, quad_deg)
+                Q = create_quadrature(facet, 2 * quad_deg - 2)
                 Pq = polynomial_set.ONPolynomialSet(facet, degree-1, (sd,))
                 Pq_at_qpts = Pq.tabulate(Q.get_points())[(0, 0)]
 
@@ -272,7 +273,7 @@ class NedelecDual3D(dual_set.DualSet):
 
             # internal nodes. These are \int_T v \cdot p dx where p \in P_{q-3}^3(T)
             if degree > 1:
-                Q = quadrature.make_quadrature(ref_el, quad_deg)
+                Q = create_quadrature(ref_el, 2 * quad_deg - 2)
                 qpts = Q.get_points()
                 Pkm2 = polynomial_set.ONPolynomialSet(ref_el, degree - 2)
                 zero_index = tuple([0 for i in range(sd)])
@@ -306,7 +307,7 @@ class NedelecDual3D(dual_set.DualSet):
                             nodes.append(f)
 
             if degree > 1:  # internal moments
-                Q = quadrature.make_quadrature(ref_el, 2 * (degree + 1))
+                Q = create_quadrature(ref_el, 2 * (degree + 1))
                 qpts = Q.get_points()
                 Pkm2 = polynomial_set.ONPolynomialSet(ref_el, degree - 2)
                 zero_index = tuple([0 for i in range(sd)])
