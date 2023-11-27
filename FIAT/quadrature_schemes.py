@@ -31,8 +31,8 @@ Background on the schemes:
 from numpy import array, arange, float64
 
 # FIAT
-from FIAT.reference_element import QUADRILATERAL, HEXAHEDRON, TENSORPRODUCT, UFCTriangle, UFCTetrahedron
-from FIAT.quadrature import QuadratureRule, make_quadrature, make_tensor_product_quadrature
+from FIAT.reference_element import QUADRILATERAL, HEXAHEDRON, TENSORPRODUCT, TRIANGLE, TETRAHEDRON, UFCTriangle, UFCTetrahedron
+from FIAT.quadrature import QuadratureRule, make_quadrature, make_tensor_product_quadrature, map_quadrature
 
 
 def create_quadrature(ref_el, degree, scheme="default"):
@@ -67,12 +67,10 @@ def create_quadrature(ref_el, degree, scheme="default"):
         raise ValueError("Need positive degree, not %d" % degree)
 
     if scheme == "default":
-        # TODO: Point transformation to support good schemes on
-        # non-UFC reference elements.
-        if isinstance(ref_el, UFCTriangle):
-            return _triangle_scheme(degree)
-        elif isinstance(ref_el, UFCTetrahedron):
-            return _tetrahedron_scheme(degree)
+        if ref_el.get_shape() == TRIANGLE:
+            return _triangle_scheme(ref_el, degree)
+        elif ref_el.get_shape() == TETRAHEDRON:
+            return _tetrahedron_scheme(ref_el, degree)
         else:
             return _fiat_scheme(ref_el, degree)
     elif scheme == "canonical":
@@ -325,7 +323,7 @@ def _kmv_lump_scheme(ref_el, degree):
     return QuadratureRule(T, x, w)
 
 
-def _triangle_scheme(degree):
+def _triangle_scheme(ref_el, degree):
     """Return a quadrature scheme on a triangle of specified order. Falls
     back on canonical rule for higher orders."""
 
@@ -397,13 +395,14 @@ def _triangle_scheme(degree):
         w = w/2.0
     else:
         # Get canonical scheme
-        return _fiat_scheme(UFCTriangle(), degree)
+        return _fiat_scheme(ref_el, degree)
 
     # Return scheme
-    return QuadratureRule(UFCTriangle(), x, w)
+    x, w = map_quadrature(x, w, UFCTriangle(), ref_el)
+    return QuadratureRule(ref_el, x, w)
 
 
-def _tetrahedron_scheme(degree):
+def _tetrahedron_scheme(ref_el, degree):
     """Return a quadrature scheme on a tetrahedron of specified
     degree. Falls back on canonical rule for higher orders"""
 
@@ -516,7 +515,8 @@ def _tetrahedron_scheme(degree):
         w = w/6.0
     else:
         # Get canonical scheme
-        return _fiat_scheme(UFCTetrahedron(), degree)
+        return _fiat_scheme(ref_el, degree)
 
     # Return scheme
-    return QuadratureRule(UFCTetrahedron(), x, w)
+    x, w = map_quadrature(x, w, UFCTetrahedron(), ref_el)
+    return QuadratureRule(ref_el, x, w)
