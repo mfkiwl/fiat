@@ -26,51 +26,40 @@ class BDMDualSet(dual_set.DualSet):
             facet = ref_el.get_facet_element()
             # Facet nodes are \int_F v\cdot n p ds where p \in P_{q-1}
             # degree is q - 1
-            Q = create_quadrature(facet, 2 * quad_deg - 2)
+            Q = create_quadrature(facet, degree + quad_deg - 1)
             Pq = polynomial_set.ONPolynomialSet(facet, degree)
             Pq_at_qpts = Pq.tabulate(Q.get_points())[(0,)*(sd - 1)]
-            for f in range(len(t[sd - 1])):
-                for i in range(Pq_at_qpts.shape[0]):
-                    phi = Pq_at_qpts[i, :]
-                    nodes.append(functional.IntegralMomentOfScaledNormalEvaluation(ref_el, Q, phi, f))
+            nodes.extend(functional.IntegralMomentOfScaledNormalEvaluation(ref_el, Q, phi, f)
+                         for f in range(len(t[sd - 1]))
+                         for phi in Pq_at_qpts)
 
             # internal nodes
             if degree > 1:
-                Q = create_quadrature(ref_el, 2 * quad_deg - 2)
+                Q = create_quadrature(ref_el, degree + quad_deg - 1)
                 qpts = Q.get_points()
                 Nedel = nedelec.Nedelec(ref_el, degree - 1, variant)
                 Nedfs = Nedel.get_nodal_basis()
-                zero_index = (0,)*sd
-                Ned_at_qpts = Nedfs.tabulate(qpts)[zero_index]
-
-                for i in range(len(Ned_at_qpts)):
-                    phi_cur = Ned_at_qpts[i, :]
-                    l_cur = functional.FrobeniusIntegralMoment(ref_el, Q, phi_cur)
-                    nodes.append(l_cur)
+                Ned_at_qpts = Nedfs.tabulate(qpts)[(0,) * sd]
+                nodes.extend(functional.FrobeniusIntegralMoment(ref_el, Q, phi)
+                             for phi in Ned_at_qpts)
 
         elif variant == "point":
             # Define each functional for the dual set
             # codimension 1 facets
             for i in range(len(t[sd - 1])):
                 pts_cur = ref_el.make_points(sd - 1, i, sd + degree)
-                for j in range(len(pts_cur)):
-                    pt_cur = pts_cur[j]
-                    f = functional.PointScaledNormalEvaluation(ref_el, i, pt_cur)
-                    nodes.append(f)
+                nodes.extend(functional.PointScaledNormalEvaluation(ref_el, i, pt)
+                             for pt in pts_cur)
 
             # internal nodes
             if degree > 1:
-                Q = create_quadrature(ref_el, 2 * (degree + 1))
+                Q = create_quadrature(ref_el, 2 * degree - 1)
                 qpts = Q.get_points()
                 Nedel = nedelec.Nedelec(ref_el, degree - 1, variant)
                 Nedfs = Nedel.get_nodal_basis()
-                zero_index = tuple([0 for i in range(sd)])
-                Ned_at_qpts = Nedfs.tabulate(qpts)[zero_index]
-
-                for i in range(len(Ned_at_qpts)):
-                    phi_cur = Ned_at_qpts[i, :]
-                    l_cur = functional.FrobeniusIntegralMoment(ref_el, Q, phi_cur)
-                    nodes.append(l_cur)
+                Ned_at_qpts = Nedfs.tabulate(qpts)[(0,) * sd]
+                nodes.extend(functional.FrobeniusIntegralMoment(ref_el, Q, phi)
+                             for phi in Ned_at_qpts)
 
         # sets vertices (and in 3d, edges) to have no nodes
         for i in range(sd - 1):

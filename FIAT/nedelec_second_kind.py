@@ -100,13 +100,12 @@ class NedelecSecondKindDual(DualSet):
 
         if variant == "integral":
             edge = cell.construct_subelement(1)
-            Q = create_quadrature(edge, 2 * quad_deg - 2)
+            Q = create_quadrature(edge, 2*(quad_deg-1))
             Pq = polynomial_set.ONPolynomialSet(edge, degree)
             Pq_at_qpts = Pq.tabulate(Q.get_points())[tuple([0]*(1))]
             for e in range(len(cell.get_topology()[1])):
-                for i in range(Pq_at_qpts.shape[0]):
-                    phi = Pq_at_qpts[i, :]
-                    dofs.append(functional.IntegralMomentOfEdgeTangentEvaluation(cell, Q, phi, e))
+                dofs.extend(functional.IntegralMomentOfEdgeTangentEvaluation(cell, Q, phi, e)
+                            for phi in Pq_at_qpts)
                 jj = Pq_at_qpts.shape[0] * e
                 ids[e] = list(range(offset + jj, offset + jj + Pq_at_qpts.shape[0]))
 
@@ -195,19 +194,22 @@ class NedelecSecondKindDual(DualSet):
             return ([], {0: []})
 
         # Create quadrature points
-        Q = create_quadrature(cell, 2 * (degree + 1))
+        rt_degree = degree + 1 - d
+        if quad_deg is None:
+            quad_deg = degree + 1
+        Q = create_quadrature(cell, rt_degree + quad_deg-1)
         qs = Q.get_points()
 
         # Create Raviart-Thomas nodal basis
-        RT = RaviartThomas(cell, degree + 1 - d, variant)
+        RT = RaviartThomas(cell, rt_degree, variant)
         phi = RT.get_nodal_basis()
 
         # Evaluate Raviart-Thomas basis at quadrature points
         phi_at_qs = phi.tabulate(qs)[(0,) * d]
 
         # Use (Frobenius) integral moments against RTs as dofs
-        dofs = [IntegralMoment(cell, Q, phi_at_qs[i, :])
-                for i in range(len(phi_at_qs))]
+        dofs = [IntegralMoment(cell, Q, phi)
+                for phi in phi_at_qs]
 
         # Associate these dofs with the interior
         ids = {0: list(range(offset, offset + len(dofs)))}
