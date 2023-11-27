@@ -9,9 +9,9 @@
 
 import itertools
 import numpy
-from recursivenodes.quadrature import gaussjacobi
+from recursivenodes.quadrature import gaussjacobi, simplexgausslegendre
 
-from FIAT import reference_element, expansions, orthopoly
+from FIAT import reference_element
 
 
 class QuadratureRule(object):
@@ -40,29 +40,23 @@ class GaussJacobiQuadratureLineRule(QuadratureRule):
     """Gauss-Jacobi quadature rule determined by Jacobi weights a and b
     using m roots of m:th order Jacobi polynomial."""
 
-    def __init__(self, ref_el, m):
+    def __init__(self, ref_el, m, a=0, b=0):
         # this gives roots on the default (-1,1) reference element
-        #        (xs_ref, ws_ref) = gaussjacobi(m, a, b)
-        (xs_ref, ws_ref) = gaussjacobi(m, 0., 0.)
+        xs_ref, wts = gaussjacobi(m, a, b)
+        xs_ref = xs_ref.reshape((-1, 1))
 
         Ref1 = reference_element.DefaultLine()
         A, b = reference_element.make_affine_mapping(Ref1.get_vertices(),
                                                      ref_el.get_vertices())
+        mapping = lambda x: numpy.dot(x, A.T) + b[None, :]
+        pts = tuple(map(tuple, mapping(xs_ref)))
+        wts *= numpy.linalg.det(A)
 
-        mapping = lambda x: numpy.dot(A, x) + b
-
-        scale = numpy.linalg.det(A)
-
-        xs = tuple([tuple(mapping(x_ref)[0]) for x_ref in xs_ref])
-        ws = tuple([scale * w for w in ws_ref])
-
-        QuadratureRule.__init__(self, ref_el, xs, ws)
+        QuadratureRule.__init__(self, ref_el, pts, tuple(wts.flat))
 
 
 class GaussLobattoLegendreQuadratureLineRule(QuadratureRule):
-    """Implement the Gauss-Lobatto-Legendre quadrature rules on the interval using
-    Greg von Winckel's implementation. This facilitates implementing
-    spectral elements.
+    """Gauss-Lobatto-Legendre quadrature rule on the interval.
 
     The quadrature rule uses m points for a degree of precision of 2m-3.
     """
@@ -71,169 +65,104 @@ class GaussLobattoLegendreQuadratureLineRule(QuadratureRule):
             raise ValueError(
                 "Gauss-Labotto-Legendre quadrature invalid for fewer than 2 points")
 
-        Ref1 = reference_element.DefaultLine()
-        verts = Ref1.get_vertices()
-
+        verts = ref_el.vertices
+        volume = ref_el.volume()
         if m > 2:
-            # Calculate the recursion coefficients.
-            alpha, beta = orthopoly.rec_jacobi(m, 0, 0)
-            xs_ref, ws_ref = orthopoly.lobatto(alpha, beta, verts[0][0], verts[1][0])
+            # Make the interior points and weights
+            rule = GaussJacobiQuadratureLineRule(ref_el, m-2, 1, 1)
+            # Remove the bubble weight from the quadrature weights
+            x = rule.get_points().reshape((-1,))
+            bubble = (2.0 / volume)**2 * (x - verts[0][0]) * (verts[1][0] - x)
+            wts = rule.get_weights() / bubble
+            pts = rule.pts
         else:
             # Special case for lowest order.
-            xs_ref = [v[0] for v in verts[:]]
-            ws_ref = (0.5 * (xs_ref[1] - xs_ref[0]), ) * 2
+            wts = ()
+            pts = ()
 
-        A, b = reference_element.make_affine_mapping(Ref1.get_vertices(),
-                                                     ref_el.get_vertices())
-
-        mapping = lambda x: numpy.dot(A, x) + b
-
-        scale = numpy.linalg.det(A)
-
-        xs = tuple([tuple(mapping(x_ref)[0]) for x_ref in xs_ref])
-        ws = tuple([scale * w for w in ws_ref])
+        # Get the weight at the endpoints via sum(ws) == volume
+        w0 = 0.5*(volume - sum(wts))
+        xs = (verts[0], *pts, verts[1])
+        ws = (w0, *wts, w0)
 
         QuadratureRule.__init__(self, ref_el, xs, ws)
 
 
-class GaussLegendreQuadratureLineRule(QuadratureRule):
-    """Produce the Gauss--Legendre quadrature rules on the interval using
-    the implementation in numpy. This facilitates implementing
-    discontinuous spectral elements.
+class GaussLegendreQuadratureLineRule(GaussJacobiQuadratureLineRule):
+    """Gauss--Legendre quadrature rule on the interval.
 
     The quadrature rule uses m points for a degree of precision of 2m-1.
     """
     def __init__(self, ref_el, m):
-        if m < 1:
-            raise ValueError(
-                "Gauss-Legendre quadrature invalid for fewer than 2 points")
-
-        xs_ref, ws_ref = numpy.polynomial.legendre.leggauss(m)
-
-        A, b = reference_element.make_affine_mapping(((-1.,), (1.)),
-                                                     ref_el.get_vertices())
-
-        mapping = lambda x: numpy.dot(A, x) + b
-
-        scale = numpy.linalg.det(A)
-
-        xs = tuple([tuple(mapping(x_ref)[0]) for x_ref in xs_ref])
-        ws = tuple([scale * w for w in ws_ref])
-
-        QuadratureRule.__init__(self, ref_el, xs, ws)
+        super(GaussLegendreQuadratureLineRule, self).__init__(ref_el, m)
 
 
 class RadauQuadratureLineRule(QuadratureRule):
-    """Produce the Gauss--Radau quadrature rules on the interval using
-    an adaptation of Winkel's Matlab code.
+    """Gauss--Radau quadrature rule on the interval.
 
     The quadrature rule uses m points for a degree of precision of 2m-1.
     """
     def __init__(self, ref_el, m, right=True):
-        assert m >= 1
-        N = m - 1
-        # Use Chebyshev-Gauss-Radau nodes as initial guess for LGR nodes
-        x = -numpy.cos(2 * numpy.pi * numpy.linspace(0, N, m) / (2 * N + 1))
+        if m < 1:
+            raise ValueError(
+                "Gauss-Radau quadrature invalid for fewer than 1 points")
 
-        P = numpy.zeros((N + 1, N + 2))
+        right = int(right)
+        x0 = ref_el.vertices[right]
+        volume = ref_el.volume()
+        if m > 1:
+            # Make the interior points and weights
+            rule = GaussJacobiQuadratureLineRule(ref_el, m-1, right, 1-right)
+            # Remove the hat weight from the quadrature weights
+            x = rule.get_points().reshape((-1,))
+            hat = (2.0 / volume) * abs(x0[0] - x)
+            wts = rule.get_weights() / hat
+            pts = rule.pts
+        else:
+            # Special case for lowest order.
+            wts = ()
+            pts = ()
 
-        xold = 2
-
-        free = numpy.arange(1, N + 1, dtype='int')
-
-        while numpy.max(numpy.abs(x - xold)) > 5e-16:
-            xold = x.copy()
-
-            P[0, :] = (-1) ** numpy.arange(0, N + 2)
-            P[free, 0] = 1
-            P[free, 1] = x[free]
-
-            for k in range(2, N + 2):
-                P[free, k] = ((2 * k - 1) * x[free] * P[free, k - 1] - (k - 1) * P[free, k - 2]) / k
-
-            x[free] = xold[free] - ((1 - xold[free]) / (N + 1)) * (P[free, N] + P[free, N + 1]) / (P[free, N] - P[free, N + 1])
-
-        # The Legendre-Gauss-Radau Vandermonde
-        P = P[:, :-1]
-        # Compute the weights
-        w = numpy.zeros(N + 1)
-        w[0] = 2 / (N + 1) ** 2
-        w[free] = (1 - x[free])/((N + 1) * P[free, -1])**2
-
-        if right:
-            x = numpy.flip(-x)
-            w = numpy.flip(w)
-
-        xs_ref = x
-        ws_ref = w
-
-        A, b = reference_element.make_affine_mapping(((-1.,), (1.)),
-                                                     ref_el.get_vertices())
-
-        mapping = lambda x: numpy.dot(A, x) + b
-
-        scale = numpy.linalg.det(A)
-
-        xs = tuple([tuple(mapping(x_ref)[0]) for x_ref in xs_ref])
-        ws = tuple([scale * w for w in ws_ref])
+        # Get the weight at the endpoint via sum(ws) == volume
+        w0 = volume - sum(wts)
+        xs = (*pts, x0) if right else (x0, *pts)
+        ws = (*wts, w0) if right else (w0, *wts)
 
         QuadratureRule.__init__(self, ref_el, xs, ws)
 
 
-class CollapsedQuadratureTriangleRule(QuadratureRule):
+class CollapsedQuadratureSimplexRule(QuadratureRule):
+    """Implements the collapsed quadrature rules defined in
+    Karniadakis & Sherwin by mapping products of Gauss-Jacobi rules
+    from the hypercube to the simplex."""
+
+    def __init__(self, ref_el, m):
+        dim = ref_el.get_spatial_dimension()
+        pts_ref, wts = simplexgausslegendre(dim, m)
+        pts_ref = pts_ref.reshape((-1, dim))
+
+        Ref1 = reference_element.default_simplex(dim)
+        A, b = reference_element.make_affine_mapping(Ref1.get_vertices(),
+                                                     ref_el.get_vertices())
+        mapping = lambda x: numpy.dot(x, A.T) + b[None, :]
+        pts = tuple(map(tuple, mapping(pts_ref)))
+        wts *= numpy.linalg.det(A)
+
+        QuadratureRule.__init__(self, ref_el, pts, tuple(wts.flat))
+
+
+class CollapsedQuadratureTriangleRule(CollapsedQuadratureSimplexRule):
     """Implements the collapsed quadrature rules defined in
     Karniadakis & Sherwin by mapping products of Gauss-Jacobi rules
     from the square to the triangle."""
-
-    def __init__(self, ref_el, m):
-        ptx, wx = gaussjacobi(m, 0., 0.)
-        pty, wy = gaussjacobi(m, 1., 0.)
-
-        # map ptx , pty
-        pts_ref = [expansions.xi_triangle((x, y))
-                   for x in ptx for y in pty]
-
-        Ref1 = reference_element.DefaultTriangle()
-        A, b = reference_element.make_affine_mapping(Ref1.get_vertices(),
-                                                     ref_el.get_vertices())
-        mapping = lambda x: numpy.dot(A, x) + b
-
-        scale = numpy.linalg.det(A)
-
-        pts = tuple([tuple(mapping(x)) for x in pts_ref])
-
-        wts = [0.5 * scale * w1 * w2 for w1 in wx for w2 in wy]
-
-        QuadratureRule.__init__(self, ref_el, tuple(pts), tuple(wts))
+    pass
 
 
-class CollapsedQuadratureTetrahedronRule(QuadratureRule):
+class CollapsedQuadratureTetrahedronRule(CollapsedQuadratureSimplexRule):
     """Implements the collapsed quadrature rules defined in
     Karniadakis & Sherwin by mapping products of Gauss-Jacobi rules
     from the cube to the tetrahedron."""
-
-    def __init__(self, ref_el, m):
-        ptx, wx = gaussjacobi(m, 0., 0.)
-        pty, wy = gaussjacobi(m, 1., 0.)
-        ptz, wz = gaussjacobi(m, 2., 0.)
-
-        # map ptx , pty
-        pts_ref = [expansions.xi_tetrahedron((x, y, z))
-                   for x in ptx for y in pty for z in ptz]
-
-        Ref1 = reference_element.DefaultTetrahedron()
-        A, b = reference_element.make_affine_mapping(Ref1.get_vertices(),
-                                                     ref_el.get_vertices())
-        mapping = lambda x: numpy.dot(A, x) + b
-
-        scale = numpy.linalg.det(A)
-
-        pts = tuple([tuple(mapping(x)) for x in pts_ref])
-
-        wts = [scale * 0.125 * w1 * w2 * w3
-               for w1 in wx for w2 in wy for w3 in wz]
-
-        QuadratureRule.__init__(self, ref_el, tuple(pts), tuple(wts))
+    pass
 
 
 class UFCTetrahedronFaceQuadratureRule(QuadratureRule):

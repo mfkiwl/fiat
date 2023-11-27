@@ -53,7 +53,10 @@ class FDMDual(dual_set.DualSet):
         self.embedded = embedded
 
         vertices = ref_el.get_vertices()
-        rule = quadrature.GaussLegendreQuadratureLineRule(ref_el, edim)
+        if bc_order == 1 and formdegree == 0:
+            rule = quadrature.GaussLobattoLegendreQuadratureLineRule(ref_el, edim+1)
+        else:
+            rule = quadrature.GaussLegendreQuadratureLineRule(ref_el, edim)
         self.rule = rule
 
         solve_eig = sym_eig
