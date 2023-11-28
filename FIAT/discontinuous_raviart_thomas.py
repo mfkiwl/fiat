@@ -26,19 +26,14 @@ class DRTDualSet(dual_set.DualSet):
         # codimension 1 facets
         for i in range(len(t[sd - 1])):
             pts_cur = ref_el.make_points(sd - 1, i, sd + degree - 1)
-            for j in range(len(pts_cur)):
-                pt_cur = pts_cur[j]
-                f = functional.PointScaledNormalEvaluation(ref_el, i, pt_cur)
-                nodes.append(f)
+            nodes.extend(functional.PointScaledNormalEvaluation(ref_el, i, pt)
+                         for pt in pts_cur)
 
         # internal nodes.  Let's just use points at a lattice
         if degree > 1:
-            cpe = functional.ComponentPointEvaluation
             pts = ref_el.make_points(sd, 0, sd + degree - 1)
-            for d in range(sd):
-                for i in range(len(pts)):
-                    l_cur = cpe(ref_el, d, (sd,), pts[i])
-                    nodes.append(l_cur)
+            nodes.extend(functional.ComponentPointEvaluation(ref_el, d, (sd,), pt)
+                         for d in range(sd) for pt in pts)
 
         # sets vertices (and in 3d, edges) to have no nodes
         for i in range(sd - 1):
