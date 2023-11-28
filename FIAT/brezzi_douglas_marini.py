@@ -26,7 +26,7 @@ class BDMDualSet(dual_set.DualSet):
             facet = ref_el.get_facet_element()
             # Facet nodes are \int_F v\cdot n p ds where p \in P_{q-1}
             # degree is q - 1
-            Q = create_quadrature(facet, degree + quad_deg - 1)
+            Q = create_quadrature(facet, degree + quad_deg)
             Pq = polynomial_set.ONPolynomialSet(facet, degree)
             Pq_at_qpts = Pq.tabulate(Q.get_points())[(0,)*(sd - 1)]
             nodes.extend(functional.IntegralMomentOfScaledNormalEvaluation(ref_el, Q, phi, f)
@@ -35,7 +35,7 @@ class BDMDualSet(dual_set.DualSet):
 
             # internal nodes
             if degree > 1:
-                Q = create_quadrature(ref_el, degree + quad_deg - 1)
+                Q = create_quadrature(ref_el, degree - 1 + quad_deg)
                 qpts = Q.get_points()
                 Nedel = nedelec.Nedelec(ref_el, degree - 1, variant)
                 Nedfs = Nedel.get_nodal_basis()
@@ -107,7 +107,8 @@ class BrezziDouglasMarini(finite_element.CiarletElement):
 
     def __init__(self, ref_el, k, variant=None):
 
-        (variant, quad_deg) = check_format_variant(variant, k)
+        variant, num_quad_pts = check_format_variant(variant, k)
+        quad_deg = None if num_quad_pts is None else num_quad_pts - 1
 
         if k < 1:
             raise Exception("BDM_k elements only valid for k >= 1")

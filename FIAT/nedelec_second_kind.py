@@ -100,9 +100,9 @@ class NedelecSecondKindDual(DualSet):
 
         if variant == "integral":
             edge = cell.construct_subelement(1)
-            Q = create_quadrature(edge, 2*(quad_deg-1))
+            Q = create_quadrature(edge, degree + quad_deg)
             Pq = polynomial_set.ONPolynomialSet(edge, degree)
-            Pq_at_qpts = Pq.tabulate(Q.get_points())[tuple([0]*(1))]
+            Pq_at_qpts = Pq.tabulate(Q.get_points())[(0,)]
             for e in range(len(cell.get_topology()[1])):
                 dofs.extend(functional.IntegralMomentOfEdgeTangentEvaluation(cell, Q, phi, e)
                             for phi in Pq_at_qpts)
@@ -144,7 +144,7 @@ class NedelecSecondKindDual(DualSet):
         for face in range(num_faces):
 
             # Construct quadrature scheme for this face
-            m = 2 * (degree + 1)
+            m = quad_deg or degree+1
             Q_face = UFCTetrahedronFaceQuadratureRule(face, m)
 
             # Construct Raviart-Thomas of (degree - 1) on the
@@ -195,9 +195,8 @@ class NedelecSecondKindDual(DualSet):
 
         # Create quadrature points
         rt_degree = degree + 1 - d
-        if quad_deg is None:
-            quad_deg = degree + 1
-        Q = create_quadrature(cell, rt_degree + quad_deg-1)
+        quad_deg = quad_deg or degree
+        Q = create_quadrature(cell, rt_degree + quad_deg)
         qs = Q.get_points()
 
         # Create Raviart-Thomas nodal basis
@@ -238,7 +237,8 @@ class NedelecSecondKind(CiarletElement):
 
     def __init__(self, cell, k, variant=None):
 
-        (variant, quad_deg) = check_format_variant(variant, k)
+        variant, num_quad_pts = check_format_variant(variant, k)
+        quad_deg = None if num_quad_pts is None else num_quad_pts - 1
 
         # Check degree
         assert k >= 1, "Second kind Nedelecs start at 1!"

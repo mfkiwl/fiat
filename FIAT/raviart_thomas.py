@@ -13,30 +13,31 @@ from FIAT.check_format_variant import check_format_variant
 from FIAT.quadrature_schemes import create_quadrature
 
 
-def RTSpace(ref_el, deg):
+def RTSpace(ref_el, degree):
     """Constructs a basis for the the Raviart-Thomas space
-    (P_k)^d + P_k x"""
+    (P_{degree-1})^d + P_{degree-1} x"""
     sd = ref_el.get_spatial_dimension()
 
-    vec_Pkp1 = polynomial_set.ONPolynomialSet(ref_el, deg + 1, (sd,))
+    k = degree - 1
+    vec_Pkp1 = polynomial_set.ONPolynomialSet(ref_el, k + 1, (sd,))
 
-    dimPkp1 = expansions.polynomial_dimension(ref_el, deg + 1)
-    dimPk = expansions.polynomial_dimension(ref_el, deg)
-    dimPkm1 = expansions.polynomial_dimension(ref_el, deg - 1)
+    dimPkp1 = expansions.polynomial_dimension(ref_el, k + 1)
+    dimPk = expansions.polynomial_dimension(ref_el, k)
+    dimPkm1 = expansions.polynomial_dimension(ref_el, k - 1)
 
     vec_Pk_indices = list(chain(*(range(i * dimPkp1, i * dimPkp1 + dimPk)
                                   for i in range(sd))))
     vec_Pk_from_Pkp1 = vec_Pkp1.take(vec_Pk_indices)
 
-    Pkp1 = polynomial_set.ONPolynomialSet(ref_el, deg + 1)
+    Pkp1 = polynomial_set.ONPolynomialSet(ref_el, k + 1)
     PkH = Pkp1.take(list(range(dimPkm1, dimPk)))
 
-    Q = create_quadrature(ref_el, 2 * (deg + 1))
+    Q = create_quadrature(ref_el, 2 * (k + 1))
 
     # have to work on this through "tabulate" interface
     # first, tabulate PkH at quadrature points
-    Qpts = numpy.array(Q.get_points())
-    Qwts = numpy.array(Q.get_weights())
+    Qpts = Q.get_points()
+    Qwts = Q.get_weights()
 
     PkH_at_Qpts = PkH.tabulate(Qpts)[(0,) * sd]
     Pkp1_at_Qpts = Pkp1.tabulate(Qpts)[(0,) * sd]
@@ -51,8 +52,8 @@ def RTSpace(ref_el, deg):
             PkHx_coeffs[i, j, :] = numpy.dot(Pkp1_at_Qpts, fooij)
 
     PkHx = polynomial_set.PolynomialSet(ref_el,
-                                        deg,
-                                        deg + 1,
+                                        k,
+                                        k + 1,
                                         vec_Pkp1.get_expansion_set(),
                                         PkHx_coeffs)
 
@@ -75,19 +76,18 @@ class RTDualSet(dual_set.DualSet):
             facet = ref_el.get_facet_element()
             # Facet nodes are \int_F v\cdot n p ds where p \in P_{q-1}
             # degree is q - 1
-            Q = create_quadrature(facet, degree + quad_deg-1)
-            Pq = polynomial_set.ONPolynomialSet(facet, degree)
+            Q = create_quadrature(facet, degree - 1 + quad_deg)
+            Pq = polynomial_set.ONPolynomialSet(facet, degree - 1)
             Pq_at_qpts = Pq.tabulate(Q.get_points())[(0,)*(sd - 1)]
             nodes.extend(functional.IntegralMomentOfScaledNormalEvaluation(ref_el, Q, phi, f)
                          for f in range(len(t[sd - 1]))
                          for phi in Pq_at_qpts)
 
             # internal nodes. These are \int_T v \cdot p dx where p \in P_{q-2}^d
-            if degree > 0:
-                Q = create_quadrature(ref_el, degree + quad_deg-1)
-                qpts = Q.get_points()
-                Pkm1 = polynomial_set.ONPolynomialSet(ref_el, degree - 1)
-                Pkm1_at_qpts = Pkm1.tabulate(qpts)[(0,) * sd]
+            if degree > 1:
+                Q = create_quadrature(ref_el, degree - 2 + quad_deg)
+                Pkm1 = polynomial_set.ONPolynomialSet(ref_el, degree - 2)
+                Pkm1_at_qpts = Pkm1.tabulate(Q.get_points())[(0,) * sd]
                 nodes.extend(functional.IntegralMoment(ref_el, Q, phi, (d,), (sd,))
                              for d in range(sd)
                              for phi in Pkm1_at_qpts)
@@ -95,13 +95,13 @@ class RTDualSet(dual_set.DualSet):
         elif variant == "point":
             # codimension 1 facets
             for i in range(len(t[sd - 1])):
-                pts_cur = ref_el.make_points(sd - 1, i, sd + degree)
+                pts_cur = ref_el.make_points(sd - 1, i, sd + degree - 1)
                 nodes.extend(functional.PointScaledNormalEvaluation(ref_el, i, pt)
                              for pt in pts_cur)
 
             # internal nodes.  Let's just use points at a lattice
-            if degree > 0:
-                pts = ref_el.make_points(sd, 0, degree + sd)
+            if degree > 1:
+                pts = ref_el.make_points(sd, 0, sd + degree - 1)
                 nodes.extend(functional.ComponentPointEvaluation(ref_el, d, (sd,), pt)
                              for d in range(sd)
                              for pt in pts)
@@ -115,7 +115,7 @@ class RTDualSet(dual_set.DualSet):
         cur = 0
 
         # set codimension 1 (edges 2d, faces 3d) dof
-        pts_facet_0 = ref_el.make_points(sd - 1, 0, sd + degree)
+        pts_facet_0 = ref_el.make_points(sd - 1, 0, sd + degree - 1)
         pts_per_facet = len(pts_facet_0)
         entity_ids[sd - 1] = {}
         for i in range(len(t[sd - 1])):
@@ -124,9 +124,9 @@ class RTDualSet(dual_set.DualSet):
 
         # internal nodes, if applicable
         entity_ids[sd] = {0: []}
-        if degree > 0:
+        if degree > 1:
             num_internal_nodes = expansions.polynomial_dimension(ref_el,
-                                                                 degree - 1)
+                                                                 degree - 2)
             entity_ids[sd][0] = list(range(cur, cur + num_internal_nodes * sd))
 
         super(RTDualSet, self).__init__(nodes, ref_el, entity_ids)
@@ -149,11 +149,10 @@ class RaviartThomas(finite_element.CiarletElement):
     when you want to have (nearly) div-preserving interpolation.
     """
 
-    def __init__(self, ref_el, k, variant=None):
+    def __init__(self, ref_el, degree, variant=None):
 
-        degree = k - 1
-
-        (variant, quad_deg) = check_format_variant(variant, degree)
+        variant, num_quad_pts = check_format_variant(variant, degree)
+        quad_deg = None if num_quad_pts is None else num_quad_pts - 1
 
         poly_set = RTSpace(ref_el, degree)
         dual = RTDualSet(ref_el, degree, variant, quad_deg)
