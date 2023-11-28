@@ -103,8 +103,8 @@ def NedelecSpace3D(ref_el, degree):
 
     Q = create_quadrature(ref_el, 2 * (k + 1))
 
-    Qpts = numpy.array(Q.get_points())
-    Qwts = numpy.array(Q.get_weights())
+    Qpts = Q.get_points()
+    Qwts = Q.get_weights()
 
     PkCrossXcoeffs = numpy.zeros((vec_Pke.get_num_members(),
                                   sd,

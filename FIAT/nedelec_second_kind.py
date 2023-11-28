@@ -116,7 +116,7 @@ class NedelecSecondKindDual(DualSet):
                 points = cell.make_points(1, edge, degree + 2)
 
                 # A tangential component evaluation for each point
-                dofs += [Tangent(cell, edge, point) for point in points]
+                dofs.extend(Tangent(cell, edge, point) for point in points)
 
                 # Associate these dofs with this edge
                 i = len(points) * edge
@@ -133,7 +133,7 @@ class NedelecSecondKindDual(DualSet):
 
         # Return empty info if not applicable
         d = cell.get_spatial_dimension()
-        if (degree < 2):
+        if degree < 2:
             return (dofs, ids)
 
         msg = "2nd kind Nedelec face dofs only available with UFC convention"
@@ -144,8 +144,8 @@ class NedelecSecondKindDual(DualSet):
         for face in range(num_faces):
 
             # Construct quadrature scheme for this face
-            m = quad_deg or degree+1
-            Q_face = UFCTetrahedronFaceQuadratureRule(face, m)
+            num_quad_pts = quad_deg + 1 or degree + 1
+            Q_face = UFCTetrahedronFaceQuadratureRule(face, num_quad_pts)
 
             # Construct Raviart-Thomas of (degree - 1) on the
             # reference face
@@ -177,7 +177,7 @@ class NedelecSecondKindDual(DualSet):
                 # this cell, using the special face quadrature
                 # weighted against the values of the (physical)
                 # Raviart--Thomas'es on the face
-                dofs += [IntegralMoment(cell, Q_face, phis)]
+                dofs.extend(IntegralMoment(cell, Q_face, phis))
 
             # Assign identifiers (num RTs per face + previous edge dofs)
             ids[face] = list(range(offset + num_rts*face, offset + num_rts*(face + 1)))
