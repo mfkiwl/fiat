@@ -139,12 +139,13 @@ class NedelecSecondKindDual(DualSet):
         msg = "2nd kind Nedelec face dofs only available with UFC convention"
         assert isinstance(cell, UFCTetrahedron), msg
 
+        num_quad_pts = degree + 1 if quad_deg is None else quad_deg + 1
+
         # Iterate over the faces of the tet
         num_faces = len(cell.get_topology()[2])
         for face in range(num_faces):
 
             # Construct quadrature scheme for this face
-            num_quad_pts = quad_deg + 1 or degree + 1
             Q_face = UFCTetrahedronFaceQuadratureRule(face, num_quad_pts)
 
             # Construct Raviart-Thomas of (degree - 1) on the
