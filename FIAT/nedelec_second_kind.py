@@ -177,7 +177,7 @@ class NedelecSecondKindDual(DualSet):
                 # this cell, using the special face quadrature
                 # weighted against the values of the (physical)
                 # Raviart--Thomas'es on the face
-                dofs.extend(IntegralMoment(cell, Q_face, phis))
+                dofs.append(IntegralMoment(cell, Q_face, phis))
 
             # Assign identifiers (num RTs per face + previous edge dofs)
             ids[face] = list(range(offset + num_rts*face, offset + num_rts*(face + 1)))
