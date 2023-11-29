@@ -136,7 +136,7 @@ class RaviartThomas(finite_element.CiarletElement):
     The Raviart Thomas element
 
     :arg ref_el: The reference element.
-    :arg k: The degree.
+    :arg degree: The degree.
     :arg variant: optional variant specifying the types of nodes.
 
     variant can be chosen from ["point", "integral", "integral(q)"]

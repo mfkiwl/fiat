@@ -224,7 +224,7 @@ class NedelecSecondKind(CiarletElement):
     H(curl) conformity.
 
     :arg ref_el: The reference element.
-    :arg k: The degree.
+    :arg degree: The degree.
     :arg variant: optional variant specifying the types of nodes.
 
     variant can be chosen from ["point", "integral", "integral(q)"]
@@ -239,21 +239,21 @@ class NedelecSecondKind(CiarletElement):
     interpolation.
     """
 
-    def __init__(self, cell, k, variant=None):
+    def __init__(self, cell, degree, variant=None):
 
-        variant, interpolant_deg = check_format_variant(variant, k)
+        variant, interpolant_deg = check_format_variant(variant, degree)
 
         # Check degree
-        assert k >= 1, "Second kind Nedelecs start at 1!"
+        assert degree >= 1, "Second kind Nedelecs start at 1!"
 
         # Get dimension
         d = cell.get_spatial_dimension()
 
         # Construct polynomial basis for d-vector fields
-        Ps = ONPolynomialSet(cell, k, (d, ))
+        Ps = ONPolynomialSet(cell, degree, (d, ))
 
         # Construct dual space
-        Ls = NedelecSecondKindDual(cell, k, variant, interpolant_deg)
+        Ls = NedelecSecondKindDual(cell, degree, variant, interpolant_deg)
 
         # Set form degree
         formdegree = 1  # 1-form
@@ -262,4 +262,4 @@ class NedelecSecondKind(CiarletElement):
         mapping = "covariant piola"
 
         # Call init of super-class
-        super(NedelecSecondKind, self).__init__(Ps, Ls, k, formdegree, mapping=mapping)
+        super(NedelecSecondKind, self).__init__(Ps, Ls, degree, formdegree, mapping=mapping)

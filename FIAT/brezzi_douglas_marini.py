@@ -93,7 +93,7 @@ class BrezziDouglasMarini(finite_element.CiarletElement):
     The BDM element
 
     :arg ref_el: The reference element.
-    :arg k: The degree.
+    :arg degree: The degree.
     :arg variant: optional variant specifying the types of nodes.
 
     variant can be chosen from ["point", "integral", "integral(q)"]
@@ -108,16 +108,16 @@ class BrezziDouglasMarini(finite_element.CiarletElement):
     interpolation.
     """
 
-    def __init__(self, ref_el, k, variant=None):
+    def __init__(self, ref_el, degree, variant=None):
 
-        variant, interpolant_deg = check_format_variant(variant, k)
+        variant, interpolant_deg = check_format_variant(variant, degree)
 
-        if k < 1:
+        if degree < 1:
             raise Exception("BDM_k elements only valid for k >= 1")
 
         sd = ref_el.get_spatial_dimension()
-        poly_set = polynomial_set.ONPolynomialSet(ref_el, k, (sd, ))
-        dual = BDMDualSet(ref_el, k, variant, interpolant_deg)
+        poly_set = polynomial_set.ONPolynomialSet(ref_el, degree, (sd, ))
+        dual = BDMDualSet(ref_el, degree, variant, interpolant_deg)
         formdegree = sd - 1  # (n-1)-form
-        super(BrezziDouglasMarini, self).__init__(poly_set, dual, k, formdegree,
+        super(BrezziDouglasMarini, self).__init__(poly_set, dual, degree, formdegree,
                                                   mapping="contravariant piola")
