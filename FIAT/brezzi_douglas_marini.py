@@ -12,7 +12,7 @@ from FIAT.quadrature_schemes import create_quadrature
 
 
 class BDMDualSet(dual_set.DualSet):
-    def __init__(self, ref_el, degree, variant, quad_deg):
+    def __init__(self, ref_el, degree, variant, interpolant_deg):
 
         # Initialize containers for map: mesh_entity -> dof number and
         # dual basis
@@ -26,7 +26,7 @@ class BDMDualSet(dual_set.DualSet):
             facet = ref_el.get_facet_element()
             # Facet nodes are \int_F v\cdot n p ds where p \in P_{q-1}
             # degree is q - 1
-            Q = create_quadrature(facet, degree + quad_deg)
+            Q = create_quadrature(facet, interpolant_deg + degree)
             Pq = polynomial_set.ONPolynomialSet(facet, degree)
             Pq_at_qpts = Pq.tabulate(Q.get_points())[(0,)*(sd - 1)]
             nodes.extend(functional.IntegralMomentOfScaledNormalEvaluation(ref_el, Q, phi, f)
@@ -35,7 +35,7 @@ class BDMDualSet(dual_set.DualSet):
 
             # internal nodes
             if degree > 1:
-                Q = create_quadrature(ref_el, degree - 1 + quad_deg)
+                Q = create_quadrature(ref_el, interpolant_deg + degree - 1)
                 qpts = Q.get_points()
                 Nedel = nedelec.Nedelec(ref_el, degree - 1, variant)
                 Nedfs = Nedel.get_nodal_basis()
@@ -96,26 +96,28 @@ class BrezziDouglasMarini(finite_element.CiarletElement):
     :arg k: The degree.
     :arg variant: optional variant specifying the types of nodes.
 
-    variant can be chosen from ["point", "integral", "integral(quadrature_degree)"]
-    "point" -> dofs are evaluated by point evaluation. Note that this variant has suboptimal
-    convergence order in the H(div)-norm
-    "integral" -> dofs are evaluated by quadrature rule of degree k.
-    "integral(quadrature_degree)" -> dofs are evaluated by quadrature rule of degree quadrature_degree. You might
-    want to choose a high quadrature degree to make sure that expressions will be interpolated exactly. This is important
-    when you want to have (nearly) div-preserving interpolation.
+    variant can be chosen from ["point", "integral", "integral(q)"]
+    "point" -> dofs are evaluated by point evaluation. Note that this variant
+    has suboptimal convergence order in the H(div)-norm
+    "integral" -> dofs are evaluated by quadrature rules with the minimum
+    degree required for unisolvence.
+    "integral(q)" -> dofs are evaluated by quadrature rules with the minimum
+    degree required for unisolvence plus q. You might want to choose a high
+    quadrature degree to make sure that expressions will be interpolated
+    exactly. This is important when you want to have (nearly) div-preserving
+    interpolation.
     """
 
     def __init__(self, ref_el, k, variant=None):
 
-        variant, num_quad_pts = check_format_variant(variant, k)
-        quad_deg = None if num_quad_pts is None else num_quad_pts - 1
+        variant, interpolant_deg = check_format_variant(variant, k)
 
         if k < 1:
             raise Exception("BDM_k elements only valid for k >= 1")
 
         sd = ref_el.get_spatial_dimension()
         poly_set = polynomial_set.ONPolynomialSet(ref_el, k, (sd, ))
-        dual = BDMDualSet(ref_el, k, variant, quad_deg)
+        dual = BDMDualSet(ref_el, k, variant, interpolant_deg)
         formdegree = sd - 1  # (n-1)-form
         super(BrezziDouglasMarini, self).__init__(poly_set, dual, k, formdegree,
                                                   mapping="contravariant piola")

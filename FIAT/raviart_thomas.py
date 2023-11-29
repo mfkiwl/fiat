@@ -42,14 +42,13 @@ def RTSpace(ref_el, degree):
     PkH_at_Qpts = PkH.tabulate(Qpts)[(0,) * sd]
     Pkp1_at_Qpts = Pkp1.tabulate(Qpts)[(0,) * sd]
 
-    PkHx_coeffs = numpy.zeros((PkH.get_num_members(),
-                               sd,
-                               Pkp1.get_num_members()), "d")
-
-    for i in range(PkH.get_num_members()):
-        for j in range(sd):
-            fooij = PkH_at_Qpts[i, :] * Qpts[:, j] * Qwts
-            PkHx_coeffs[i, j, :] = numpy.dot(Pkp1_at_Qpts, fooij)
+    x = Qpts.T
+    xPkH_at_Qpts = numpy.zeros((PkH_at_Qpts.shape[0],
+                                sd,
+                                PkH_at_Qpts.shape[1]), "d")
+    for i in range(PkH_at_Qpts.shape[0]):
+        xPkH_at_Qpts[i] = PkH_at_Qpts[i] * x
+    PkHx_coeffs = numpy.dot(xPkH_at_Qpts, Qwts[:, None] * Pkp1_at_Qpts.T)
 
     PkHx = polynomial_set.PolynomialSet(ref_el,
                                         k,
@@ -65,7 +64,7 @@ class RTDualSet(dual_set.DualSet):
     evaluation of normals on facets of codimension 1 and internal
     moments against polynomials"""
 
-    def __init__(self, ref_el, degree, variant, quad_deg):
+    def __init__(self, ref_el, degree, variant, interpolant_deg):
         entity_ids = {}
         nodes = []
 
@@ -76,7 +75,7 @@ class RTDualSet(dual_set.DualSet):
             facet = ref_el.get_facet_element()
             # Facet nodes are \int_F v\cdot n p ds where p \in P_{q-1}
             # degree is q - 1
-            Q = create_quadrature(facet, degree - 1 + quad_deg)
+            Q = create_quadrature(facet, interpolant_deg + degree - 1)
             Pq = polynomial_set.ONPolynomialSet(facet, degree - 1)
             Pq_at_qpts = Pq.tabulate(Q.get_points())[(0,)*(sd - 1)]
             nodes.extend(functional.IntegralMomentOfScaledNormalEvaluation(ref_el, Q, phi, f)
@@ -85,7 +84,7 @@ class RTDualSet(dual_set.DualSet):
 
             # internal nodes. These are \int_T v \cdot p dx where p \in P_{q-2}^d
             if degree > 1:
-                Q = create_quadrature(ref_el, degree - 2 + quad_deg)
+                Q = create_quadrature(ref_el, interpolant_deg + degree - 2)
                 Pkm1 = polynomial_set.ONPolynomialSet(ref_el, degree - 2)
                 Pkm1_at_qpts = Pkm1.tabulate(Q.get_points())[(0,) * sd]
                 nodes.extend(functional.IntegralMoment(ref_el, Q, phi, (d,), (sd,))
@@ -140,22 +139,24 @@ class RaviartThomas(finite_element.CiarletElement):
     :arg k: The degree.
     :arg variant: optional variant specifying the types of nodes.
 
-    variant can be chosen from ["point", "integral", "integral(quadrature_degree)"]
-    "point" -> dofs are evaluated by point evaluation. Note that this variant has suboptimal
-    convergence order in the H(div)-norm
-    "integral" -> dofs are evaluated by quadrature rule of degree k.
-    "integral(quadrature_degree)" -> dofs are evaluated by quadrature rule of degree quadrature_degree. You might
-    want to choose a high quadrature degree to make sure that expressions will be interpolated exactly. This is important
-    when you want to have (nearly) div-preserving interpolation.
+    variant can be chosen from ["point", "integral", "integral(q)"]
+    "point" -> dofs are evaluated by point evaluation. Note that this variant
+    has suboptimal convergence order in the H(div)-norm
+    "integral" -> dofs are evaluated by quadrature rules with the minimum
+    degree required for unisolvence.
+    "integral(q)" -> dofs are evaluated by quadrature rules with the minimum
+    degree required for unisolvence plus q. You might want to choose a high
+    quadrature degree to make sure that expressions will be interpolated
+    exactly. This is important when you want to have (nearly) div-preserving
+    interpolation.
     """
 
     def __init__(self, ref_el, degree, variant=None):
 
-        variant, num_quad_pts = check_format_variant(variant, degree)
-        quad_deg = None if num_quad_pts is None else num_quad_pts - 1
+        variant, interpolant_deg = check_format_variant(variant, degree)
 
         poly_set = RTSpace(ref_el, degree)
-        dual = RTDualSet(ref_el, degree, variant, quad_deg)
+        dual = RTDualSet(ref_el, degree, variant, interpolant_deg)
         formdegree = ref_el.get_spatial_dimension() - 1  # (n-1)-form
         super(RaviartThomas, self).__init__(poly_set, dual, degree, formdegree,
                                             mapping="contravariant piola")

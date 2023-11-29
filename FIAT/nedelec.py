@@ -36,8 +36,8 @@ def NedelecSpace2D(ref_el, degree):
 
     Q = create_quadrature(ref_el, 2 * (k + 1))
 
-    Qpts = numpy.array(Q.get_points())
-    Qwts = numpy.array(Q.get_weights())
+    Qpts = Q.get_points()
+    Qwts = Q.get_weights()
 
     PkH_at_Qpts = PkH.tabulate(Qpts)[(0,) * sd]
     Pkp1_at_Qpts = Pkp1.tabulate(Qpts)[(0,) * sd]
@@ -141,7 +141,7 @@ def NedelecSpace3D(ref_el, degree):
 class NedelecDual2D(dual_set.DualSet):
     """Dual basis for first-kind Nedelec in 2D."""
 
-    def __init__(self, ref_el, degree, variant, quad_deg):
+    def __init__(self, ref_el, degree, variant, interpolant_deg):
         sd = ref_el.get_spatial_dimension()
         if sd != 2:
             raise Exception("Nedelec2D only works on triangles")
@@ -154,7 +154,7 @@ class NedelecDual2D(dual_set.DualSet):
             # edge nodes are \int_F v\cdot t p ds where p \in P_{q-1}(edge)
             # degree is q - 1
             edge = ref_el.get_facet_element()
-            Q = create_quadrature(edge, degree-1 + quad_deg)
+            Q = create_quadrature(edge, interpolant_deg + degree - 1)
             Pq = polynomial_set.ONPolynomialSet(edge, degree - 1)
             Pq_at_qpts = Pq.tabulate(Q.get_points())[(0,)*(sd - 1)]
             nodes.extend(functional.IntegralMomentOfEdgeTangentEvaluation(ref_el, Q, phi, e)
@@ -162,7 +162,7 @@ class NedelecDual2D(dual_set.DualSet):
 
             # internal nodes. These are \int_T v \cdot p dx where p \in P_{q-2}^2
             if degree > 1:
-                Q = create_quadrature(ref_el, degree-2 + quad_deg)
+                Q = create_quadrature(ref_el, interpolant_deg + degree - 2)
                 qpts = Q.get_points()
                 Pkm1 = polynomial_set.ONPolynomialSet(ref_el, degree - 2)
                 Pkm1_at_qpts = Pkm1.tabulate(qpts)[(0,) * sd]
@@ -214,7 +214,7 @@ class NedelecDual2D(dual_set.DualSet):
 class NedelecDual3D(dual_set.DualSet):
     """Dual basis for first-kind Nedelec in 3D."""
 
-    def __init__(self, ref_el, degree, variant, quad_deg):
+    def __init__(self, ref_el, degree, variant, interpolant_deg):
         sd = ref_el.get_spatial_dimension()
         if sd != 3:
             raise Exception("NedelecDual3D only works on tetrahedra")
@@ -227,7 +227,7 @@ class NedelecDual3D(dual_set.DualSet):
             # edge nodes are \int_F v\cdot t p ds where p \in P_{q-1}(edge)
             # degree is q - 1
             edge = ref_el.get_facet_element().get_facet_element()
-            Q = create_quadrature(edge, degree - 1 + quad_deg)
+            Q = create_quadrature(edge, interpolant_deg + degree - 1)
             Pq = polynomial_set.ONPolynomialSet(edge, degree - 1)
             Pq_at_qpts = Pq.tabulate(Q.get_points())[(0,)]
             nodes.extend(functional.IntegralMomentOfEdgeTangentEvaluation(ref_el, Q, phi, e)
@@ -238,7 +238,7 @@ class NedelecDual3D(dual_set.DualSet):
             # \int_F v\times n \cdot p ds where p \in P_{q-2}(f)^2
             if degree > 1:
                 facet = ref_el.get_facet_element()
-                Q = create_quadrature(facet, degree - 2 + quad_deg)
+                Q = create_quadrature(facet, interpolant_deg + degree - 2)
                 Pq = polynomial_set.ONPolynomialSet(facet, degree - 2, (sd,))
                 Pq_at_qpts = Pq.tabulate(Q.get_points())[(0, 0)]
 
@@ -247,14 +247,12 @@ class NedelecDual3D(dual_set.DualSet):
                     R = ref_el.compute_face_tangents(f)
 
                     # Skip last functionals because we only want p with p \cdot n = 0
-                    for i in range(2 * Pq.get_num_members() // 3):
-                        phi = Pq_at_qpts[i, ...]
-                        phi = numpy.matmul(phi[:-1, ...].T, R)
-                        nodes.append(functional.MonkIntegralMoment(ref_el, Q, phi, f))
+                    nodes.extend(functional.MonkIntegralMoment(ref_el, Q, numpy.dot(phi.T, R), f)
+                                 for phi in Pq_at_qpts[:2 * Pq.get_num_members() // 3, :-1, ...])
 
             # internal nodes. These are \int_T v \cdot p dx where p \in P_{q-3}^3(T)
             if degree > 2:
-                Q = create_quadrature(ref_el, degree - 3 + quad_deg)
+                Q = create_quadrature(ref_el, interpolant_deg + degree - 3)
                 qpts = Q.get_points()
                 Pkm2 = polynomial_set.ONPolynomialSet(ref_el, degree - 3)
                 Pkm2_at_qpts = Pkm2.tabulate(qpts)[(0,) * sd]
@@ -321,28 +319,30 @@ class Nedelec(finite_element.CiarletElement):
     Nedelec finite element
 
     :arg ref_el: The reference element.
-    :arg k: The degree.
+    :arg degree: The degree.
     :arg variant: optional variant specifying the types of nodes.
 
-    variant can be chosen from ["point", "integral", "integral(quadrature_degree)"]
-    "point" -> dofs are evaluated by point evaluation. Note that this variant has suboptimal
-    convergence order in the H(curl)-norm
-    "integral" -> dofs are evaluated by quadrature rule of degree k.
-    "integral(quadrature_degree)" -> dofs are evaluated by quadrature rule of degree quadrature_degree. You might
-    want to choose a high quadrature degree to make sure that expressions will be interpolated exactly. This is important
-    when you want to have (nearly) curl-preserving interpolation.
+    variant can be chosen from ["point", "integral", "integral(q)"]
+    "point" -> dofs are evaluated by point evaluation. Note that this variant
+    has suboptimal convergence order in the H(curl)-norm
+    "integral" -> dofs are evaluated by quadrature rules with the minimum
+    degree required for unisolvence.
+    "integral(q)" -> dofs are evaluated by quadrature rules with the minimum
+    degree required for unisolvence plus q. You might want to choose a high
+    quadrature degree to make sure that expressions will be interpolated
+    exactly. This is important when you want to have (nearly) curl-preserving
+    interpolation.
     """
 
     def __init__(self, ref_el, degree, variant=None):
 
-        variant, num_quad_pts = check_format_variant(variant, degree)
-        quad_deg = None if num_quad_pts is None else num_quad_pts - 1
+        variant, interpolant_deg = check_format_variant(variant, degree)
         if ref_el.get_spatial_dimension() == 3:
             poly_set = NedelecSpace3D(ref_el, degree)
-            dual = NedelecDual3D(ref_el, degree, variant, quad_deg)
+            dual = NedelecDual3D(ref_el, degree, variant, interpolant_deg)
         elif ref_el.get_spatial_dimension() == 2:
             poly_set = NedelecSpace2D(ref_el, degree)
-            dual = NedelecDual2D(ref_el, degree, variant, quad_deg)
+            dual = NedelecDual2D(ref_el, degree, variant, interpolant_deg)
         else:
             raise Exception("Not implemented")
         formdegree = 1  # 1-form

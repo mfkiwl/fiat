@@ -50,14 +50,14 @@ class NedelecSecondKindDual(DualSet):
     these elements coincide with the CG_k elements.)
     """
 
-    def __init__(self, cell, degree, variant, quad_deg):
+    def __init__(self, cell, degree, variant, interpolant_deg):
 
         # Define degrees of freedom
-        (dofs, ids) = self.generate_degrees_of_freedom(cell, degree, variant, quad_deg)
+        (dofs, ids) = self.generate_degrees_of_freedom(cell, degree, variant, interpolant_deg)
         # Call init of super-class
         super(NedelecSecondKindDual, self).__init__(dofs, cell, ids)
 
-    def generate_degrees_of_freedom(self, cell, degree, variant, quad_deg):
+    def generate_degrees_of_freedom(self, cell, degree, variant, interpolant_deg):
         "Generate dofs and geometry-to-dof maps (ids)."
 
         dofs = []
@@ -71,25 +71,25 @@ class NedelecSecondKindDual(DualSet):
         ids[0] = dict(list(zip(list(range(d + 1)), ([] for i in range(d + 1)))))
 
         # (d+1) degrees of freedom per entity of codimension 1 (edges)
-        (edge_dofs, edge_ids) = self._generate_edge_dofs(cell, degree, 0, variant, quad_deg)
+        (edge_dofs, edge_ids) = self._generate_edge_dofs(cell, degree, 0, variant, interpolant_deg)
         dofs.extend(edge_dofs)
         ids[1] = edge_ids
 
         # Include face degrees of freedom if 3D
         if d == 3:
             (face_dofs, face_ids) = self._generate_face_dofs(cell, degree,
-                                                             len(dofs), variant, quad_deg)
+                                                             len(dofs), variant, interpolant_deg)
             dofs.extend(face_dofs)
             ids[2] = face_ids
 
         # Varying degrees of freedom (possibly zero) per cell
-        (cell_dofs, cell_ids) = self._generate_cell_dofs(cell, degree, len(dofs), variant, quad_deg)
+        (cell_dofs, cell_ids) = self._generate_cell_dofs(cell, degree, len(dofs), variant, interpolant_deg)
         dofs.extend(cell_dofs)
         ids[d] = cell_ids
 
         return (dofs, ids)
 
-    def _generate_edge_dofs(self, cell, degree, offset, variant, quad_deg):
+    def _generate_edge_dofs(self, cell, degree, offset, variant, interpolant_deg):
         """Generate degrees of freedoms (dofs) for entities of
         codimension 1 (edges)."""
 
@@ -100,7 +100,7 @@ class NedelecSecondKindDual(DualSet):
 
         if variant == "integral":
             edge = cell.construct_subelement(1)
-            Q = create_quadrature(edge, degree + quad_deg)
+            Q = create_quadrature(edge, degree + interpolant_deg)
             Pq = polynomial_set.ONPolynomialSet(edge, degree)
             Pq_at_qpts = Pq.tabulate(Q.get_points())[(0,)]
             for e in range(len(cell.get_topology()[1])):
@@ -124,7 +124,7 @@ class NedelecSecondKindDual(DualSet):
 
         return (dofs, ids)
 
-    def _generate_face_dofs(self, cell, degree, offset, variant, quad_deg):
+    def _generate_face_dofs(self, cell, degree, offset, variant, interpolant_deg):
         """Generate degrees of freedoms (dofs) for faces."""
 
         # Initialize empty dofs and identifiers (ids)
@@ -139,7 +139,7 @@ class NedelecSecondKindDual(DualSet):
         msg = "2nd kind Nedelec face dofs only available with UFC convention"
         assert isinstance(cell, UFCTetrahedron), msg
 
-        num_edge_pts = degree + 1 if quad_deg is None else quad_deg + 1
+        num_edge_pts = degree + 1 if interpolant_deg is None else interpolant_deg + 1
 
         # Iterate over the faces of the tet
         num_faces = len(cell.get_topology()[2])
@@ -185,7 +185,7 @@ class NedelecSecondKindDual(DualSet):
 
         return (dofs, ids)
 
-    def _generate_cell_dofs(self, cell, degree, offset, variant, quad_deg):
+    def _generate_cell_dofs(self, cell, degree, offset, variant, interpolant_deg):
         """Generate degrees of freedoms (dofs) for entities of
         codimension d (cells)."""
 
@@ -196,8 +196,8 @@ class NedelecSecondKindDual(DualSet):
 
         # Create quadrature points
         rt_degree = degree + 1 - d
-        quad_deg = quad_deg or degree
-        Q = create_quadrature(cell, rt_degree + quad_deg)
+        interpolant_deg = interpolant_deg or degree
+        Q = create_quadrature(cell, rt_degree + interpolant_deg)
         qs = Q.get_points()
 
         # Create Raviart-Thomas nodal basis
@@ -227,19 +227,21 @@ class NedelecSecondKind(CiarletElement):
     :arg k: The degree.
     :arg variant: optional variant specifying the types of nodes.
 
-    variant can be chosen from ["point", "integral", "integral(quadrature_degree)"]
-    "point" -> dofs are evaluated by point evaluation. Note that this variant has suboptimal
-    convergence order in the H(curl)-norm
-    "integral" -> dofs are evaluated by quadrature rule of degree k.
-    "integral(quadrature_degree)" -> dofs are evaluated by quadrature rule of degree quadrature_degree. You might
-    want to choose a high quadrature degree to make sure that expressions will be interpolated exactly. This is important
-    when you want to have (nearly) curl-preserving interpolation.
+    variant can be chosen from ["point", "integral", "integral(q)"]
+    "point" -> dofs are evaluated by point evaluation. Note that this variant
+    has suboptimal convergence order in the H(curl)-norm
+    "integral" -> dofs are evaluated by quadrature rules with the minimum
+    degree required for unisolvence.
+    "integral(q)" -> dofs are evaluated by quadrature rules with the minimum
+    degree required for unisolvence plus q. You might want to choose a high
+    quadrature degree to make sure that expressions will be interpolated
+    exactly. This is important when you want to have (nearly) curl-preserving
+    interpolation.
     """
 
     def __init__(self, cell, k, variant=None):
 
-        variant, num_quad_pts = check_format_variant(variant, k)
-        quad_deg = None if num_quad_pts is None else num_quad_pts - 1
+        variant, interpolant_deg = check_format_variant(variant, k)
 
         # Check degree
         assert k >= 1, "Second kind Nedelecs start at 1!"
@@ -251,7 +253,7 @@ class NedelecSecondKind(CiarletElement):
         Ps = ONPolynomialSet(cell, k, (d, ))
 
         # Construct dual space
-        Ls = NedelecSecondKindDual(cell, k, variant, quad_deg)
+        Ls = NedelecSecondKindDual(cell, k, variant, interpolant_deg)
 
         # Set form degree
         formdegree = 1  # 1-form
