@@ -131,7 +131,6 @@ class NedelecSecondKindDual(DualSet):
         ids = dict(list(zip(list(range(4)), ([] for i in range(4)))))
 
         # Return empty info if not applicable
-        d = cell.get_spatial_dimension()
         if degree < 2:
             return (dofs, ids)
 
@@ -147,10 +146,8 @@ class NedelecSecondKindDual(DualSet):
         num_rts = RT.space_dimension()
 
         # Evaluate RT basis functions at reference quadrature points
-        ref_quad_points = Q_ref.get_points()
-        num_quad_points = len(ref_quad_points)
         Phi = RT.get_nodal_basis()
-        Phis = Phi.tabulate(ref_quad_points)[(0, 0)]
+        Phis = Phi.tabulate(Q_ref.get_points())[(0, 0)]
         # Note: Phis has dimensions:
         # num_basis_functions x num_components x num_quad_points
         Phis = numpy.transpose(Phis, (0, 2, 1))
