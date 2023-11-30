@@ -157,7 +157,7 @@ class FacetQuadratureRule(QuadratureRule):
         facet_topology = ref_el.get_topology()[entity_dim][entity_id]
         facet.vertices = ref_el.get_vertices_of_subcomplex(facet_topology)
 
-        # Map referent points and weights on the appropriate facet
+        # Map reference points and weights on the appropriate facet
         pts_ref = Q_ref.get_points()
         wts_ref = Q_ref.get_weights()
         pts, wts, J = map_quadrature(pts_ref, wts_ref, Q_ref.ref_el, facet, jacobian=True)
