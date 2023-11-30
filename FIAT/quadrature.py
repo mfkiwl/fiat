@@ -14,17 +14,35 @@ from recursivenodes.quadrature import gaussjacobi, lobattogaussjacobi, simplexga
 from FIAT import reference_element
 
 
-def map_quadrature(pts_ref, wts_ref, source_cell, target_cell):
+def map_quadrature(pts_ref, wts_ref, source_cell, target_cell, jacobian=False):
     """Map quadrature points and weights defined on source_cell to target_cell.
     """
     A, b = reference_element.make_affine_mapping(source_cell.get_vertices(),
                                                  target_cell.get_vertices())
+    scale = numpy.sqrt(numpy.linalg.det(numpy.dot(A.T, A)))
     pts = numpy.dot(pts_ref.reshape((-1, A.shape[1])), A.T) + b[None, :]
-    wts = numpy.linalg.det(A) * wts_ref
+    wts = scale * wts_ref
     # return immutable types
     pts = tuple(map(tuple, pts))
     wts = tuple(wts.flat)
+    if jacobian:
+        return pts, wts, A
     return pts, wts
+
+
+def map_facet_quadrature(Q_ref, cell, face_num):
+    """Map a reference quadrature to a face of a cell.
+    """
+    d = cell.get_spatial_dimension()
+    face_topology = cell.get_topology()[d-1][face_num]
+    face = cell.get_facet_element()
+    face.vertices = cell.get_vertices_of_subcomplex(face_topology)
+
+    pts_ref = Q_ref.get_points()
+    wts_ref = Q_ref.get_weights()
+    pts, wts, J = map_quadrature(pts_ref, wts_ref, Q_ref.ref_el, face, jacobian=True)
+    Q_face = QuadratureRule(face, pts, wts)
+    return Q_face, J
 
 
 class QuadratureRule(object):

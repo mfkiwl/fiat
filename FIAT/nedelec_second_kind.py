@@ -13,8 +13,8 @@ from FIAT.polynomial_set import ONPolynomialSet
 from FIAT.functional import PointEdgeTangentEvaluation as Tangent
 from FIAT.functional import FrobeniusIntegralMoment as IntegralMoment
 from FIAT.raviart_thomas import RaviartThomas
-from FIAT.quadrature_schemes import create_quadrature, UFCTetrahedronFaceQuadratureRule
-from FIAT.reference_element import UFCTetrahedron
+from FIAT.quadrature import map_facet_quadrature
+from FIAT.quadrature_schemes import create_quadrature
 from FIAT.check_format_variant import check_format_variant
 
 from FIAT import polynomial_set, functional
@@ -135,49 +135,43 @@ class NedelecSecondKindDual(DualSet):
         if degree < 2:
             return (dofs, ids)
 
-        msg = "2nd kind Nedelec face dofs only available with UFC convention"
-        assert isinstance(cell, UFCTetrahedron), msg
         if interpolant_deg is None:
             interpolant_deg = degree
+
+        # Construct quadrature scheme for the reference face
+        ref_face = cell.get_facet_element()
+        Q_ref = create_quadrature(ref_face, interpolant_deg + degree - 1)
+
+        # Construct Raviart-Thomas of (degree - 1) on the reference face
+        RT = RaviartThomas(ref_face, degree - 1, variant)
+        num_rts = RT.space_dimension()
+
+        # Evaluate RT basis functions at reference quadrature points
+        ref_quad_points = Q_ref.get_points()
+        num_quad_points = len(ref_quad_points)
+        Phi = RT.get_nodal_basis()
+        Phis = Phi.tabulate(ref_quad_points)[(0, 0)]
+        # Note: Phis has dimensions:
+        # num_basis_functions x num_components x num_quad_points
+        Phis = numpy.transpose(Phis, (0, 2, 1))
+        # Note: Phis has dimensions:
+        # num_basis_functions x num_quad_points x num_components
 
         # Iterate over the faces of the tet
         num_faces = len(cell.get_topology()[2])
         for face in range(num_faces):
-
-            # Construct quadrature scheme for this face
-            Q_face = UFCTetrahedronFaceQuadratureRule(face, interpolant_deg + degree - 1)
-
-            # Construct Raviart-Thomas of (degree - 1) on the
-            # reference face
-            reference_face = Q_face.reference_rule().ref_el
-            RT = RaviartThomas(reference_face, degree - 1, variant)
-            num_rts = RT.space_dimension()
-
-            # Evaluate RT basis functions at reference quadrature
-            # points
-            ref_quad_points = Q_face.reference_rule().get_points()
-            num_quad_points = len(ref_quad_points)
-            Phi = RT.get_nodal_basis()
-            Phis = Phi.tabulate(ref_quad_points)[(0, 0)]
-
-            # Note: Phis has dimensions:
-            # num_basis_functions x num_components x num_quad_points
+            # Get the quadrature and Jacobian of this face
+            Q_face, J = map_facet_quadrature(Q_ref, cell, face)
 
             # Map Phis -> phis (reference values to physical values)
-            J = Q_face.jacobian()
-            scale = 1.0 / numpy.sqrt(numpy.linalg.det(numpy.dot(J.T, J)))
-            phis = numpy.ndarray((d, num_quad_points))
-            for i in range(num_rts):
-                for q in range(num_quad_points):
-                    phi_i_q = scale * numpy.dot(J, Phis[numpy.newaxis, i, :, q].T)
-                    for j in range(d):
-                        phis[j, q] = phi_i_q[j]
+            piola_map = J / numpy.sqrt(numpy.linalg.det(numpy.dot(J.T, J)))
+            phis = numpy.dot(Phis, piola_map.T)
+            phis = numpy.transpose(phis, (0, 2, 1))
 
-                # Construct degrees of freedom as integral moments on
-                # this cell, using the special face quadrature
-                # weighted against the values of the (physical)
-                # Raviart--Thomas'es on the face
-                dofs.append(IntegralMoment(cell, Q_face, phis))
+            # Construct degrees of freedom as integral moments on this cell,
+            # using the reference face quadrature weighted against the values
+            # of the (physical) Raviart--Thomas'es on the face
+            dofs.extend(IntegralMoment(cell, Q_face, phi) for phi in phis)
 
             # Assign identifiers (num RTs per face + previous edge dofs)
             ids[face] = list(range(offset + num_rts*face, offset + num_rts*(face + 1)))
