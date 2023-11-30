@@ -157,7 +157,7 @@ class NedelecSecondKindDual(DualSet):
         # Iterate over the faces of the tet
         num_faces = len(cell.get_topology()[2])
         for face in range(num_faces):
-            # Get the quadrature and Jacobian of this face
+            # Get the quadrature and Jacobian on this face
             Q_face, J = map_facet_quadrature(Q_ref, cell, face)
 
             # Map Phis -> phis (reference values to physical values)
@@ -166,7 +166,7 @@ class NedelecSecondKindDual(DualSet):
             phis = numpy.transpose(phis, (0, 2, 1))
 
             # Construct degrees of freedom as integral moments on this cell,
-            # using the reference face quadrature weighted against the values
+            # using the face quadrature weighted against the values
             # of the (physical) Raviart--Thomas'es on the face
             dofs.extend(IntegralMoment(cell, Q_face, phi) for phi in phis)
 
@@ -181,21 +181,20 @@ class NedelecSecondKindDual(DualSet):
 
         # Return empty info if not applicable
         d = cell.get_spatial_dimension()
-        if (d == 2 and degree < 2) or (d == 3 and degree < 3):
+        rt_degree = degree - d + 1
+        if rt_degree < 1:
             return ([], {0: []})
 
         # Create quadrature points
-        rt_degree = degree + 1 - d
         interpolant_deg = interpolant_deg or degree
-        Q = create_quadrature(cell, rt_degree + interpolant_deg)
-        qs = Q.get_points()
+        Q = create_quadrature(cell, interpolant_deg + rt_degree)
 
         # Create Raviart-Thomas nodal basis
         RT = RaviartThomas(cell, rt_degree, variant)
         phi = RT.get_nodal_basis()
 
         # Evaluate Raviart-Thomas basis at quadrature points
-        phi_at_qs = phi.tabulate(qs)[(0,) * d]
+        phi_at_qs = phi.tabulate(Q.get_points())[(0,) * d]
 
         # Use (Frobenius) integral moments against RTs as dofs
         dofs = [IntegralMoment(cell, Q, phi)
