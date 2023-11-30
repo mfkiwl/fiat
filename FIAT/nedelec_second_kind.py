@@ -131,6 +131,7 @@ class NedelecSecondKindDual(DualSet):
         ids = dict(list(zip(list(range(4)), ([] for i in range(4)))))
 
         # Return empty info if not applicable
+        d = cell.get_spatial_dimension()
         if degree < 2:
             return (dofs, ids)
 
@@ -155,10 +156,10 @@ class NedelecSecondKindDual(DualSet):
         # num_basis_functions x num_quad_points x num_components
 
         # Iterate over the faces of the tet
-        num_faces = len(cell.get_topology()[2])
+        num_faces = len(cell.get_topology()[d-1])
         for face in range(num_faces):
             # Get the quadrature and Jacobian on this face
-            Q_face, J = map_facet_quadrature(Q_ref, cell, face)
+            Q_face, J = map_facet_quadrature(Q_ref, cell, d-1, face)
 
             # Map Phis -> phis (reference values to physical values)
             piola_map = J / numpy.sqrt(numpy.linalg.det(numpy.dot(J.T, J)))

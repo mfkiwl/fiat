@@ -30,11 +30,10 @@ def map_quadrature(pts_ref, wts_ref, source_cell, target_cell, jacobian=False):
     return pts, wts
 
 
-def map_facet_quadrature(Q_ref, cell, face_num):
-    """Map a reference quadrature to a face of a cell.
+def map_facet_quadrature(Q_ref, cell, entity_dim, entity_id):
+    """Map a reference quadrature to a facet of a cell.
     """
-    d = cell.get_spatial_dimension()
-    face_topology = cell.get_topology()[d-1][face_num]
+    face_topology = cell.get_topology()[entity_dim][entity_id]
     face = cell.get_facet_element()
     face.vertices = cell.get_vertices_of_subcomplex(face_topology)
 
