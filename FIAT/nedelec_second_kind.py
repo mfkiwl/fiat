@@ -13,8 +13,7 @@ from FIAT.polynomial_set import ONPolynomialSet
 from FIAT.functional import PointEdgeTangentEvaluation as Tangent
 from FIAT.functional import FrobeniusIntegralMoment as IntegralMoment
 from FIAT.raviart_thomas import RaviartThomas
-from FIAT.quadrature import UFCTetrahedronFaceQuadratureRule
-from FIAT.quadrature_schemes import create_quadrature
+from FIAT.quadrature_schemes import create_quadrature, UFCTetrahedronFaceQuadratureRule
 from FIAT.reference_element import UFCTetrahedron
 from FIAT.check_format_variant import check_format_variant
 
@@ -138,15 +137,15 @@ class NedelecSecondKindDual(DualSet):
 
         msg = "2nd kind Nedelec face dofs only available with UFC convention"
         assert isinstance(cell, UFCTetrahedron), msg
-
-        num_edge_pts = degree + 1 if interpolant_deg is None else interpolant_deg + 1
+        if interpolant_deg is None:
+            interpolant_deg = degree
 
         # Iterate over the faces of the tet
         num_faces = len(cell.get_topology()[2])
         for face in range(num_faces):
 
             # Construct quadrature scheme for this face
-            Q_face = UFCTetrahedronFaceQuadratureRule(face, num_edge_pts)
+            Q_face = UFCTetrahedronFaceQuadratureRule(face, interpolant_deg + degree - 1)
 
             # Construct Raviart-Thomas of (degree - 1) on the
             # reference face

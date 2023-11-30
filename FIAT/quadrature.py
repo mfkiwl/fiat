@@ -145,47 +145,6 @@ class CollapsedQuadratureTetrahedronRule(CollapsedQuadratureSimplexRule):
     pass
 
 
-class UFCTetrahedronFaceQuadratureRule(QuadratureRule):
-    """Highly specialized quadrature rule for the face of a
-    tetrahedron, mapped from a reference triangle, used for higher
-    order Nedelecs"""
-
-    def __init__(self, face_number, degree):
-
-        # Create quadrature rule on reference triangle
-        reference_triangle = reference_element.UFCTriangle()
-        reference_rule = make_quadrature(reference_triangle, degree)
-        ref_points = reference_rule.get_points()
-        ref_weights = reference_rule.get_weights()
-
-        # Get geometry information about the face of interest
-        reference_tet = reference_element.UFCTetrahedron()
-        face = reference_tet.get_topology()[2][face_number]
-        vertices = reference_tet.get_vertices_of_subcomplex(face)
-
-        # Use tet to map points and weights on the appropriate face
-        vertices = [numpy.array(list(vertex)) for vertex in vertices]
-        x0 = vertices[0]
-        J = numpy.vstack([vertices[1] - x0, vertices[2] - x0]).T
-        # This is just a very numpyfied way of writing J*p + x0:
-        points = numpy.einsum("ij,kj->ki", J, ref_points) + x0
-
-        # Map weights: multiply reference weights by sqrt(|J^T J|)
-        detJTJ = numpy.linalg.det(numpy.dot(J.T, J))
-        weights = numpy.sqrt(detJTJ) * ref_weights
-
-        # Initialize super class with new points and weights
-        QuadratureRule.__init__(self, reference_tet, points, weights)
-        self._reference_rule = reference_rule
-        self._J = J
-
-    def reference_rule(self):
-        return self._reference_rule
-
-    def jacobian(self):
-        return self._J
-
-
 def make_quadrature(ref_el, m):
     """Returns the collapsed quadrature rule using m points per
     direction on the given reference element. In the tensor product
