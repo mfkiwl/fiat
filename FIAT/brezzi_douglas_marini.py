@@ -5,13 +5,14 @@
 #
 # SPDX-License-Identifier:    LGPL-3.0-or-later
 
-from FIAT import (finite_element, quadrature, functional, dual_set,
+from FIAT import (finite_element, functional, dual_set,
                   polynomial_set, nedelec)
 from FIAT.check_format_variant import check_format_variant
+from FIAT.quadrature_schemes import create_quadrature
 
 
 class BDMDualSet(dual_set.DualSet):
-    def __init__(self, ref_el, degree, variant, quad_deg):
+    def __init__(self, ref_el, degree, variant, interpolant_deg):
 
         # Initialize containers for map: mesh_entity -> dof number and
         # dual basis
@@ -25,51 +26,40 @@ class BDMDualSet(dual_set.DualSet):
             facet = ref_el.get_facet_element()
             # Facet nodes are \int_F v\cdot n p ds where p \in P_{q-1}
             # degree is q - 1
-            Q = quadrature.make_quadrature(facet, quad_deg)
+            Q = create_quadrature(facet, interpolant_deg + degree)
             Pq = polynomial_set.ONPolynomialSet(facet, degree)
-            Pq_at_qpts = Pq.tabulate(Q.get_points())[tuple([0]*(sd - 1))]
-            for f in range(len(t[sd - 1])):
-                for i in range(Pq_at_qpts.shape[0]):
-                    phi = Pq_at_qpts[i, :]
-                    nodes.append(functional.IntegralMomentOfScaledNormalEvaluation(ref_el, Q, phi, f))
+            Pq_at_qpts = Pq.tabulate(Q.get_points())[(0,)*(sd - 1)]
+            nodes.extend(functional.IntegralMomentOfScaledNormalEvaluation(ref_el, Q, phi, f)
+                         for f in range(len(t[sd - 1]))
+                         for phi in Pq_at_qpts)
 
             # internal nodes
             if degree > 1:
-                Q = quadrature.make_quadrature(ref_el, quad_deg)
+                Q = create_quadrature(ref_el, interpolant_deg + degree - 1)
                 qpts = Q.get_points()
                 Nedel = nedelec.Nedelec(ref_el, degree - 1, variant)
                 Nedfs = Nedel.get_nodal_basis()
-                zero_index = tuple([0 for i in range(sd)])
-                Ned_at_qpts = Nedfs.tabulate(qpts)[zero_index]
-
-                for i in range(len(Ned_at_qpts)):
-                    phi_cur = Ned_at_qpts[i, :]
-                    l_cur = functional.FrobeniusIntegralMoment(ref_el, Q, phi_cur)
-                    nodes.append(l_cur)
+                Ned_at_qpts = Nedfs.tabulate(qpts)[(0,) * sd]
+                nodes.extend(functional.FrobeniusIntegralMoment(ref_el, Q, phi)
+                             for phi in Ned_at_qpts)
 
         elif variant == "point":
             # Define each functional for the dual set
             # codimension 1 facets
             for i in range(len(t[sd - 1])):
                 pts_cur = ref_el.make_points(sd - 1, i, sd + degree)
-                for j in range(len(pts_cur)):
-                    pt_cur = pts_cur[j]
-                    f = functional.PointScaledNormalEvaluation(ref_el, i, pt_cur)
-                    nodes.append(f)
+                nodes.extend(functional.PointScaledNormalEvaluation(ref_el, i, pt)
+                             for pt in pts_cur)
 
             # internal nodes
             if degree > 1:
-                Q = quadrature.make_quadrature(ref_el, 2 * (degree + 1))
+                Q = create_quadrature(ref_el, 2 * degree - 1)
                 qpts = Q.get_points()
                 Nedel = nedelec.Nedelec(ref_el, degree - 1, variant)
                 Nedfs = Nedel.get_nodal_basis()
-                zero_index = tuple([0 for i in range(sd)])
-                Ned_at_qpts = Nedfs.tabulate(qpts)[zero_index]
-
-                for i in range(len(Ned_at_qpts)):
-                    phi_cur = Ned_at_qpts[i, :]
-                    l_cur = functional.FrobeniusIntegralMoment(ref_el, Q, phi_cur)
-                    nodes.append(l_cur)
+                Ned_at_qpts = Nedfs.tabulate(qpts)[(0,) * sd]
+                nodes.extend(functional.FrobeniusIntegralMoment(ref_el, Q, phi)
+                             for phi in Ned_at_qpts)
 
         # sets vertices (and in 3d, edges) to have no nodes
         for i in range(sd - 1):
@@ -103,28 +93,31 @@ class BrezziDouglasMarini(finite_element.CiarletElement):
     The BDM element
 
     :arg ref_el: The reference element.
-    :arg k: The degree.
+    :arg degree: The degree.
     :arg variant: optional variant specifying the types of nodes.
 
-    variant can be chosen from ["point", "integral", "integral(quadrature_degree)"]
-    "point" -> dofs are evaluated by point evaluation. Note that this variant has suboptimal
-    convergence order in the H(div)-norm
-    "integral" -> dofs are evaluated by quadrature rule of degree k.
-    "integral(quadrature_degree)" -> dofs are evaluated by quadrature rule of degree quadrature_degree. You might
-    want to choose a high quadrature degree to make sure that expressions will be interpolated exactly. This is important
-    when you want to have (nearly) div-preserving interpolation.
+    variant can be chosen from ["point", "integral", "integral(q)"]
+    "point" -> dofs are evaluated by point evaluation. Note that this variant
+    has suboptimal convergence order in the H(div)-norm
+    "integral" -> dofs are evaluated by quadrature rules with the minimum
+    degree required for unisolvence.
+    "integral(q)" -> dofs are evaluated by quadrature rules with the minimum
+    degree required for unisolvence plus q. You might want to choose a high
+    quadrature degree to make sure that expressions will be interpolated
+    exactly. This is important when you want to have (nearly) div-preserving
+    interpolation.
     """
 
-    def __init__(self, ref_el, k, variant=None):
+    def __init__(self, ref_el, degree, variant=None):
 
-        (variant, quad_deg) = check_format_variant(variant, k)
+        variant, interpolant_deg = check_format_variant(variant, degree)
 
-        if k < 1:
+        if degree < 1:
             raise Exception("BDM_k elements only valid for k >= 1")
 
         sd = ref_el.get_spatial_dimension()
-        poly_set = polynomial_set.ONPolynomialSet(ref_el, k, (sd, ))
-        dual = BDMDualSet(ref_el, k, variant, quad_deg)
+        poly_set = polynomial_set.ONPolynomialSet(ref_el, degree, (sd, ))
+        dual = BDMDualSet(ref_el, degree, variant, interpolant_deg)
         formdegree = sd - 1  # (n-1)-form
-        super(BrezziDouglasMarini, self).__init__(poly_set, dual, k, formdegree,
+        super(BrezziDouglasMarini, self).__init__(poly_set, dual, degree, formdegree,
                                                   mapping="contravariant piola")

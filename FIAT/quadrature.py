@@ -9,9 +9,25 @@
 
 import itertools
 import numpy
-from recursivenodes.quadrature import gaussjacobi, simplexgausslegendre
+from recursivenodes.quadrature import gaussjacobi, lobattogaussjacobi, simplexgausslegendre
 
 from FIAT import reference_element
+
+
+def map_quadrature(pts_ref, wts_ref, source_cell, target_cell, jacobian=False):
+    """Map quadrature points and weights defined on source_cell to target_cell.
+    """
+    A, b = reference_element.make_affine_mapping(source_cell.get_vertices(),
+                                                 target_cell.get_vertices())
+    scale = numpy.sqrt(numpy.linalg.det(numpy.dot(A.T, A)))
+    pts = numpy.dot(pts_ref.reshape((-1, A.shape[1])), A.T) + b[None, :]
+    wts = scale * wts_ref
+    # return immutable types
+    pts = tuple(map(tuple, pts))
+    wts = tuple(wts.flat)
+    if jacobian:
+        return pts, wts, A
+    return pts, wts
 
 
 class QuadratureRule(object):
@@ -41,18 +57,10 @@ class GaussJacobiQuadratureLineRule(QuadratureRule):
     using m roots of m:th order Jacobi polynomial."""
 
     def __init__(self, ref_el, m, a=0, b=0):
-        # this gives roots on the default (-1,1) reference element
-        xs_ref, wts = gaussjacobi(m, a, b)
-        xs_ref = xs_ref.reshape((-1, 1))
-
         Ref1 = reference_element.DefaultLine()
-        A, b = reference_element.make_affine_mapping(Ref1.get_vertices(),
-                                                     ref_el.get_vertices())
-        mapping = lambda x: numpy.dot(x, A.T) + b[None, :]
-        pts = tuple(map(tuple, mapping(xs_ref)))
-        wts *= numpy.linalg.det(A)
-
-        QuadratureRule.__init__(self, ref_el, pts, tuple(wts.flat))
+        pts_ref, wts_ref = gaussjacobi(m, a, b)
+        pts, wts = map_quadrature(pts_ref, wts_ref, Ref1, ref_el)
+        QuadratureRule.__init__(self, ref_el, pts, wts)
 
 
 class GaussLobattoLegendreQuadratureLineRule(QuadratureRule):
@@ -64,28 +72,10 @@ class GaussLobattoLegendreQuadratureLineRule(QuadratureRule):
         if m < 2:
             raise ValueError(
                 "Gauss-Labotto-Legendre quadrature invalid for fewer than 2 points")
-
-        verts = ref_el.vertices
-        volume = ref_el.volume()
-        if m > 2:
-            # Make the interior points and weights
-            rule = GaussJacobiQuadratureLineRule(ref_el, m-2, 1, 1)
-            # Remove the bubble weight from the quadrature weights
-            x = rule.get_points().reshape((-1,))
-            bubble = (2.0 / volume)**2 * (x - verts[0][0]) * (verts[1][0] - x)
-            wts = rule.get_weights() / bubble
-            pts = rule.pts
-        else:
-            # Special case for lowest order.
-            wts = ()
-            pts = ()
-
-        # Get the weight at the endpoints via sum(ws) == volume
-        w0 = 0.5*(volume - sum(wts))
-        xs = (verts[0], *pts, verts[1])
-        ws = (w0, *wts, w0)
-
-        QuadratureRule.__init__(self, ref_el, xs, ws)
+        Ref1 = reference_element.DefaultLine()
+        pts_ref, wts_ref = lobattogaussjacobi(m, 0, 0)
+        pts, wts = map_quadrature(pts_ref, wts_ref, Ref1, ref_el)
+        QuadratureRule.__init__(self, ref_el, pts, wts)
 
 
 class GaussLegendreQuadratureLineRule(GaussJacobiQuadratureLineRule):
@@ -138,17 +128,10 @@ class CollapsedQuadratureSimplexRule(QuadratureRule):
 
     def __init__(self, ref_el, m):
         dim = ref_el.get_spatial_dimension()
-        pts_ref, wts = simplexgausslegendre(dim, m)
-        pts_ref = pts_ref.reshape((-1, dim))
-
         Ref1 = reference_element.default_simplex(dim)
-        A, b = reference_element.make_affine_mapping(Ref1.get_vertices(),
-                                                     ref_el.get_vertices())
-        mapping = lambda x: numpy.dot(x, A.T) + b[None, :]
-        pts = tuple(map(tuple, mapping(pts_ref)))
-        wts *= numpy.linalg.det(A)
-
-        QuadratureRule.__init__(self, ref_el, pts, tuple(wts.flat))
+        pts_ref, wts_ref = simplexgausslegendre(dim, m)
+        pts, wts = map_quadrature(pts_ref, wts_ref, Ref1, ref_el)
+        QuadratureRule.__init__(self, ref_el, pts, wts)
 
 
 class CollapsedQuadratureTriangleRule(CollapsedQuadratureSimplexRule):
@@ -165,39 +148,24 @@ class CollapsedQuadratureTetrahedronRule(CollapsedQuadratureSimplexRule):
     pass
 
 
-class UFCTetrahedronFaceQuadratureRule(QuadratureRule):
-    """Highly specialized quadrature rule for the face of a
-    tetrahedron, mapped from a reference triangle, used for higher
-    order Nedelecs"""
+class FacetQuadratureRule(QuadratureRule):
+    """A quadrature rule on a facet mapped from a reference quadrature rule.
+    """
+    def __init__(self, ref_el, entity_dim, entity_id, Q_ref):
+        # Construct the facet of interest
+        facet = ref_el.construct_subelement(entity_dim)
+        facet_topology = ref_el.get_topology()[entity_dim][entity_id]
+        facet.vertices = ref_el.get_vertices_of_subcomplex(facet_topology)
 
-    def __init__(self, face_number, degree):
-
-        # Create quadrature rule on reference triangle
-        reference_triangle = reference_element.UFCTriangle()
-        reference_rule = make_quadrature(reference_triangle, degree)
-        ref_points = reference_rule.get_points()
-        ref_weights = reference_rule.get_weights()
-
-        # Get geometry information about the face of interest
-        reference_tet = reference_element.UFCTetrahedron()
-        face = reference_tet.get_topology()[2][face_number]
-        vertices = reference_tet.get_vertices_of_subcomplex(face)
-
-        # Use tet to map points and weights on the appropriate face
-        vertices = [numpy.array(list(vertex)) for vertex in vertices]
-        x0 = vertices[0]
-        J = numpy.vstack([vertices[1] - x0, vertices[2] - x0]).T
-        # This is just a very numpyfied way of writing J*p + x0:
-        points = numpy.einsum("ij,kj->ki", J, ref_points) + x0
-
-        # Map weights: multiply reference weights by sqrt(|J^T J|)
-        detJTJ = numpy.linalg.det(numpy.dot(J.T, J))
-        weights = numpy.sqrt(detJTJ) * ref_weights
+        # Map reference points and weights on the appropriate facet
+        pts_ref = Q_ref.get_points()
+        wts_ref = Q_ref.get_weights()
+        pts, wts, J = map_quadrature(pts_ref, wts_ref, Q_ref.ref_el, facet, jacobian=True)
 
         # Initialize super class with new points and weights
-        QuadratureRule.__init__(self, reference_tet, points, weights)
-        self._reference_rule = reference_rule
+        QuadratureRule.__init__(self, facet, pts, wts)
         self._J = J
+        self._reference_rule = Q_ref
 
     def reference_rule(self):
         return self._reference_rule
