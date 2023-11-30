@@ -13,7 +13,7 @@ from FIAT.polynomial_set import ONPolynomialSet
 from FIAT.functional import PointEdgeTangentEvaluation as Tangent
 from FIAT.functional import FrobeniusIntegralMoment as IntegralMoment
 from FIAT.raviart_thomas import RaviartThomas
-from FIAT.quadrature import map_facet_quadrature
+from FIAT.quadrature import FacetQuadratureRule
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.check_format_variant import check_format_variant
 
@@ -159,7 +159,8 @@ class NedelecSecondKindDual(DualSet):
         num_faces = len(cell.get_topology()[d-1])
         for face in range(num_faces):
             # Get the quadrature and Jacobian on this face
-            Q_face, J = map_facet_quadrature(Q_ref, cell, d-1, face)
+            Q_face = FacetQuadratureRule(cell, d-1, face, Q_ref)
+            J = Q_face.jacobian()
 
             # Map Phis -> phis (reference values to physical values)
             piola_map = J / numpy.sqrt(numpy.linalg.det(numpy.dot(J.T, J)))

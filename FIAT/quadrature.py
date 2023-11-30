@@ -30,20 +30,6 @@ def map_quadrature(pts_ref, wts_ref, source_cell, target_cell, jacobian=False):
     return pts, wts
 
 
-def map_facet_quadrature(Q_ref, cell, entity_dim, entity_id):
-    """Map a reference quadrature to a facet of a cell.
-    """
-    face_topology = cell.get_topology()[entity_dim][entity_id]
-    face = cell.get_facet_element()
-    face.vertices = cell.get_vertices_of_subcomplex(face_topology)
-
-    pts_ref = Q_ref.get_points()
-    wts_ref = Q_ref.get_weights()
-    pts, wts, J = map_quadrature(pts_ref, wts_ref, Q_ref.ref_el, face, jacobian=True)
-    Q_face = QuadratureRule(face, pts, wts)
-    return Q_face, J
-
-
 class QuadratureRule(object):
     """General class that models integration over a reference element
     as the weighted sum of a function evaluated at a set of points."""
@@ -160,6 +146,32 @@ class CollapsedQuadratureTetrahedronRule(CollapsedQuadratureSimplexRule):
     Karniadakis & Sherwin by mapping products of Gauss-Jacobi rules
     from the cube to the tetrahedron."""
     pass
+
+
+class FacetQuadratureRule(QuadratureRule):
+    """A quadrature rule on a facet mapped from a reference quadrature rule.
+    """
+    def __init__(self, ref_el, entity_dim, entity_id, Q_ref):
+        # Construct the facet of interest
+        facet = ref_el.construct_subelement(entity_dim)
+        facet_topology = ref_el.get_topology()[entity_dim][entity_id]
+        facet.vertices = ref_el.get_vertices_of_subcomplex(facet_topology)
+
+        # Map referent points and weights on the appropriate facet
+        pts_ref = Q_ref.get_points()
+        wts_ref = Q_ref.get_weights()
+        pts, wts, J = map_quadrature(pts_ref, wts_ref, Q_ref.ref_el, facet, jacobian=True)
+
+        # Initialize super class with new points and weights
+        QuadratureRule.__init__(self, facet, pts, wts)
+        self._J = J
+        self._reference_rule = Q_ref
+
+    def reference_rule(self):
+        return self._reference_rule
+
+    def jacobian(self):
+        return self._J
 
 
 def make_quadrature(ref_el, m):
