@@ -337,10 +337,8 @@ def xg_scheme(ref_el, degree):
         http://dx.doi.org/10.1016/j.camwa.2009.10.027
     """
     dim = ref_el.get_spatial_dimension()
-    if dim == 2:
+    if dim == 2 or dim == 3:
         from FIAT.xg_quad_data import triangle_table as table
-    elif dim == 3:
-        from FIAT.xg_quad_data import tetrahedron_table as table
     else:
         raise ValueError(f"Xiao-Gambutas rule not availale for {dim} dimensions.")
     try:
@@ -350,18 +348,17 @@ def xg_scheme(ref_el, degree):
 
     # Get affine map from the (-1,1)^d triangle to the G-X equilateral triangle
     if dim == 2:
-        A = numpy.array([[1, -1/numpy.sqrt(3)],
-                         [0, 2/numpy.sqrt(3)]])
-        b = numpy.array([-1/3, -1/3])
+        A = numpy.array([[1, 1/2],
+                         [0, numpy.sqrt(3)/2]])
+        b = A.sum(axis=1)/3
     else:
-        A = numpy.array([[1, -1/numpy.sqrt(3), -1/numpy.sqrt(6)],
-                         [0, 2/numpy.sqrt(3), -1/numpy.sqrt(6)],
-                         [0, 0, numpy.sqrt(6)/2]])
-        b = numpy.array([-1/2, -1/2, -1/2])
+        A = numpy.array([[1, 1/2, 1/2],
+                         [0, numpy.sqrt(3)/2, numpy.sqrt(3)/6],
+                         [0, 0, numpy.sqrt(6)/3]])
+        b = A.sum(axis=1)/2
 
-    A = numpy.linalg.inv(A)
     Ref1 = default_simplex(dim)
-    v = numpy.dot(numpy.array(Ref1.vertices) - b[None, :], A.T)
+    v = numpy.dot(Ref1.vertices, A.T) + b[None, :]
     Ref1.vertices = tuple(map(tuple, v))
 
     pts_ref = order_table["points"]
@@ -373,6 +370,11 @@ def xg_scheme(ref_el, degree):
 def _triangle_scheme(ref_el, degree):
     """Return a quadrature scheme on a triangle of specified order. Falls
     back on canonical rule for higher orders."""
+    try:
+        # Get Xiao-Gambutas scheme
+        return xg_scheme(ref_el, degree)
+    except ValueError:
+        pass
 
     if degree == 0 or degree == 1:
         # Scheme from Zienkiewicz and Taylor, 1 point, degree of precision 1
@@ -441,12 +443,8 @@ def _triangle_scheme(ref_el, degree):
         w[6:12] = 0.082851075618374
         w = w/2.0
     else:
-        try:
-            # Get Xiao-Gambutas scheme
-            return xg_scheme(ref_el, degree)
-        except ValueError:
-            # Get canonical scheme
-            return _fiat_scheme(ref_el, degree)
+        # Get canonical scheme
+        return _fiat_scheme(ref_el, degree)
 
     # Return scheme
     x, w = map_quadrature(x, w, UFCTriangle(), ref_el)
@@ -456,6 +454,12 @@ def _triangle_scheme(ref_el, degree):
 def _tetrahedron_scheme(ref_el, degree):
     """Return a quadrature scheme on a tetrahedron of specified
     degree. Falls back on canonical rule for higher orders"""
+    if degree != 3:
+        try:
+            # Get Xiao-Gambutas scheme
+            return xg_scheme(ref_el, degree)
+        except ValueError:
+            pass
 
     if degree == 0 or degree == 1:
         # Scheme from Zienkiewicz and Taylor, 1 point, degree of precision 1
@@ -565,12 +569,8 @@ def _tetrahedron_scheme(ref_el, degree):
         w[12:24] = 0.0482142857142857
         w = w/6.0
     else:
-        try:
-            # Get Xiao-Gambutas scheme
-            return xg_scheme(ref_el, degree)
-        except ValueError:
-            # Get canonical scheme
-            return _fiat_scheme(ref_el, degree)
+        # Get canonical scheme
+        return _fiat_scheme(ref_el, degree)
 
     # Return scheme
     x, w = map_quadrature(x, w, UFCTetrahedron(), ref_el)
