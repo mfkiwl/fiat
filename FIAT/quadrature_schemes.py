@@ -31,7 +31,7 @@ Background on the schemes:
 import numpy
 
 # FIAT
-from FIAT.reference_element import QUADRILATERAL, HEXAHEDRON, TENSORPRODUCT, TRIANGLE, TETRAHEDRON, UFCTriangle, UFCTetrahedron
+from FIAT.reference_element import QUADRILATERAL, HEXAHEDRON, TENSORPRODUCT, TRIANGLE, TETRAHEDRON, UFCTriangle, UFCTetrahedron, default_simplex
 from FIAT.quadrature import QuadratureRule, make_quadrature, make_tensor_product_quadrature, map_quadrature
 
 
@@ -323,6 +323,53 @@ def _kmv_lump_scheme(ref_el, degree):
     return QuadratureRule(T, x, w)
 
 
+def xg_scheme(ref_el, degree):
+    """A (nearly) Gaussian simplicial quadrature with very few quadrature nodes,
+    available for low-to-moderate orders.
+
+    Raises `ValueError` if no quadrature rule for the requested parameters is available.
+
+    See
+
+        H. Xiao and Z. Gimbutas, "A numerical algorithm for the construction of
+        efficient quadrature rules in two and higher dimensions," Computers &
+        Mathematics with Applications, vol. 59, no. 2, pp. 663-676, 2010.
+        http://dx.doi.org/10.1016/j.camwa.2009.10.027
+    """
+    dim = ref_el.get_spatial_dimension()
+    if dim == 2:
+        from FIAT.xg_quad_data import triangle_table as table
+    elif dim == 3:
+        from FIAT.xg_quad_data import tetrahedron_table as table
+    else:
+        raise ValueError(f"Xiao-Gambutas rule not availale for {dim} dimensions.")
+    try:
+        order_table = table[degree]
+    except KeyError:
+        raise ValueError(f"Xiao-Gambutas rule not availale for degree {degree}.")
+
+    # Get affine map from the (-1,1)^d triangle to the G-X equilateral triangle
+    if dim == 2:
+        A = numpy.array([[1, -1/numpy.sqrt(3)],
+                         [0, 2/numpy.sqrt(3)]])
+        b = numpy.array([-1/3, -1/3])
+    else:
+        A = numpy.array([[1, -1/numpy.sqrt(3), -1/numpy.sqrt(6)],
+                         [0, 2/numpy.sqrt(3), -1/numpy.sqrt(6)],
+                         [0, 0, numpy.sqrt(6)/2]])
+        b = numpy.array([-1/2, -1/2, -1/2])
+
+    A = numpy.linalg.inv(A)
+    Ref1 = default_simplex(dim)
+    v = numpy.dot(numpy.array(Ref1.vertices) - b[None, :], A.T)
+    Ref1.vertices = tuple(map(tuple, v))
+
+    pts_ref = order_table["points"]
+    wts_ref = order_table["weights"]
+    pts, wts = map_quadrature(pts_ref, wts_ref, Ref1, ref_el)
+    return QuadratureRule(ref_el, pts, wts)
+
+
 def _triangle_scheme(ref_el, degree):
     """Return a quadrature scheme on a triangle of specified order. Falls
     back on canonical rule for higher orders."""
@@ -394,8 +441,12 @@ def _triangle_scheme(ref_el, degree):
         w[6:12] = 0.082851075618374
         w = w/2.0
     else:
-        # Get canonical scheme
-        return _fiat_scheme(ref_el, degree)
+        try:
+            # Get Xiao-Gambutas scheme
+            return xg_scheme(ref_el, degree)
+        except ValueError:
+            # Get canonical scheme
+            return _fiat_scheme(ref_el, degree)
 
     # Return scheme
     x, w = map_quadrature(x, w, UFCTriangle(), ref_el)
@@ -514,8 +565,12 @@ def _tetrahedron_scheme(ref_el, degree):
         w[12:24] = 0.0482142857142857
         w = w/6.0
     else:
-        # Get canonical scheme
-        return _fiat_scheme(ref_el, degree)
+        try:
+            # Get Xiao-Gambutas scheme
+            return xg_scheme(ref_el, degree)
+        except ValueError:
+            # Get canonical scheme
+            return _fiat_scheme(ref_el, degree)
 
     # Return scheme
     x, w = map_quadrature(x, w, UFCTetrahedron(), ref_el)
