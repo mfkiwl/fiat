@@ -370,11 +370,12 @@ def xg_scheme(ref_el, degree):
 def _triangle_scheme(ref_el, degree):
     """Return a quadrature scheme on a triangle of specified order. Falls
     back on canonical rule for higher orders."""
-    try:
-        # Get Xiao-Gambutas scheme
-        return xg_scheme(ref_el, degree)
-    except ValueError:
-        pass
+    if degree != 3:
+        try:
+            # Get Xiao-Gambutas scheme
+            return xg_scheme(ref_el, degree)
+        except ValueError:
+            pass
 
     if degree == 0 or degree == 1:
         # Scheme from Zienkiewicz and Taylor, 1 point, degree of precision 1
