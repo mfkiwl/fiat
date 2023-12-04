@@ -31,7 +31,7 @@ Background on the schemes:
 import numpy
 
 # FIAT
-from FIAT.reference_element import QUADRILATERAL, HEXAHEDRON, TENSORPRODUCT, TRIANGLE, TETRAHEDRON, UFCTriangle, UFCTetrahedron
+from FIAT.reference_element import QUADRILATERAL, HEXAHEDRON, TENSORPRODUCT, TRIANGLE, TETRAHEDRON, UFCTriangle, UFCTetrahedron, default_simplex
 from FIAT.quadrature import QuadratureRule, make_quadrature, make_tensor_product_quadrature, map_quadrature
 
 
@@ -323,10 +323,53 @@ def _kmv_lump_scheme(ref_el, degree):
     return QuadratureRule(T, x, w)
 
 
+def xg_scheme(ref_el, degree):
+    """A (nearly) Gaussian simplicial quadrature with very few quadrature nodes,
+    available for low-to-moderate orders.
+
+    Raises `ValueError` if no quadrature rule for the requested parameters is available.
+
+    See
+
+        H. Xiao and Z. Gimbutas, "A numerical algorithm for the construction of
+        efficient quadrature rules in two and higher dimensions," Computers &
+        Mathematics with Applications, vol. 59, no. 2, pp. 663-676, 2010.
+        http://dx.doi.org/10.1016/j.camwa.2009.10.027
+    """
+    dim = ref_el.get_spatial_dimension()
+    if dim == 2 or dim == 3:
+        from FIAT.xg_quad_data import triangle_table as table
+    else:
+        raise ValueError(f"Xiao-Gambutas rule not availale for {dim} dimensions.")
+    try:
+        order_table = table[degree]
+    except KeyError:
+        raise ValueError(f"Xiao-Gambutas rule not availale for degree {degree}.")
+
+    # Get affine map from the (-1,1)^d triangle to the G-X equilateral triangle
+    if dim == 2:
+        A = numpy.array([[1, 1/2],
+                         [0, numpy.sqrt(3)/2]])
+        b = A.sum(axis=1)/3
+    else:
+        A = numpy.array([[1, 1/2, 1/2],
+                         [0, numpy.sqrt(3)/2, numpy.sqrt(3)/6],
+                         [0, 0, numpy.sqrt(6)/3]])
+        b = A.sum(axis=1)/2
+
+    Ref1 = default_simplex(dim)
+    v = numpy.dot(Ref1.vertices, A.T) + b[None, :]
+    Ref1.vertices = tuple(map(tuple, v))
+
+    pts_ref = order_table["points"]
+    wts_ref = order_table["weights"]
+    pts, wts = map_quadrature(pts_ref, wts_ref, Ref1, ref_el)
+    return QuadratureRule(ref_el, pts, wts)
+
+
 def _triangle_scheme(ref_el, degree):
     """Return a quadrature scheme on a triangle of specified order. Falls
     back on canonical rule for higher orders."""
-
     if degree == 0 or degree == 1:
         # Scheme from Zienkiewicz and Taylor, 1 point, degree of precision 1
         x = numpy.array([[1.0/3.0, 1.0/3.0]])
@@ -336,8 +379,8 @@ def _triangle_scheme(ref_el, degree):
         x = numpy.array([[1.0/6.0, 1.0/6.0],
                          [1.0/6.0, 2.0/3.0],
                          [2.0/3.0, 1.0/6.0]])
-        w = numpy.arange(3, dtype=numpy.float64)
-        w[:] = 1.0/6.0
+        w = numpy.zeros((3,), dtype=numpy.float64)
+        w.fill(1.0/6.0)
     elif degree == 3:
         # Scheme from Strang and Fix, 6 points, degree of precision 3
         x = numpy.array([[0.659027622374092, 0.231933368553031],
@@ -346,56 +389,15 @@ def _triangle_scheme(ref_el, degree):
                          [0.231933368553031, 0.109039009072877],
                          [0.109039009072877, 0.659027622374092],
                          [0.109039009072877, 0.231933368553031]])
-        w = numpy.arange(6, dtype=numpy.float64)
-        w[:] = 1.0/12.0
-    elif degree == 4:
-        # Scheme from Strang and Fix, 6 points, degree of precision 4
-        x = numpy.array([[0.816847572980459, 0.091576213509771],
-                         [0.091576213509771, 0.816847572980459],
-                         [0.091576213509771, 0.091576213509771],
-                         [0.108103018168070, 0.445948490915965],
-                         [0.445948490915965, 0.108103018168070],
-                         [0.445948490915965, 0.445948490915965]])
-        w = numpy.arange(6, dtype=numpy.float64)
-        w[0:3] = 0.109951743655322
-        w[3:6] = 0.223381589678011
-        w = w/2.0
-    elif degree == 5:
-        # Scheme from Strang and Fix, 7 points, degree of precision 5
-        x = numpy.array([[0.33333333333333333, 0.33333333333333333],
-                         [0.79742698535308720, 0.10128650732345633],
-                         [0.10128650732345633, 0.79742698535308720],
-                         [0.10128650732345633, 0.10128650732345633],
-                         [0.05971587178976981, 0.47014206410511505],
-                         [0.47014206410511505, 0.05971587178976981],
-                         [0.47014206410511505, 0.47014206410511505]])
-        w = numpy.arange(7, dtype=numpy.float64)
-        w[0] = 0.22500000000000000
-        w[1:4] = 0.12593918054482717
-        w[4:7] = 0.13239415278850616
-        w = w/2.0
-    elif degree == 6:
-        # Scheme from Strang and Fix, 12 points, degree of precision 6
-        x = numpy.array([[0.873821971016996, 0.063089014491502],
-                         [0.063089014491502, 0.873821971016996],
-                         [0.063089014491502, 0.063089014491502],
-                         [0.501426509658179, 0.249286745170910],
-                         [0.249286745170910, 0.501426509658179],
-                         [0.249286745170910, 0.249286745170910],
-                         [0.636502499121399, 0.310352451033785],
-                         [0.636502499121399, 0.053145049844816],
-                         [0.310352451033785, 0.636502499121399],
-                         [0.310352451033785, 0.053145049844816],
-                         [0.053145049844816, 0.636502499121399],
-                         [0.053145049844816, 0.310352451033785]])
-        w = numpy.arange(12, dtype=numpy.float64)
-        w[0:3] = 0.050844906370207
-        w[3:6] = 0.116786275726379
-        w[6:12] = 0.082851075618374
-        w = w/2.0
+        w = numpy.zeros((6,), dtype=numpy.float64)
+        w.fill(1.0/12.0)
     else:
-        # Get canonical scheme
-        return _fiat_scheme(ref_el, degree)
+        try:
+            # Get Xiao-Gambutas scheme
+            return xg_scheme(ref_el, degree)
+        except ValueError:
+            # Get canonical scheme
+            return _fiat_scheme(ref_el, degree)
 
     # Return scheme
     x, w = map_quadrature(x, w, UFCTriangle(), ref_el)
@@ -405,7 +407,6 @@ def _triangle_scheme(ref_el, degree):
 def _tetrahedron_scheme(ref_el, degree):
     """Return a quadrature scheme on a tetrahedron of specified
     degree. Falls back on canonical rule for higher orders"""
-
     if degree == 0 or degree == 1:
         # Scheme from Zienkiewicz and Taylor, 1 point, degree of precision 1
         x = numpy.array([[1.0/4.0, 1.0/4.0, 1.0/4.0]])
@@ -417,105 +418,15 @@ def _tetrahedron_scheme(ref_el, degree):
                          [b, a, b],
                          [b, b, a],
                          [b, b, b]])
-        w = numpy.arange(4, dtype=numpy.float64)
-        w[:] = 1.0/24.0
-    elif degree == 3:
-        # Scheme from Zienkiewicz and Taylor, 5 points, degree of precision 3
-        # Note: this scheme has a negative weight
-        x = numpy.array([[0.2500000000000000, 0.2500000000000000, 0.2500000000000000],
-                         [0.5000000000000000, 0.1666666666666666, 0.1666666666666666],
-                         [0.1666666666666666, 0.5000000000000000, 0.1666666666666666],
-                         [0.1666666666666666, 0.1666666666666666, 0.5000000000000000],
-                         [0.1666666666666666, 0.1666666666666666, 0.1666666666666666]])
-        w = numpy.arange(5, dtype=numpy.float64)
-        w[0] = -0.8
-        w[1:5] = 0.45
-        w = w/6.0
-    elif degree == 4:
-        # Keast rule, 14 points, degree of precision 4
-        # Values taken from http://people.sc.fsu.edu/~jburkardt/datasets/quadrature_rules_tet/quadrature_rules_tet.html
-        # (KEAST5)
-        x = numpy.array([[0.0000000000000000, 0.5000000000000000, 0.5000000000000000],
-                         [0.5000000000000000, 0.0000000000000000, 0.5000000000000000],
-                         [0.5000000000000000, 0.5000000000000000, 0.0000000000000000],
-                         [0.5000000000000000, 0.0000000000000000, 0.0000000000000000],
-                         [0.0000000000000000, 0.5000000000000000, 0.0000000000000000],
-                         [0.0000000000000000, 0.0000000000000000, 0.5000000000000000],
-                         [0.6984197043243866, 0.1005267652252045, 0.1005267652252045],
-                         [0.1005267652252045, 0.1005267652252045, 0.1005267652252045],
-                         [0.1005267652252045, 0.1005267652252045, 0.6984197043243866],
-                         [0.1005267652252045, 0.6984197043243866, 0.1005267652252045],
-                         [0.0568813795204234, 0.3143728734931922, 0.3143728734931922],
-                         [0.3143728734931922, 0.3143728734931922, 0.3143728734931922],
-                         [0.3143728734931922, 0.3143728734931922, 0.0568813795204234],
-                         [0.3143728734931922, 0.0568813795204234, 0.3143728734931922]])
-        w = numpy.arange(14, dtype=numpy.float64)
-        w[0:6] = 0.0190476190476190
-        w[6:10] = 0.0885898247429807
-        w[10:14] = 0.1328387466855907
-        w = w/6.0
-    elif degree == 5:
-        # Keast rule, 15 points, degree of precision 5
-        # Values taken from http://people.sc.fsu.edu/~jburkardt/datasets/quadrature_rules_tet/quadrature_rules_tet.html
-        # (KEAST6)
-        x = numpy.array([[0.2500000000000000, 0.2500000000000000, 0.2500000000000000],
-                         [0.0000000000000000, 0.3333333333333333, 0.3333333333333333],
-                         [0.3333333333333333, 0.3333333333333333, 0.3333333333333333],
-                         [0.3333333333333333, 0.3333333333333333, 0.0000000000000000],
-                         [0.3333333333333333, 0.0000000000000000, 0.3333333333333333],
-                         [0.7272727272727273, 0.0909090909090909, 0.0909090909090909],
-                         [0.0909090909090909, 0.0909090909090909, 0.0909090909090909],
-                         [0.0909090909090909, 0.0909090909090909, 0.7272727272727273],
-                         [0.0909090909090909, 0.7272727272727273, 0.0909090909090909],
-                         [0.4334498464263357, 0.0665501535736643, 0.0665501535736643],
-                         [0.0665501535736643, 0.4334498464263357, 0.0665501535736643],
-                         [0.0665501535736643, 0.0665501535736643, 0.4334498464263357],
-                         [0.0665501535736643, 0.4334498464263357, 0.4334498464263357],
-                         [0.4334498464263357, 0.0665501535736643, 0.4334498464263357],
-                         [0.4334498464263357, 0.4334498464263357, 0.0665501535736643]])
-        w = numpy.arange(15, dtype=numpy.float64)
-        w[0] = 0.1817020685825351
-        w[1:5] = 0.0361607142857143
-        w[5:9] = 0.0698714945161738
-        w[9:15] = 0.0656948493683187
-        w = w/6.0
-    elif degree == 6:
-        # Keast rule, 24 points, degree of precision 6
-        # Values taken from http://people.sc.fsu.edu/~jburkardt/datasets/quadrature_rules_tet/quadrature_rules_tet.html
-        # (KEAST7)
-        x = numpy.array([[0.3561913862225449, 0.2146028712591517, 0.2146028712591517],
-                         [0.2146028712591517, 0.2146028712591517, 0.2146028712591517],
-                         [0.2146028712591517, 0.2146028712591517, 0.3561913862225449],
-                         [0.2146028712591517, 0.3561913862225449, 0.2146028712591517],
-                         [0.8779781243961660, 0.0406739585346113, 0.0406739585346113],
-                         [0.0406739585346113, 0.0406739585346113, 0.0406739585346113],
-                         [0.0406739585346113, 0.0406739585346113, 0.8779781243961660],
-                         [0.0406739585346113, 0.8779781243961660, 0.0406739585346113],
-                         [0.0329863295731731, 0.3223378901422757, 0.3223378901422757],
-                         [0.3223378901422757, 0.3223378901422757, 0.3223378901422757],
-                         [0.3223378901422757, 0.3223378901422757, 0.0329863295731731],
-                         [0.3223378901422757, 0.0329863295731731, 0.3223378901422757],
-                         [0.2696723314583159, 0.0636610018750175, 0.0636610018750175],
-                         [0.0636610018750175, 0.2696723314583159, 0.0636610018750175],
-                         [0.0636610018750175, 0.0636610018750175, 0.2696723314583159],
-                         [0.6030056647916491, 0.0636610018750175, 0.0636610018750175],
-                         [0.0636610018750175, 0.6030056647916491, 0.0636610018750175],
-                         [0.0636610018750175, 0.0636610018750175, 0.6030056647916491],
-                         [0.0636610018750175, 0.2696723314583159, 0.6030056647916491],
-                         [0.2696723314583159, 0.6030056647916491, 0.0636610018750175],
-                         [0.6030056647916491, 0.0636610018750175, 0.2696723314583159],
-                         [0.0636610018750175, 0.6030056647916491, 0.2696723314583159],
-                         [0.2696723314583159, 0.0636610018750175, 0.6030056647916491],
-                         [0.6030056647916491, 0.2696723314583159, 0.0636610018750175]])
-        w = numpy.arange(24, dtype=numpy.float64)
-        w[0:4] = 0.0399227502581679
-        w[4:8] = 0.0100772110553207
-        w[8:12] = 0.0553571815436544
-        w[12:24] = 0.0482142857142857
-        w = w/6.0
+        w = numpy.zeros((4,), dtype=numpy.float64)
+        w.fill(1.0/24.0)
     else:
-        # Get canonical scheme
-        return _fiat_scheme(ref_el, degree)
+        try:
+            # Get Xiao-Gambutas scheme
+            return xg_scheme(ref_el, degree)
+        except ValueError:
+            # Get canonical scheme
+            return _fiat_scheme(ref_el, degree)
 
     # Return scheme
     x, w = map_quadrature(x, w, UFCTetrahedron(), ref_el)
