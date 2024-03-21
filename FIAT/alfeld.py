@@ -2,7 +2,6 @@ import copy
 
 import numpy
 
-from FIAT import Lagrange
 from FIAT.reference_element import SimplicialComplex, ufc_simplex
 
 
@@ -29,9 +28,17 @@ class AlfeldSplit(SimplicialComplex):
 
         super(AlfeldSplit, self).__init__(T.shape, new_verts, new_topology)
 
+    def construct_subelement(self, dimension):
+        """Constructs the reference element of a cell subentity
+        specified by subelement dimension.
+
+        :arg dimension: subentity dimension (integer)
+        """
+        return self.parent.construct_subelement(dimension)
+
 
 if __name__ == "__main__":
-    sdim = 3
+    sdim = 2
 
     T = ufc_simplex(sdim)
 
@@ -39,10 +46,10 @@ if __name__ == "__main__":
 
     TAT = TA.topology
 
-    # degree = sdim+1
-    # print(T.vertices)
-    # for i in range(4):
-    #     print("subcell", i, TA.get_vertices_of_subcomplex(TAT[3][i]))
-    #     print("points", TA.make_points(sdim, i, degree))
-    # print(T.connectivity)
-    # print(TA.connectivity)
+    for i in range(1, sdim+1):
+        TX = TA.construct_subelement(i)
+        b = numpy.average(TX.get_vertices(), axis=0)
+        for entity in TAT[i].keys():
+            mapped_bary = TA.get_entity_transform(i, entity)(b)
+            computed_bary = numpy.average(TA.get_vertices_of_subcomplex(TAT[i][entity]), axis=0)
+            assert numpy.allclose(mapped_bary, computed_bary)
