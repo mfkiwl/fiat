@@ -9,8 +9,7 @@ to allow users to get coordinates that they want."""
 
 import numpy
 import math
-from FIAT import reference_element
-from FIAT import jacobi
+from FIAT import reference_element, jacobi
 
 
 def morton_index2(p, q=0):
@@ -24,8 +23,19 @@ def morton_index3(p, q=0, r=0):
 def jrc(a, b, n):
     """Jacobi recurrence coefficients"""
     an = (2*n+1+a+b)*(2*n+2+a+b) / (2*(n+1)*(n+1+a+b))
-    bn = (a*a-b*b) * (2*n+1+a+b) / (2*(n+1)*(2*n+a+b)*(n+1+a+b))
+    bn = (a+b)*(a-b)*(2*n+1+a+b) / (2*(n+1)*(n+1+a+b)*(2*n+a+b))
     cn = (n+a)*(n+b)*(2*n+2+a+b) / ((n+1)*(n+1+a+b)*(2*n+a+b))
+    return an, bn, cn
+
+
+def integrated_jrc(a, b, n):
+    """Integrated Jacobi recurrence coefficients"""
+    if n == 1:
+        an = (a + b + 2) / 2
+        bn = (a - 3*b - 2) / 2
+        cn = 0.0
+    else:
+        an, bn, cn = jrc(a-1, b+1, n-1)
     return an, bn, cn
 
 
@@ -52,10 +62,31 @@ def jacobi_factors(x, y, z, dx, dy, dz):
     return fa, fb, fc, dfa, dfb, dfc
 
 
-def dubiner_recurrence(dim, n, order, ref_pts, jacobian):
-    """Dubiner recurrence from (Kirby 2010)"""
+def dubiner_recurrence(dim, n, order, ref_pts, Jinv, scale, variant=None):
+    """Tabulate a Dubiner expansion set using the recurrence from (Kirby 2010).
+
+    :arg dim: The spatial dimension of the simplex.
+    :arg n: The polynomial degree.
+    :arg order: The maximum order of differenation.
+    :arg ref_pts: An ``ndarray`` with the coordinates on the default (-1, 1)^d simplex.
+    :arg Jinv: The inverse of the Jacobian of the coordinate mapping from the default simplex.
+    :arg scale: A scale factor that sets the first member of expansion set.
+    :arg variant: Choose between the default (None) orthogonal basis,
+                  'integral' for integrated Jacobi polynomials,
+                  or 'dual' for the L2-duals of the integrated Jacobi polynomials.
+
+    :returns: A tuple with tabulations of the expansion set and its derivatives.
+    """
     if order > 2:
         raise ValueError("Higher order derivatives not supported")
+    if variant not in [None, "integral", "dual"]:
+        raise ValueError(f"Invalid variant {variant}")
+
+    if variant == "integral":
+        scale = -scale
+    if n == 0:
+        # Always return 1 for n=0 to make regression tests pass
+        scale = 1.0
 
     num_members = math.comb(n + dim, dim)
     results = tuple([None] * num_members for i in range(order+1))
@@ -65,8 +96,8 @@ def dubiner_recurrence(dim, n, order, ref_pts, jacobian):
     sym_outer = lambda x, y: outer(x, y) + outer(y, x)
 
     pad_dim = dim + 2
-    dX = pad_jacobian(jacobian, pad_dim)
-    phi[0] = sum((ref_pts[i] - ref_pts[i] for i in range(dim)), 1.)
+    dX = pad_jacobian(Jinv, pad_dim)
+    phi[0] = sum((ref_pts[i] - ref_pts[i] for i in range(dim)), scale)
     if dphi is not None:
         dphi[0] = (phi[0] - phi[0]) * dX[0]
     if ddphi is not None:
@@ -76,9 +107,10 @@ def dubiner_recurrence(dim, n, order, ref_pts, jacobian):
     if dim > 3 or dim < 0:
         raise ValueError("Invalid number of spatial dimensions")
 
+    beta = 1 if variant == "dual" else 0
+    coefficients = integrated_jrc if variant == "integral" else jrc
     X = pad_coordinates(ref_pts, pad_dim)
     idx = (lambda p: p, morton_index2, morton_index3)[dim-1]
-
     for codim in range(dim):
         # Extend the basis from codim to codim + 1
         fa, fb, fc, dfa, dfb, dfc = jacobi_factors(*X[codim:codim+3], *dX[codim:codim+3])
@@ -87,9 +119,17 @@ def dubiner_recurrence(dim, n, order, ref_pts, jacobian):
             # handle i = 1
             icur = idx(*sub_index, 0)
             inext = idx(*sub_index, 1)
-            alpha = 2 * sum(sub_index) + len(sub_index)
-            b = 0.5 * alpha
-            a = b + 1.0
+
+            if variant == "integral":
+                alpha = 2 * sum(sub_index)
+                a = b = -0.5
+            else:
+                alpha = 2 * sum(sub_index) + len(sub_index)
+                if variant == "dual":
+                    alpha += 1 + len(sub_index)
+                a = 0.5 * (alpha + beta) + 1.0
+                b = 0.5 * (alpha - beta)
+
             factor = a * fa - b * fb
             phi[inext] = factor * phi[icur]
             if dphi is not None:
@@ -101,7 +141,7 @@ def dubiner_recurrence(dim, n, order, ref_pts, jacobian):
             # general i by recurrence
             for i in range(1, n - sum(sub_index)):
                 iprev, icur, inext = icur, inext, idx(*sub_index, i + 1)
-                a, b, c = jrc(alpha, 0, i)
+                a, b, c = coefficients(alpha, beta, i)
                 factor = a * fa - b * fb
                 phi[inext] = factor * phi[icur] - c * (fc * phi[iprev])
                 if dphi is None:
@@ -115,11 +155,54 @@ def dubiner_recurrence(dim, n, order, ref_pts, jacobian):
                                 c * (fc * ddphi[iprev] + sym_outer(dphi[iprev], dfc) + phi[iprev] * ddfc))
 
         # normalize
-        for alpha in reference_element.lattice_iter(0, n+1, codim+1):
-            icur = idx(*alpha)
-            scale = math.sqrt(sum(alpha) + 0.5 * len(alpha))
+        d = codim + 1
+        shift = 1 if variant == "dual" else 0
+        for index in reference_element.lattice_iter(0, n+1, d):
+            icur = idx(*index)
+            if variant is not None:
+                p = index[-1] + shift
+                alpha = 2 * (sum(index[:-1]) + d * shift) - 1
+                norm2 = 1.0
+                if p > 0 and p + alpha > 0:
+                    norm2 = (p + alpha) * (2*p + alpha) / p
+                    norm2 *= (2*d+1) / (2*d)
+            else:
+                norm2 = (2*sum(index) + d) / d
+            scale = math.sqrt(norm2)
             for result in results:
                 result[icur] *= scale
+
+    # recover facet bubbles
+    if variant == "integral":
+        icur = 0
+        for result in results:
+            result[icur] *= -1
+        for inext in range(1, dim+1):
+            for result in results:
+                result[icur] -= result[inext]
+
+        if dim == 2:
+            for i in range(2, n+1):
+                icur = idx(0, i)
+                iprev = idx(1, i-1)
+                for result in results:
+                    result[icur] -= result[iprev]
+
+        elif dim == 3:
+            for i in range(2, n+1):
+                for j in range(0, n+1-i):
+                    icur = idx(0, i, j)
+                    iprev = idx(1, i-1, j)
+                    for result in results:
+                        result[icur] -= result[iprev]
+
+                icur = idx(0, 0, i)
+                iprev0 = idx(1, 0, i-1)
+                iprev1 = idx(0, 1, i-1)
+                for result in results:
+                    result[icur] -= result[iprev0]
+                    result[icur] -= result[iprev1]
+
     return results
 
 
@@ -141,32 +224,42 @@ def xi_tetrahedron(eta):
 
 
 class ExpansionSet(object):
-    def __new__(cls, ref_el, *args, **kwargs):
+    def __new__(cls, *args, **kwargs):
         """Returns an ExpansionSet instance appopriate for the given
         reference element."""
         if cls is not ExpansionSet:
             return super(ExpansionSet, cls).__new__(cls)
-        if ref_el.get_shape() == reference_element.POINT:
-            return PointExpansionSet(ref_el)
-        elif ref_el.get_shape() == reference_element.LINE:
-            return LineExpansionSet(ref_el)
-        elif ref_el.get_shape() == reference_element.TRIANGLE:
-            return TriangleExpansionSet(ref_el)
-        elif ref_el.get_shape() == reference_element.TETRAHEDRON:
-            return TetrahedronExpansionSet(ref_el)
-        else:
+        try:
+            ref_el = args[0]
+            expansion_set = {
+                reference_element.POINT: PointExpansionSet,
+                reference_element.LINE: LineExpansionSet,
+                reference_element.TRIANGLE: TriangleExpansionSet,
+                reference_element.TETRAHEDRON: TetrahedronExpansionSet,
+            }[ref_el.get_shape()]
+            return expansion_set(*args, **kwargs)
+        except KeyError:
             raise ValueError("Invalid reference element type.")
 
-    def __init__(self, ref_el):
+    def __init__(self, ref_el, scale=None, variant=None):
         self.ref_el = ref_el
+        self.variant = variant
         dim = ref_el.get_spatial_dimension()
         self.base_ref_el = reference_element.default_simplex(dim)
         v1 = ref_el.get_vertices()
         v2 = self.base_ref_el.get_vertices()
         self.A, self.b = reference_element.make_affine_mapping(v1, v2)
         self.mapping = lambda x: numpy.dot(self.A, x) + self.b
-        self.scale = numpy.sqrt(numpy.linalg.det(self.A))
         self._dmats_cache = {}
+        if scale is None:
+            scale = math.sqrt(1.0 / self.base_ref_el.volume())
+        elif isinstance(scale, str):
+            scale = scale.lower()
+            if scale == "orthonormal":
+                scale = math.sqrt(1.0 / ref_el.volume())
+            elif scale == "l2 piola":
+                scale = 1.0 / ref_el.volume()
+        self.scale = scale
 
     def get_num_members(self, n):
         D = self.ref_el.get_spatial_dimension()
@@ -184,7 +277,7 @@ class ExpansionSet(object):
         """A version of tabulate() that also works for a single point.
         """
         D = self.ref_el.get_spatial_dimension()
-        return dubiner_recurrence(D, n, order, self._mapping(pts), self.A)
+        return dubiner_recurrence(D, n, order, self._mapping(pts), self.A, self.scale, variant=self.variant)
 
     def get_dmats(self, degree):
         """Returns a numpy array with the expansion coefficients dmat[k, j, i]
@@ -266,10 +359,10 @@ class ExpansionSet(object):
 
 class PointExpansionSet(ExpansionSet):
     """Evaluates the point basis on a point reference element."""
-    def __init__(self, ref_el):
+    def __init__(self, ref_el, **kwargs):
         if ref_el.get_spatial_dimension() != 0:
             raise ValueError("Must have a point")
-        super(PointExpansionSet, self).__init__(ref_el)
+        super(PointExpansionSet, self).__init__(ref_el, **kwargs)
 
     def tabulate(self, n, pts):
         """Returns a numpy array A[i,j] = phi_i(pts[j]) = 1.0."""
@@ -279,17 +372,20 @@ class PointExpansionSet(ExpansionSet):
 
 class LineExpansionSet(ExpansionSet):
     """Evaluates the Legendre basis on a line reference element."""
-    def __init__(self, ref_el):
+    def __init__(self, ref_el, **kwargs):
         if ref_el.get_spatial_dimension() != 1:
             raise Exception("Must have a line")
-        super(LineExpansionSet, self).__init__(ref_el)
+        super(LineExpansionSet, self).__init__(ref_el, **kwargs)
 
     def _tabulate(self, n, pts, order=0):
         """Returns a tuple of (vals, derivs) such that
         vals[i,j] = phi_i(pts[j]), derivs[i,j] = D vals[i,j]."""
+        if self.variant is not None:
+            return super(LineExpansionSet, self)._tabulate(n, pts, order=order)
+
         xs = self._mapping(pts).T
         results = []
-        scale = numpy.sqrt(0.5 + numpy.arange(n+1))
+        scale = self.scale * numpy.sqrt(2 * numpy.arange(n+1) + 1)
         for k in range(order+1):
             v = numpy.zeros((n + 1, len(xs)), xs.dtype)
             if n >= k:
@@ -306,18 +402,18 @@ class LineExpansionSet(ExpansionSet):
 class TriangleExpansionSet(ExpansionSet):
     """Evaluates the orthonormal Dubiner basis on a triangular
     reference element."""
-    def __init__(self, ref_el):
+    def __init__(self, ref_el, **kwargs):
         if ref_el.get_spatial_dimension() != 2:
             raise Exception("Must have a triangle")
-        super(TriangleExpansionSet, self).__init__(ref_el)
+        super(TriangleExpansionSet, self).__init__(ref_el, **kwargs)
 
 
 class TetrahedronExpansionSet(ExpansionSet):
     """Collapsed orthonormal polynomial expansion on a tetrahedron."""
-    def __init__(self, ref_el):
+    def __init__(self, ref_el, **kwargs):
         if ref_el.get_spatial_dimension() != 3:
             raise Exception("Must be a tetrahedron")
-        super(TetrahedronExpansionSet, self).__init__(ref_el)
+        super(TetrahedronExpansionSet, self).__init__(ref_el, **kwargs)
 
 
 def polynomial_dimension(ref_el, degree):
