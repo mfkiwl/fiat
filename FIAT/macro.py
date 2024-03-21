@@ -1,8 +1,8 @@
-import numpy as np
+import copy
 
-from FIAT.quadrature import QuadratureRule, map_quadrature
-from FIAT.quadrature_schemes import create_quadrature
-from FIAT.reference_element import Cell, ufc_simplex
+import numpy
+
+from FIAT.reference_element import SimplicialComplex, ufc_simplex
 
 
 def bary_to_xy(verts, bary, result=None):
@@ -13,7 +13,7 @@ def bary_to_xy(verts, bary, result=None):
     if result is None:
         return bary @ verts
     else:
-        np.dot(bary, verts, out=result)
+        numpy.dot(bary, verts, out=result)
         return result
 
 
@@ -24,55 +24,54 @@ def xy_to_bary(verts, pts, result=None):
     npts = pts.shape[0]
     sdim = verts.shape[1]
 
-    mat = np.vstack((verts.T, np.ones((1, sdim+1))))
+    mat = numpy.vstack((verts.T, numpy.ones((1, sdim+1))))
 
-    b = np.vstack((pts.T, np.ones((1, npts))))
+    b = numpy.vstack((pts.T, numpy.ones((1, npts))))
 
-    foo = np.linalg.solve(mat, b)
+    foo = numpy.linalg.solve(mat, b)
 
     if result is None:
-        return np.copy(foo.T)
+        return numpy.copy(foo.T)
     else:
         result[:, :] = foo[:, :].T
     return result
 
 
-def barycentric_split(ref_el):
-    d = ref_el.get_dimension()
-    vs = np.asarray(T.get_vertices())
-    # existing vertices plus the barycenter
-    newvs = np.vstack((vs, np.average(vs, axis=0)))
-    # cells comprising each face plus the barycenter
-    subcell2vert = np.asarray(
-        [[j for j in range(d+1) if j != i] + [d+1] for i in range(d+1)])
-    return newvs, subcell2vert
+class AlfeldSplit(SimplicialComplex):
+    def __init__(self, T):
+        self.parent = T
+        sdim = T.get_spatial_dimension()
+        old_vs = T.get_vertices()
+
+        b = numpy.average(old_vs, axis=0)
+
+        new_verts = old_vs + (tuple(b),)
+
+        new_topology = copy.deepcopy(T.topology)
+
+        new_vert_id = len(T.topology[0])
+        new_topology[0] = {i: (i,) for i in range(new_vert_id+1)}
+        new_topology[sdim] = {}
+
+        for dim_cur in range(1, sdim + 1):
+            start = len(new_topology[dim_cur])
+            for eid, vs in T.topology[dim_cur-1].items():
+                new_topology[dim_cur][start+eid] = vs + (new_vert_id,)
+
+        super(AlfeldSplit, self).__init__(T.shape, new_verts, new_topology)
+
+    def construct_subelement(self, dimension):
+        """Constructs the reference element of a cell subentity
+        specified by subelement dimension.
+
+        :arg dimension: subentity dimension (integer)
+        """
+        return self.parent.construct_subelement(dimension)
 
 
-def split_to_cells(ref_el, splitting):
-    newvs, subcell2vert = splitting(ref_el)
-    top = ref_el.get_topology()
-    shape = ref_el.shape
-    ncells = subcell2vert.shape[0]
-    return [Cell(shape, newvs[subcell2vert[i, :]], top)
-            for i in range(ncells)]
-
-
-class MacroQuadratureRule(QuadratureRule):
-    def __init__(self, rule, splitting):
-        ref_el = rule.ref_el
-        pts = np.asarray(rule.pts)
-        wts = np.asarray(rule.wts)
-        new_els = split_to_cells(ref_el, splitting)
-        new_rules = [map_quadrature(pts, wts, ref_el, new_el)
-                     for new_el in new_els]
-        super(MacroQuadratureRule, self).__init__(
-            ref_el,
-            np.vstack([np.asarray(new_rule[0]) for new_rule in new_rules]),
-            np.hstack([np.asarray(new_rule[1]) for new_rule in new_rules]))
-
-
-T = ufc_simplex(2)
-Q = create_quadrature(T, 2)
-macro_Q = MacroQuadratureRule(Q, barycentric_split)
-print(macro_Q.pts)
-print(macro_Q.wts)
+# Does a uniform split
+class UniformSplit(SimplicialComplex):
+    def __init__(self, T):
+        self.parent = T
+        sdim = T.get_spatial_dimension()
+        old_vs = T.get_vertices()
