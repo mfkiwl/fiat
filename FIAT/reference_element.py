@@ -19,17 +19,18 @@ and orderings of entities have a single point of entry.
 
 Currently implemented are UFC and Default Line, Triangle and Tetrahedron.
 """
-from itertools import chain, product, count
-from functools import reduce
-from collections import defaultdict
 import operator
+from collections import defaultdict
+from functools import reduce
+from itertools import chain, count, product
 from math import factorial
-from recursivenodes.nodes import _recursive, _decode_family
-from FIAT.orientation_utils import make_cell_orientation_reflection_map_simplex, make_cell_orientation_reflection_map_tensorproduct
-
 
 import numpy
+from recursivenodes.nodes import _decode_family, _recursive
 
+from FIAT.orientation_utils import (
+    make_cell_orientation_reflection_map_simplex,
+    make_cell_orientation_reflection_map_tensorproduct)
 
 POINT = 0
 LINE = 1
@@ -214,7 +215,7 @@ class Cell(object):
     def get_vertices_of_subcomplex(self, t):
         """Returns the tuple of vertex coordinates associated with the labels
         contained in the iterable t."""
-        return tuple([self.vertices[ti] for ti in t])
+        return tuple(self.vertices[ti] for ti in t)
 
     def get_dimension(self):
         """Returns the subelement dimension of the cell.  For tensor
@@ -250,7 +251,7 @@ class Cell(object):
         raise NotImplementedError("Should be implemented in a subclass.")
 
 
-class Simplex(Cell):
+class SimplicialComplex(Cell):
     r"""Abstract class for a reference simplex.
 
     Orientation of a physical cell is computed systematically
@@ -414,13 +415,11 @@ class Simplex(Cell):
         include in each direction."""
         if dim == 0:
             return (self.get_vertices()[entity_id], )
-        elif 0 < dim < self.get_spatial_dimension():
+        elif 0 < dim <= self.get_spatial_dimension():
             entity_verts = \
                 self.get_vertices_of_subcomplex(
                     self.get_topology()[dim][entity_id])
             return make_lattice(entity_verts, order, 1, variant=variant)
-        elif dim == self.get_spatial_dimension():
-            return make_lattice(self.get_vertices(), order, 1, variant=variant)
         else:
             raise ValueError("illegal dimension")
 
@@ -443,7 +442,7 @@ class Simplex(Cell):
     def compute_reference_normal(self, facet_dim, facet_i):
         """Returns the unit normal in infinity norm to facet_i."""
         assert facet_dim == self.get_spatial_dimension() - 1
-        n = Simplex.compute_normal(self, facet_i)  # skip UFC overrides
+        n = SimplicialComplex.compute_normal(self, facet_i)  # skip UFC overrides
         return n / numpy.linalg.norm(n, numpy.inf)
 
     def get_entity_transform(self, dim, entity):
@@ -512,7 +511,8 @@ class Simplex(Cell):
         return make_cell_orientation_reflection_map_simplex(self.get_dimension())
 
 
-# Backwards compatible name
+# Backwards compatible names
+Simplex = SimplicialComplex
 ReferenceElement = Simplex
 
 
