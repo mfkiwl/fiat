@@ -46,6 +46,7 @@ def test_macro_quadrature(sdim):
     degree = 6
     Q_ref = create_quadrature(T, degree)
     Q = MacroQuadratureRule(TA, Q_ref)
+    Q.get_points()
     # import matplotlib.pyplot as plt
     # plt.scatter(*Q.get_points().T)
     # plt.show()

@@ -102,9 +102,7 @@ class UniformSplit(SimplicialComplex):
         for dim in range(2, sd+1):
             new_topology[dim] = {}
 
-
         super(UniformSplit, self).__init__(ref_el.shape, new_verts, new_topology)
-
 
     def construct_subelement(self, dimension):
         """Constructs the reference element of a cell subentity
