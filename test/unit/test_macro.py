@@ -1,7 +1,8 @@
 import numpy
 import pytest
-from FIAT import ufc_simplex
-from FIAT.macro import AlfeldSplit
+from FIAT.reference_element import ufc_simplex, symmetric_simplex
+from FIAT.macro import AlfeldSplit, MacroQuadratureRule
+from FIAT.quadrature_schemes import create_quadrature
 
 
 @pytest.mark.parametrize("sdim", (2, 3))
@@ -35,3 +36,16 @@ def test_split_make_points(sdim, degree, variant):
             mapping = TA.get_entity_transform(i, entity)
             mapped_pts = list(map(mapping, pts_ref))
             assert numpy.allclose(mapped_pts, pts_entity)
+
+
+@pytest.mark.parametrize("sdim", (2, 3))
+def test_macro_quadrature(sdim):
+    T = symmetric_simplex(sdim)
+    TA = AlfeldSplit(T)
+
+    degree = 6
+    Q_ref = create_quadrature(T, degree)
+    Q = MacroQuadratureRule(TA, Q_ref)
+    # import matplotlib.pyplot as plt
+    # plt.scatter(*Q.get_points().T)
+    # plt.show()
