@@ -43,6 +43,15 @@ def test_split_make_points(split, cell, degree, variant):
 
 
 @pytest.mark.parametrize("split", (AlfeldSplit, UniformSplit))
+def test_split_child_to_parent(split, cell):
+    split_cell = split(cell)
+    mapping = split_cell.get_child_to_parent()
+    print("")
+    for dim in mapping:
+        print(mapping[dim])
+
+
+@pytest.mark.parametrize("split", (AlfeldSplit, UniformSplit))
 def test_macro_quadrature(split, cell):
     split_cell = split(cell)
 

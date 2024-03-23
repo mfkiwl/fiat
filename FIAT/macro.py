@@ -37,6 +37,16 @@ def xy_to_bary(verts, pts, result=None):
     return result
 
 
+def invert_cell_topology(T):
+    return {dim: {T[dim][entity]: entity for entity in T[dim]} for dim in T}
+
+
+def support_of_many(xs, tol=1.e-12):
+    # xs is an iterable of tuples (barycentric coordinates)
+    # produce set of indices where some x is nonzero
+    return tuple(sorted(set(i for x in xs for (i, xi) in enumerate(x) if abs(xi) > tol)))
+
+
 class SplitSimplicialComplex(SimplicialComplex):
     """Abstract class to implement a split on a Simplex
     """
@@ -48,6 +58,23 @@ class SplitSimplicialComplex(SimplicialComplex):
 
     def split_topology(self, ref_el):
         raise NotImplementedError
+
+    def get_child_to_parent(self):
+        bary = xy_to_bary(numpy.asarray(self.parent.get_vertices()),
+                          numpy.asarray(self.get_vertices()))
+        mapping = {}
+        top = self.get_topology()
+        parent_inv_top = invert_cell_topology(self.parent.get_topology())
+        for dim in top:
+            mapping[dim] = {}
+            for entity in top[dim]:
+                facet_ids = top[dim][entity]
+                facet_coords = bary[list(facet_ids), :]
+                parent_verts = support_of_many(facet_coords)
+                parent_dim = len(parent_verts) - 1
+                parent_entity = parent_inv_top[parent_dim][parent_verts]
+                mapping[dim][entity] = (parent_dim, parent_entity)
+        return mapping
 
     def construct_subelement(self, dimension):
         """Constructs the reference element of a cell subentity
