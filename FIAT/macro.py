@@ -1,6 +1,6 @@
 import copy
 import numpy
-from FIAT.reference_element import SimplicialComplex
+from FIAT.reference_element import make_lattice, lattice_iter, SimplicialComplex
 from FIAT.finite_element import FiniteElement
 from FIAT.quadrature import QuadratureRule, FacetQuadratureRule
 
@@ -37,28 +37,17 @@ def xy_to_bary(verts, pts, result=None):
     return result
 
 
-class AlfeldSplit(SimplicialComplex):
+class SplitSimplicialComplex(SimplicialComplex):
+    """Abstract class to implement a split on a Simplex
+    """
 
     def __init__(self, ref_el):
         self.parent = ref_el
-        sd = ref_el.get_spatial_dimension()
-        old_verts = ref_el.get_vertices()
+        vertices, topology = self.split_topology(ref_el)
+        super(SplitSimplicialComplex, self).__init__(ref_el.shape, vertices, topology)
 
-        b = numpy.average(old_verts, axis=0)
-        new_verts = old_verts + (tuple(b),)
-
-        new_topology = copy.deepcopy(ref_el.topology)
-
-        new_vert_id = len(ref_el.topology[0])
-        new_topology[0] = {i: (i,) for i in range(new_vert_id + 1)}
-        new_topology[sd] = {}
-
-        for dim in range(1, sd + 1):
-            offset = len(new_topology[dim])
-            for entity, ids in ref_el.topology[dim-1].items():
-                new_topology[dim][offset+entity] = ids + (new_vert_id,)
-
-        super(AlfeldSplit, self).__init__(ref_el.shape, new_verts, new_topology)
+    def split_topology(self, ref_el):
+        raise NotImplementedError
 
     def construct_subelement(self, dimension):
         """Constructs the reference element of a cell subentity
@@ -69,48 +58,75 @@ class AlfeldSplit(SimplicialComplex):
         return self.parent.construct_subelement(dimension)
 
 
-class UniformSplit(SimplicialComplex):
+class AlfeldSplit(SplitSimplicialComplex):
 
-    def __init__(self, ref_el):
-        self.parent = ref_el
+    def split_topology(self, ref_el):
+        sd = ref_el.get_spatial_dimension()
+        new_topology = copy.deepcopy(ref_el.topology)
+        new_topology[sd] = {}
+
+        barycenter = ref_el.make_points(sd, 0, sd+1)
+        new_verts = ref_el.vertices + tuple(barycenter)
+        new_vert_id = len(ref_el.vertices)
+
+        new_topology[0][new_vert_id] = (new_vert_id,)
+        for dim in range(1, sd + 1):
+            offset = len(new_topology[dim])
+            for entity, ids in ref_el.topology[dim-1].items():
+                new_topology[dim][offset+entity] = ids + (new_vert_id,)
+        return new_verts, new_topology
+
+
+class UniformSplit(SplitSimplicialComplex):
+
+    def split_topology(self, ref_el):
         sd = ref_el.get_spatial_dimension()
         old_verts = ref_el.get_vertices()
-
-        new_verts = old_verts + tuple(tuple(numpy.average(old_verts[list(ids)], axis=0))
-                                      for ids in ref_el.topology[1].values())
+        new_verts = make_lattice(old_verts, 2)
 
         new_topology = {}
         new_topology[0] = {i: (i,) for i in range(len(new_verts))}
         new_topology[1] = {}
 
-        # Split each edge
-        offset = len(old_verts)
-        for entity, verts in ref_el.topology[1].items():
-            midpoint = offset + entity
-            new_topology[1][2*entity] = (verts[0], midpoint)
-            new_topology[1][2*entity+1] = (verts[1], midpoint)
+        # Loop through vertex pairs
+        # Edges are oriented from low vertex id to high vertex id to avoid duplicates
+        # Place a new edge when the two lattice multiindices are at Manhattan distance < 3,
+        # this connects the midpoints of edges within a face
+        # Only include diagonal edges that are parallel to the simplex edges,
+        # we take the diagonal that goes through vertices of the same "polynomial degree"
+        cur = 0
+        distance = lambda x, y: sum(abs(b-a) for a, b in zip(x, y))
+        for j, v1 in enumerate(lattice_iter(0, 3, sd)):
+            for i, v0 in enumerate(lattice_iter(0, 3, sd)):
+                if i < j and distance(v0, v1) < 3 and sum(v1) - sum(v0) <= 1:
+                    new_topology[1][cur] = (i, j)
+                    cur = cur + 1
+        if sd == 3:
+            # Cut the octahedron
+            # FIXME do this more generalically
+            new_topology[1][cur] = (1, 8)
 
-        # Add edges connecting midpoints
-        num_old_edges = len(ref_el.topology[1])
-        cur = len(new_topology[1])
-        for j in range(num_old_edges):
-            for i in range(j+1, num_old_edges):
-                new_topology[1][cur] = (offset+j, offset+i)
-                cur = cur + 1
+        # Get an adjacency list for each vertex
+        adjacency = {}
+        for v in new_topology[0]:
+            cur_neigh = []
+            for entity in new_topology[1]:
+                if v in new_topology[1][entity]:
+                    cur_neigh.extend(new_topology[1][entity])
+            adjacency[v] = set(cur_neigh)
 
-        # TODO add higher dimensional entites
+        # Complete the higher dimensional facets by appending a vertex
+        # adjacent to the vertices of co-dimension 1 facets
         for dim in range(2, sd+1):
-            new_topology[dim] = {}
+            entities = []
+            for entity in new_topology[dim-1]:
+                facet = new_topology[dim-1][entity]
+                for v in range(min(facet)):
+                    if set(facet) < adjacency[v]:
+                        entities.append((v,) + facet)
 
-        super(UniformSplit, self).__init__(ref_el.shape, new_verts, new_topology)
-
-    def construct_subelement(self, dimension):
-        """Constructs the reference element of a cell subentity
-        specified by subelement dimension.
-
-        :arg dimension: subentity dimension (integer)
-        """
-        return self.parent.construct_subelement(dimension)
+            new_topology[dim] = dict(enumerate(entities))
+        return new_verts, new_topology
 
 
 class MacroElement(FiniteElement):
