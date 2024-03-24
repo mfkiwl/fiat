@@ -223,6 +223,15 @@ def xi_tetrahedron(eta):
     return xi1, xi2, xi3
 
 
+def apply_mapping(A, b, pts):
+    if isinstance(pts, numpy.ndarray) and len(pts.shape) == 2:
+        return numpy.dot(A, pts) + b[:, None]
+    else:
+        m1, m2 = A.shape
+        return [sum((A[i, j] * pts[j] for j in range(m2)), b[i])
+                for i in range(m1)]
+
+
 class ExpansionSet(object):
     def __new__(cls, *args, **kwargs):
         """Returns an ExpansionSet instance appopriate for the given
@@ -244,12 +253,15 @@ class ExpansionSet(object):
     def __init__(self, ref_el, scale=None, variant=None):
         self.ref_el = ref_el
         self.variant = variant
-        dim = ref_el.get_spatial_dimension()
-        self.base_ref_el = reference_element.default_simplex(dim)
-        v1 = ref_el.get_vertices()
+        sd = ref_el.get_spatial_dimension()
+        top = ref_el.get_topology()
+        self.base_ref_el = reference_element.default_simplex(sd)
         v2 = self.base_ref_el.get_vertices()
-        self.A, self.b = reference_element.make_affine_mapping(v1, v2)
-        self.mapping = lambda x: numpy.dot(self.A, x) + self.b
+        self.affine_mappings = [reference_element.make_affine_mapping(
+                                ref_el.get_vertices_of_subcomplex(top[sd][cell]), v2)
+                                for cell in top[sd]]
+        # self.mapping = lambda x: numpy.dot(self.A, x) + self.b
+
         self._dmats_cache = {}
         if scale is None:
             scale = math.sqrt(1.0 / self.base_ref_el.volume())
@@ -262,22 +274,45 @@ class ExpansionSet(object):
         self.scale = scale
 
     def get_num_members(self, n):
-        D = self.ref_el.get_spatial_dimension()
-        return math.comb(n + D, D)
-
-    def _mapping(self, pts):
-        if isinstance(pts, numpy.ndarray) and len(pts.shape) == 2:
-            return numpy.dot(self.A, pts) + self.b[:, None]
+        sd = self.ref_el.get_spatial_dimension()
+        top = self.ref_el.get_topology()
+        if len(top[sd]) == 1:
+            return math.comb(n + sd, sd)
         else:
-            m1, m2 = self.A.shape
-            return [sum((self.A[i, j] * pts[j] for j in range(m2)), self.b[i])
-                    for i in range(m1)]
+            # TODO macro elements
+            raise NotImplementedError
+
+    def get_cell_node_map(self, n):
+        sd = self.ref_el.get_spatial_dimension()
+        top = self.ref_el.get_topology()
+        if len(top[sd]) == 1:
+            return (slice(None, None),)
+        else:
+            # TODO macro elements
+            raise NotImplementedError
+
+    def get_point_cell_map(self, pts):
+        sd = self.ref_el.get_spatial_dimension()
+        top = self.ref_el.get_topology()
+        if len(top[sd]) == 1:
+            return (slice(None, None),)
+        else:
+            # TODO macro elements
+            raise NotImplementedError
 
     def _tabulate(self, n, pts, order=0):
         """A version of tabulate() that also works for a single point.
         """
-        D = self.ref_el.get_spatial_dimension()
-        return dubiner_recurrence(D, n, order, self._mapping(pts), self.A, self.scale, variant=self.variant)
+        sd = self.ref_el.get_spatial_dimension()
+        cell_node_map = self.get_cell_node_map(n)
+        point_cell_map = self.get_point_cell_map(pts)
+        for ibfs, ipts, (A, b) in zip(cell_node_map, point_cell_map, self.affine_mappings):
+            # TODO indirection
+            # NOTE results is a tuple of tabulations of derivatives up to the given order
+            ref_pts = apply_mapping(A, b, pts)
+            results = dubiner_recurrence(sd, n, order, ref_pts, A,
+                                         self.scale, variant=self.variant)
+        return results
 
     def get_dmats(self, degree):
         """Returns a numpy array with the expansion coefficients dmat[k, j, i]
@@ -380,10 +415,11 @@ class LineExpansionSet(ExpansionSet):
     def _tabulate(self, n, pts, order=0):
         """Returns a tuple of (vals, derivs) such that
         vals[i,j] = phi_i(pts[j]), derivs[i,j] = D vals[i,j]."""
-        if self.variant is not None:
+        if self.variant is not None or len(self.affine_mappings) > 1:
             return super(LineExpansionSet, self)._tabulate(n, pts, order=order)
 
-        xs = self._mapping(pts).T
+        A, b = self.affine_mappings[0]
+        xs = apply_mapping(A, b, pts).T
         results = []
         scale = self.scale * numpy.sqrt(2 * numpy.arange(n+1) + 1)
         for k in range(order+1):
@@ -392,7 +428,7 @@ class LineExpansionSet(ExpansionSet):
                 v[k:] = jacobi.eval_jacobi_batch(k, k, n-k, xs)
             for p in range(n + 1):
                 v[p] *= scale[p]
-                scale[p] *= 0.5 * (p + k + 1) * self.A[0, 0]
+                scale[p] *= 0.5 * (p + k + 1) * A[0, 0]
             shape = v.shape
             shape = shape[:1] + (1,) * k + shape[1:]
             results.append(v.reshape(shape))

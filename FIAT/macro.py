@@ -1,7 +1,7 @@
 import copy
 import numpy
+from itertools import chain
 from FIAT.reference_element import make_lattice, lattice_iter, SimplicialComplex
-from FIAT.finite_element import FiniteElement
 from FIAT.quadrature import QuadratureRule, FacetQuadratureRule
 
 
@@ -9,12 +9,7 @@ def bary_to_xy(verts, bary, result=None):
     # verts is (sdim + 1) x sdim so verts[i, :] is i:th vertex
     # bary is [npts, sdim + 1]
     # result is [npts, sdim]
-
-    if result is None:
-        return bary @ verts
-    else:
-        numpy.dot(bary, verts, out=result)
-        return result
+    return numpy.dot(bary, verts, out=result)
 
 
 def xy_to_bary(verts, pts, result=None):
@@ -37,14 +32,14 @@ def xy_to_bary(verts, pts, result=None):
     return result
 
 
+def facet_support(facet_coords, tol=1.e-12):
+    # facet_coords is an iterable of tuples (barycentric coordinates)
+    # return vertex ids where some x is nonzero
+    return tuple(sorted(set(i for x in facet_coords for (i, xi) in enumerate(x) if abs(xi) > tol)))
+
+
 def invert_cell_topology(T):
     return {dim: {T[dim][entity]: entity for entity in T[dim]} for dim in T}
-
-
-def support_of_many(xs, tol=1.e-12):
-    # xs is an iterable of tuples (barycentric coordinates)
-    # produce set of indices where some x is nonzero
-    return tuple(sorted(set(i for x in xs for (i, xi) in enumerate(x) if abs(xi) > tol)))
 
 
 class SplitSimplicialComplex(SimplicialComplex):
@@ -62,19 +57,19 @@ class SplitSimplicialComplex(SimplicialComplex):
     def get_child_to_parent(self):
         bary = xy_to_bary(numpy.asarray(self.parent.get_vertices()),
                           numpy.asarray(self.get_vertices()))
-        mapping = {}
         top = self.get_topology()
         parent_inv_top = invert_cell_topology(self.parent.get_topology())
+        child_to_parent = {}
         for dim in top:
-            mapping[dim] = {}
+            child_to_parent[dim] = {}
             for entity in top[dim]:
                 facet_ids = top[dim][entity]
                 facet_coords = bary[list(facet_ids), :]
-                parent_verts = support_of_many(facet_coords)
+                parent_verts = facet_support(facet_coords)
                 parent_dim = len(parent_verts) - 1
                 parent_entity = parent_inv_top[parent_dim][parent_verts]
-                mapping[dim][entity] = (parent_dim, parent_entity)
-        return mapping
+                child_to_parent[dim][entity] = (parent_dim, parent_entity)
+        return child_to_parent
 
     def construct_subelement(self, dimension):
         """Constructs the reference element of a cell subentity
@@ -120,7 +115,7 @@ class UniformSplit(SplitSimplicialComplex):
         # Place a new edge when the two lattice multiindices are at Manhattan distance < 3,
         # this connects the midpoints of edges within a face
         # Only include diagonal edges that are parallel to the simplex edges,
-        # we take the diagonal that goes through vertices of the same "polynomial degree"
+        # we take the diagonal that goes through vertices of the same multiindex sum
         cur = 0
         distance = lambda x, y: sum(abs(b-a) for a, b in zip(x, y))
         for j, v1 in enumerate(lattice_iter(0, 3, sd)):
@@ -134,16 +129,11 @@ class UniformSplit(SplitSimplicialComplex):
             new_topology[1][cur] = (1, 8)
 
         # Get an adjacency list for each vertex
-        adjacency = {}
-        for v in new_topology[0]:
-            cur_neigh = []
-            for entity in new_topology[1]:
-                if v in new_topology[1][entity]:
-                    cur_neigh.extend(new_topology[1][entity])
-            adjacency[v] = set(cur_neigh)
+        edges = new_topology[1].values()
+        adjacency = {v: set(chain.from_iterable(verts for verts in edges if v in verts)) for v in new_topology[0]}
 
         # Complete the higher dimensional facets by appending a vertex
-        # adjacent to the vertices of co-dimension 1 facets
+        # adjacent to the vertices of codimension 1 facets
         for dim in range(2, sd+1):
             entities = []
             for entity in new_topology[dim-1]:
@@ -151,29 +141,8 @@ class UniformSplit(SplitSimplicialComplex):
                 for v in range(min(facet)):
                     if set(facet) < adjacency[v]:
                         entities.append((v,) + facet)
-
             new_topology[dim] = dict(enumerate(entities))
         return new_verts, new_topology
-
-
-class MacroElement(FiniteElement):
-    """
-    A macro element built from a base finite element on a split of the reference cell
-    """
-
-    def __init__(self, element, split):
-        ref_el = element.get_reference_element()
-        dual = None
-        order = element.get_order()
-        formdegree = element.get_formdegree()
-        mapping = element._mapping
-        self.element = element
-        self.cell_complex = split(ref_el)
-        super(MacroElement, self).__init__(ref_el, dual, order, formdegree=formdegree, mapping=mapping)
-
-    def tabulate(self, order, points, entity=None):
-        raise NotImplementedError("Wait for it")
-        # tabulate the reference element on each sub-cell and scatter with the local to global mapping
 
 
 class MacroQuadratureRule(QuadratureRule):
