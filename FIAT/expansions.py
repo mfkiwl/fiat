@@ -260,8 +260,6 @@ class ExpansionSet(object):
         self.affine_mappings = [reference_element.make_affine_mapping(
                                 ref_el.get_vertices_of_subcomplex(top[sd][cell]), v2)
                                 for cell in top[sd]]
-        # self.mapping = lambda x: numpy.dot(self.A, x) + self.b
-
         self._dmats_cache = {}
         if scale is None:
             scale = math.sqrt(1.0 / self.base_ref_el.volume())
@@ -306,12 +304,14 @@ class ExpansionSet(object):
         sd = self.ref_el.get_spatial_dimension()
         cell_node_map = self.get_cell_node_map(n)
         point_cell_map = self.get_point_cell_map(pts)
+        nphis = self.get_num_members(n)
+        results = tuple(numpy.zeros((nphis,) + (sd, )*k + pts.shape[1:]) for k in range(order+1))
         for ibfs, ipts, (A, b) in zip(cell_node_map, point_cell_map, self.affine_mappings):
-            # TODO indirection
-            # NOTE results is a tuple of tabulations of derivatives up to the given order
-            ref_pts = apply_mapping(A, b, pts)
-            results = dubiner_recurrence(sd, n, order, ref_pts, A,
-                                         self.scale, variant=self.variant)
+            ref_pts = apply_mapping(A, b, pts[ipts])
+            phis = dubiner_recurrence(sd, n, order, ref_pts, A,
+                                      self.scale, variant=self.variant)
+            for result, phi in zip(results, phis):
+                result[ibfs, ..., ipts] = phi
         return results
 
     def get_dmats(self, degree):
