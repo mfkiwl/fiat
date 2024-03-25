@@ -125,12 +125,13 @@ class UniformSplit(SplitSimplicialComplex):
                     cur = cur + 1
         if sd == 3:
             # Cut the octahedron
-            # FIXME do this more generalically
+            # FIXME do this more generically
             new_topology[1][cur] = (1, 8)
 
         # Get an adjacency list for each vertex
         edges = new_topology[1].values()
-        adjacency = {v: set(chain.from_iterable(verts for verts in edges if v in verts)) for v in new_topology[0]}
+        adjacency = {v: set(chain.from_iterable(verts for verts in edges if v in verts))
+                            for v in new_topology[0]}
 
         # Complete the higher dimensional facets by appending a vertex
         # adjacent to the vertices of codimension 1 facets
