@@ -289,9 +289,10 @@ class ExpansionSet(object):
         self.scale = scale
 
     def get_num_members(self, n):
-        return polynomial_dimension(self.ref_el, n, variant=self.variant)
+        return polynomial_dimension(self.ref_el, n, self.variant)
 
     def get_cell_node_map(self, n):
+        # TODO cache by degree
         return polynomial_cell_node_map(self.ref_el, n, self.variant)
 
     def get_point_cell_map(self, pts):
@@ -299,7 +300,7 @@ class ExpansionSet(object):
         top = self.ref_el.get_topology()
         if len(top[sd]) == 1:
             if len(pts.shape) == 1:
-                return tuple()
+                return (tuple(),)
             return (slice(None, None),)
         else:
             # TODO macro elements
@@ -474,7 +475,7 @@ def polynomial_dimension(ref_el, n, variant=None):
     """Returns the dimension of the space of polynomials of degree no
     greater than degree on the reference element."""
     if ref_el.get_shape() == reference_element.POINT:
-        if degree > 0:
+        if n > 0:
             raise ValueError("Only degree zero polynomials supported on point elements.")
         return 1
     top = ref_el.get_topology()
