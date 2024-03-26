@@ -278,6 +278,7 @@ class ExpansionSet(object):
                                 ref_el.get_vertices_of_subcomplex(top[sd][cell]), v2)
                                 for cell in top[sd]]
         self._dmats_cache = {}
+        self._cell_node_map_cache = {}
         if scale is None:
             scale = math.sqrt(1.0 / self.base_ref_el.volume())
         elif isinstance(scale, str):
@@ -292,10 +293,13 @@ class ExpansionSet(object):
         return polynomial_dimension(self.ref_el, n, self.variant)
 
     def get_cell_node_map(self, n):
-        # TODO cache by degree
-        return polynomial_cell_node_map(self.ref_el, n, self.variant)
+        try:
+            return self._cell_node_map_cache[n]
+        except KeyError:
+            cell_node_map = polynomial_cell_node_map(self.ref_el, n, self.variant)
+            return self._cell_node_map_cache.setdefault(n, cell_node_map)
 
-    def get_point_cell_map(self, pts):
+    def get_cell_point_map(self, pts):
         sd = self.ref_el.get_spatial_dimension()
         top = self.ref_el.get_topology()
         if len(top[sd]) == 1:
@@ -303,18 +307,18 @@ class ExpansionSet(object):
                 return (tuple(),)
             return (slice(None, None),)
         else:
-            # TODO macro elements
-            return (slice(None, None),)
-            raise NotImplementedError
+            return compute_point_cell_map(self.ref_el, pts)
 
     def _tabulate(self, n, pts, order=0):
         """A version of tabulate() that also works for a single point.
         """
         phis = []
-        point_cell_map = self.get_point_cell_map(pts)
+        cell_point_map = self.get_cell_point_map(pts)
+        print(cell_point_map)
+
         sd = self.ref_el.get_spatial_dimension()
-        for ipts, (A, b) in zip(point_cell_map, self.affine_mappings):
-            ref_pts = apply_mapping(A, b, pts[ipts])
+        for ipts, (A, b) in zip(cell_point_map, self.affine_mappings):
+            ref_pts = apply_mapping(A, b, pts[:, ipts])
             cur_phis = dubiner_recurrence(sd, n, order, ref_pts, A,
                                           self.scale, variant=self.variant)
             if self.variant == "integral":
@@ -327,9 +331,11 @@ class ExpansionSet(object):
         cell_node_map = self.get_cell_node_map(n)
         num_phis = numpy.max(cell_node_map) + 1
         for k in range(order+1):
-            result = numpy.zeros((num_phis,) + (sd,) * k + pts.shape[1:])
-            for ibfs, ipts, phi in zip(cell_node_map, point_cell_map, phis):
-                result[ibfs, ..., ipts] = phi[k]
+            result = numpy.zeros((num_phis,) + (sd,)*k + pts.shape[1:])
+            shape_slices = (slice(None, None),)*k
+            for ibfs, ipts, phi in zip(cell_node_map, cell_point_map, phis):
+                indices = (ibfs,) + shape_slices + (ipts,)
+                result[numpy.ix_(*indices)] = phi[k]
             results.append(result)
         return tuple(results)
 
@@ -509,6 +515,7 @@ def polynomial_entity_ids(ref_el, n, variant=None):
 def polynomial_cell_node_map(ref_el, n, variant=None):
     top = ref_el.get_topology()
     sd = ref_el.get_spatial_dimension()
+
     ref_entity_ids = polynomial_entity_ids(ref_el.construct_subelement(sd), n, variant)
     entity_ids = polynomial_entity_ids(ref_el, n, variant)
 
@@ -523,3 +530,42 @@ def polynomial_cell_node_map(ref_el, n, variant=None):
                 ref_dofs = ref_entity_ids[dim][ref_entity]
                 cell_node_map[cell, ref_dofs] = entity_ids[dim][entity]
     return cell_node_map
+
+
+def compute_point_cell_map(ref_el, pts):
+    top = ref_el.get_topology()
+    sd = ref_el.get_spatial_dimension()
+
+    bins = []
+    ref_vertices = numpy.eye(sd+1, sd)
+    for entity in top[sd]:
+        vertices = ref_el.get_vertices_of_subcomplex(top[dim][entity])
+        A, b = reference_element.make_affine_mapping(vertices, ref_vertices)
+        x = numpy.dot(A, pts) + b[:, None]
+        sx = numpy.sum(x, axis=0)
+        pts_on_cell = numpy.all(numpy.logical_and(numpy.logical_and(x >= 0, x <= 1),
+                                                  numpy.logical_and(sx >= 0, sx <= 1)),
+                                axis=0)
+        bins.append(numpy.where(pts_on_cell)[0])
+    return bins
+
+
+if __name__ == "__main__":
+    from reference_element import ufc_simplex
+    from quadrature_schemes import create_quadrature
+    from macro import AlfeldSplit
+    from macro import MacroQuadratureRule
+    dim = 3
+    K = ufc_simplex(dim)
+    ref_el = AlfeldSplit(K)
+
+    degree = 2
+    Q_ref = create_quadrature(ref_el.construct_subelement(dim), degree)
+    Q = MacroQuadratureRule(ref_el, Q_ref)
+    pts = Q.get_points().T
+    cells = compute_point_cell_map(ref_el, pts)
+    print(cells)
+
+    U = ExpansionSet(ref_el, variant="integral")
+    phis = U.tabulate(degree, Q.get_points())
+    print(phis)
