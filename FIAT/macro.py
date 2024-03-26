@@ -131,7 +131,7 @@ class UniformSplit(SplitSimplicialComplex):
         # Get an adjacency list for each vertex
         edges = new_topology[1].values()
         adjacency = {v: set(chain.from_iterable(verts for verts in edges if v in verts))
-                            for v in new_topology[0]}
+                     for v in new_topology[0]}
 
         # Complete the higher dimensional facets by appending a vertex
         # adjacent to the vertices of codimension 1 facets
@@ -174,7 +174,7 @@ class MacroElement():
 
         ref_eids = finite_element.entity_dofs()
         ndofs_per_dim = {d: len(ref_eids[d][0]) for d in ref_eids}
-        
+
         sc_facet_to_dofs = {}
 
         sc_t = sc.topology
@@ -193,7 +193,7 @@ class MacroElement():
         dofs_per_cell = finite_element.space_dimension()
 
         # This is used in evaluation.
-        cell_node_map = numpy.zeros((num_cells, dofs_per_cell), int)        
+        cell_node_map = numpy.zeros((num_cells, dofs_per_cell), int)
         conn = sc.connectivity
         for cid, in conn[(sdim, sdim)]:
             for dim in range(sdim+1):
@@ -216,13 +216,11 @@ class MacroElement():
 
         print(f"Cell node map:\n{cell_node_map}")
         print(f"DOFs per facet in reference cell:\n{entity_ids}")
-        
+
 
 if __name__ == "__main__":
     from reference_element import ufc_simplex
     from lagrange import Lagrange
     K = ufc_simplex(2)
     L = Lagrange(K, 3)
-
     ML = MacroElement(L, AlfeldSplit)
-    

@@ -281,38 +281,42 @@ class ExpansionSet(object):
             raise NotImplementedError
 
     def get_cell_node_map(self, n):
-        sd = self.ref_el.get_spatial_dimension()
-        top = self.ref_el.get_topology()
-        if len(top[sd]) == 1:
-            return (slice(None, None),)
-        else:
-            # TODO macro elements
-            raise NotImplementedError
+        return make_cell_node_map(self.ref_el, n, self.variant)
 
     def get_point_cell_map(self, pts):
         sd = self.ref_el.get_spatial_dimension()
         top = self.ref_el.get_topology()
         if len(top[sd]) == 1:
+            if len(pts.shape) == 1:
+                return tuple()
             return (slice(None, None),)
         else:
             # TODO macro elements
+            return (slice(None, None),)
             raise NotImplementedError
 
     def _tabulate(self, n, pts, order=0):
         """A version of tabulate() that also works for a single point.
         """
-        sd = self.ref_el.get_spatial_dimension()
-        cell_node_map = self.get_cell_node_map(n)
+        phis = []
         point_cell_map = self.get_point_cell_map(pts)
-        nphis = self.get_num_members(n)
-        results = tuple(numpy.zeros((nphis,) + (sd, )*k + pts.shape[1:]) for k in range(order+1))
-        for ibfs, ipts, (A, b) in zip(cell_node_map, point_cell_map, self.affine_mappings):
+        sd = self.ref_el.get_spatial_dimension()
+        for ipts, (A, b) in zip(point_cell_map, self.affine_mappings):
             ref_pts = apply_mapping(A, b, pts[ipts])
-            phis = dubiner_recurrence(sd, n, order, ref_pts, A,
-                                      self.scale, variant=self.variant)
-            for result, phi in zip(results, phis):
-                result[ibfs, ..., ipts] = phi
-        return results
+            phis.append(dubiner_recurrence(sd, n, order, ref_pts, A,
+                                           self.scale, variant=self.variant))
+        if len(self.affine_mappings) == 1:
+            return phis[0]
+
+        results = []
+        cell_node_map = self.get_cell_node_map(n)
+        num_phis = numpy.max(cell_node_map) + 1
+        for k in range(order+1):
+            result = numpy.zeros((num_phis,) + (sd,) * k + pts.shape[1:])
+            for ibfs, ipts, phi in zip(cell_node_map, point_cell_map, phis):
+                result[ibfs, ..., ipts] = phi[k]
+            results.append(result)
+        return tuple(results)
 
     def get_dmats(self, degree):
         """Returns a numpy array with the expansion coefficients dmat[k, j, i]
@@ -467,3 +471,70 @@ def polynomial_dimension(ref_el, degree):
         return max(0, (degree + 1) * (degree + 2) * (degree + 3) // 6)
     else:
         raise ValueError("Unknown reference element type.")
+
+
+def support(alpha):
+    return tuple(i for (i, ai) in enumerate(alpha) if abs(ai) > 0)
+
+
+def invert_cell_topology(T):
+    return {T[dim][entity]: (dim, entity) for dim in T for entity in T[dim]}
+
+
+
+def make_entity_ids(ref_el, n, variant):
+    top = ref_el.get_topology()
+    sd = ref_el.get_spatial_dimension()
+    entity_ids = {dim: {entity: [] for entity in top[dim]} for dim in top}
+    if variant == "integral":
+        idx = (lambda p: p, morton_index2, morton_index3)[sd-1]
+        inv_top = invert_cell_topology(top)
+        if len(top[sd]) == 1:
+            for alpha in reference_element.lattice_iter(0, n+1, sd):
+                beta = list(alpha)
+                for k in range(len(beta)):
+                    m = n - sum(beta)
+                    if beta[k] == 0:
+                        beta[k] = m
+
+                beta += [n - sum(beta)]
+                dim, entity = inv_top[support(beta)]
+                entity_ids[dim][entity].append(idx(*alpha))
+        else:
+            # C0 numbering
+            cur = 0
+            for dim in top:
+                dofs = math.comb(n - 1, dim)
+                for entity in top[dim]:
+                    entity_ids[dim][entity] = list(range(cur, cur + dofs))
+                    cur += dofs
+    else:
+        # DG numbering
+        cur = 0
+        dofs = math.comb(n + sd, sd)
+        for entity in top[sd]:
+            entity_ids[sd][entity] = list(range(cur, cur + dofs))
+            cur += dofs
+
+    print(entity_ids)
+    return entity_ids
+
+
+def make_cell_node_map(ref_el, degree, variant):
+    top = ref_el.get_topology()
+    sd = ref_el.get_spatial_dimension()
+
+    ref_entity_ids = make_entity_ids(ref_el.construct_subelement(sd), degree, variant)
+    entity_ids = make_entity_ids(ref_el, degree, variant)
+
+    num_cells = len(top[sd])
+    dofs_per_cell = sum(len(ref_entity_ids[dim][entity])
+                        for dim in ref_entity_ids for entity in ref_entity_ids[dim])
+    cell_node_map = numpy.zeros((num_cells, dofs_per_cell), dtype=int)
+    conn = ref_el.connectivity
+    for cell in top[sd]:
+        for dim in range(sd+1):
+            for ref_entity, entity in enumerate(conn[(sd, dim)][cell]):
+                ref_dofs = ref_entity_ids[dim][ref_entity]
+                cell_node_map[cell, ref_dofs] = entity_ids[dim][entity]
+    return cell_node_map
