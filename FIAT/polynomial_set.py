@@ -250,17 +250,14 @@ def make_bubbles(ref_el, degree, shape=()):
     """
     dim = ref_el.get_spatial_dimension()
     poly_set = ONPolynomialSet(ref_el, degree, shape=shape, scale="L2 piola", variant="integral")
-    degrees = chain(range(dim + 1, degree+1, 2), range(dim + 2, degree+1, 2))
-
     if dim == 1:
+        # odd / even reordering
+        degrees = chain(range(dim+1, degree+1, 2), range(dim+2, degree+1, 2))
         indices = list(degrees)
     else:
-        idx = (expansions.morton_index2, expansions.morton_index3)[dim-2]
-        indices = []
-        for p in degrees:
-            for alpha in mis(dim, p):
-                if alpha[0] > 1 and min(alpha[1:]) > 0:
-                    indices.append(idx(*alpha))
+        idofs = expansions.polynomial_dimension(ref_el, degree-dim-1)
+        ndofs = poly_set.get_num_members()
+        indices = list(range(ndofs-idofs, ndofs))
 
     if shape != ():
         ncomp = numpy.prod(shape)
