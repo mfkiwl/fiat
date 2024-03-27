@@ -273,10 +273,16 @@ class ExpansionSet(object):
         sd = ref_el.get_spatial_dimension()
         top = ref_el.get_topology()
         self.base_ref_el = reference_element.default_simplex(sd)
-        v2 = self.base_ref_el.get_vertices()
-        self.affine_mappings = [reference_element.make_affine_mapping(
-                                ref_el.get_vertices_of_subcomplex(top[sd][cell]), v2)
-                                for cell in top[sd]]
+        base_verts = self.base_ref_el.get_vertices()
+
+        def oriented_affine_mapping(cell):
+            verts = ref_el.get_vertices_of_subcomplex(top[sd][cell])
+            A, b = reference_element.make_affine_mapping(verts, base_verts)
+            # FIXME determine orientation to make Alfeld work
+            # A, b = reference_element.make_affine_mapping(verts, base_verts[::-1])
+            return A, b
+
+        self.affine_mappings = [oriented_affine_mapping(cell) for cell in top[sd]]
         self._dmats_cache = {}
         self._cell_node_map_cache = {}
         if scale is None:
@@ -299,21 +305,11 @@ class ExpansionSet(object):
             cell_node_map = polynomial_cell_node_map(self.ref_el, n, self.variant)
             return self._cell_node_map_cache.setdefault(n, cell_node_map)
 
-    def get_cell_point_map(self, pts):
-        sd = self.ref_el.get_spatial_dimension()
-        top = self.ref_el.get_topology()
-        if len(top[sd]) == 1:
-            if len(pts.shape) == 1:
-                return (tuple(),)
-            return (slice(None, None),)
-        else:
-            return compute_point_cell_map(self.ref_el, pts)
-
     def _tabulate(self, n, pts, order=0):
         """A version of tabulate() that also works for a single point.
         """
         phis = []
-        cell_point_map = self.get_cell_point_map(pts)
+        cell_point_map = compute_cell_point_map(self.ref_el, pts)
 
         sd = self.ref_el.get_spatial_dimension()
         for ipts, (A, b) in zip(cell_point_map, self.affine_mappings):
@@ -391,7 +387,7 @@ class ExpansionSet(object):
         if len(pts) == 0:
             return numpy.array([])
         results, = self._tabulate(n, numpy.transpose(pts))
-        return numpy.array(results)
+        return numpy.asarray(results)
 
     def tabulate_derivatives(self, n, pts):
         vals, deriv_vals = self._tabulate(n, numpy.transpose(pts), order=1)
@@ -530,13 +526,16 @@ def polynomial_cell_node_map(ref_el, n, variant=None):
     return cell_node_map
 
 
-def compute_point_cell_map(ref_el, pts, tol=1E-12):
+def compute_cell_point_map(ref_el, pts, tol=1E-12):
     top = ref_el.get_topology()
     sd = ref_el.get_spatial_dimension()
+    if len(top[sd]) == 1:
+        point_map = tuple() if len(pts.shape) == 1 else slice(None, None)
+        return (point_map,)
 
     low, high = -tol, 1 + tol
     bins = []
-    ref_vertices = numpy.eye(sd+1, sd)
+    ref_vertices = reference_element.ufc_simplex(sd).get_vertices()
     for entity in top[sd]:
         vertices = ref_el.get_vertices_of_subcomplex(top[sd][entity])
         A, b = reference_element.make_affine_mapping(vertices, ref_vertices)
@@ -569,9 +568,9 @@ if __name__ == "__main__":
             pts.extend(ref_el.make_points(dim, entity, degree))
 
     pt_array = numpy.asarray(pts)
-    pts_on_cell = pt_array[polynomial_cell_node_map(ref_el, degree, variant)]
     print("points\n", pt_array)
-    print("points\n", pts_on_cell)
+    # pts_on_cell = pt_array[polynomial_cell_node_map(ref_el, degree, variant)]
+    # print("points\n", pts_on_cell)
 
     U = ExpansionSet(ref_el, variant=variant, scale="L2 piola")
     V = U.tabulate(degree, pts)
@@ -581,7 +580,9 @@ if __name__ == "__main__":
     V = poly_set.tabulate(pts)[(0,)*dim]
     print("PolySet\n", V)
 
-    istart, iend = 4, 7
+    Ktop = K.get_topology()
+    top = ref_el.get_topology()
+    istart, iend = len(top[0]), len(top[0]) + len(Ktop[1])
     sub = poly_set.take(range(istart, iend))
     V = poly_set.tabulate(pts[istart:iend])[(0,)*dim]
     print(f"PolySet at {pts[istart:iend]}\n", V)
