@@ -44,9 +44,9 @@ class SplitSimplicialComplex(SimplicialComplex):
     """Abstract class to implement a split on a Simplex
     """
 
-    def __init__(self, ref_el, splits=1):
+    def __init__(self, ref_el, splits=1, variant=None):
         self.parent = ref_el
-        vertices, topology = self.split_topology(ref_el, splits=splits)
+        vertices, topology = self.split_topology(ref_el, splits=splits, variant=variant)
         super(SplitSimplicialComplex, self).__init__(ref_el.shape, vertices, topology)
 
     def split_topology(self, ref_el):
@@ -69,6 +69,24 @@ class SplitSimplicialComplex(SimplicialComplex):
                 child_to_parent[dim][entity] = (parent_dim, parent_entity)
         return child_to_parent
 
+    def get_cell_connectivity(self):
+        """Connectitivity from cell in a complex to globally number and
+        respects the entity numbering on the reference cell.
+        """
+        sd = self.get_spatial_dimension()
+        top = self.get_topology()
+        inv_top = invert_cell_topology(top)
+        parent_top = self.parent.get_topology()
+        connectivity = {cell: {dim: [] for dim in top} for cell in top[sd]}
+        for cell in top[sd]:
+            cell_verts = top[sd][cell]
+            for dim in top:
+                for entity in parent_top[dim]:
+                    ref_verts = parent_top[dim][entity]
+                    global_verts = tuple(cell_verts[v] for v in ref_verts)
+                    connectivity[cell][dim].append(inv_top[dim][global_verts])
+        return connectivity
+
     def construct_subelement(self, dimension):
         """Constructs the reference element of a cell subentity
         specified by subelement dimension.
@@ -77,14 +95,10 @@ class SplitSimplicialComplex(SimplicialComplex):
         """
         return self.parent.construct_subelement(dimension)
 
-    def get_entity_transform(self, dim, entity):
-        # This is to trick FiniteElement.tabulate
-        return self.parent.get_entity_transform(dim, entity)
-
 
 class AlfeldSplit(SplitSimplicialComplex):
 
-    def split_topology(self, ref_el, splits=1):
+    def split_topology(self, ref_el, splits=1, variant=None):
         assert splits == 1
         sd = ref_el.get_spatial_dimension()
         top = ref_el.get_topology()
@@ -104,13 +118,13 @@ class AlfeldSplit(SplitSimplicialComplex):
         return new_verts, new_topology
 
 
-class UniformSplit(SplitSimplicialComplex):
+class IsoSplit(SplitSimplicialComplex):
 
-    def split_topology(self, ref_el, splits=1):
+    def split_topology(self, ref_el, splits=1, variant=None):
         depth = splits + 1
         sd = ref_el.get_spatial_dimension()
         old_verts = ref_el.get_vertices()
-        new_verts = make_lattice(old_verts, depth)
+        new_verts = make_lattice(old_verts, depth, variant=variant)
 
         new_topology = {}
         new_topology[0] = {i: (i,) for i in range(len(new_verts))}
@@ -223,11 +237,3 @@ class MacroElement():
 
         print(f"Cell node map:\n{cell_node_map}")
         print(f"DOFs per facet in reference cell:\n{entity_ids}")
-
-
-if __name__ == "__main__":
-    from reference_element import ufc_simplex
-    from lagrange import Lagrange
-    K = ufc_simplex(2)
-    L = Lagrange(K, 3)
-    ML = MacroElement(L, AlfeldSplit)

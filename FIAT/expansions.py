@@ -79,8 +79,8 @@ def C0_basis(dim, n, phi):
             for j in range(0, n+1-i):
                 phi[idx(0, i, j)] -= phi[idx(1, i-1, j)]
             icur = idx(0, 0, i)
-            phi[icur] -= phi[idx(1, 0, i-1)]
             phi[icur] -= phi[idx(0, 1, i-1)]
+            phi[icur] -= phi[idx(1, 0, i-1)]
 
     # reorder by dimension and entity on the reference simplex
     dofs = list(range(dim+1))
@@ -275,14 +275,9 @@ class ExpansionSet(object):
         self.base_ref_el = reference_element.default_simplex(sd)
         base_verts = self.base_ref_el.get_vertices()
 
-        def oriented_affine_mapping(cell):
-            verts = ref_el.get_vertices_of_subcomplex(top[sd][cell])
-            A, b = reference_element.make_affine_mapping(verts, base_verts)
-            # FIXME determine orientation to make Alfeld work
-            # A, b = reference_element.make_affine_mapping(verts, base_verts[::-1])
-            return A, b
-
-        self.affine_mappings = [oriented_affine_mapping(cell) for cell in top[sd]]
+        self.affine_mappings = [reference_element.make_affine_mapping(
+                                ref_el.get_vertices_of_subcomplex(top[sd][cell]),
+                                base_verts) for cell in top[sd]]
         self._dmats_cache = {}
         self._cell_node_map_cache = {}
         if scale is None:
@@ -508,19 +503,21 @@ def polynomial_entity_ids(ref_el, n, variant=None):
 
 
 def polynomial_cell_node_map(ref_el, n, variant=None):
+    assert hasattr(ref_el, "parent")
     top = ref_el.get_topology()
     sd = ref_el.get_spatial_dimension()
 
     entity_ids = polynomial_entity_ids(ref_el, n, variant)
     ref_entity_ids = polynomial_entity_ids(ref_el.construct_subelement(sd), n, variant)
+
     num_cells = len(top[sd])
     dofs_per_cell = sum(len(ref_entity_ids[dim][entity])
                         for dim in ref_entity_ids for entity in ref_entity_ids[dim])
     cell_node_map = numpy.zeros((num_cells, dofs_per_cell), dtype=int)
-    conn = ref_el.connectivity
+    conn = ref_el.get_cell_connectivity()
     for cell in top[sd]:
         for dim in top:
-            for ref_entity, entity in enumerate(conn[(sd, dim)][cell]):
+            for ref_entity, entity in enumerate(conn[cell][dim]):
                 ref_dofs = ref_entity_ids[dim][ref_entity]
                 cell_node_map[cell, ref_dofs] = entity_ids[dim][entity]
     return cell_node_map
@@ -530,8 +527,7 @@ def compute_cell_point_map(ref_el, pts, tol=1E-12):
     top = ref_el.get_topology()
     sd = ref_el.get_spatial_dimension()
     if len(top[sd]) == 1:
-        point_map = tuple() if len(pts.shape) == 1 else slice(None, None)
-        return (point_map,)
+        return (Ellipsis,)
 
     low, high = -tol, 1 + tol
     bins = []
@@ -546,47 +542,3 @@ def compute_cell_point_map(ref_el, pts, tol=1E-12):
         pts_on_cell = numpy.all(numpy.logical_and(x >= low, x <= high), axis=0)
         bins.append(numpy.where(pts_on_cell)[0])
     return bins
-
-
-if __name__ == "__main__":
-    from reference_element import ufc_simplex
-    from macro import AlfeldSplit, UniformSplit
-    from lagrange import Lagrange
-    from polynomial_set import ONPolynomialSet
-    dim = 2
-    K = ufc_simplex(dim)
-    ref_el = AlfeldSplit(K)
-    ref_el = UniformSplit(K)
-
-    degree = 2
-    variant = "integral"
-
-    pts = []
-    top = ref_el.get_topology()
-    for dim in sorted(top):
-        for entity in sorted(top[dim]):
-            pts.extend(ref_el.make_points(dim, entity, degree))
-
-    pt_array = numpy.asarray(pts)
-    print("points\n", pt_array)
-    # pts_on_cell = pt_array[polynomial_cell_node_map(ref_el, degree, variant)]
-    # print("points\n", pts_on_cell)
-
-    U = ExpansionSet(ref_el, variant=variant, scale="L2 piola")
-    V = U.tabulate(degree, pts)
-    print("ExpansionSet\n", V)
-
-    poly_set = ONPolynomialSet(ref_el, degree, variant=variant, scale="L2 piola")
-    V = poly_set.tabulate(pts)[(0,)*dim]
-    print("PolySet\n", V)
-
-    Ktop = K.get_topology()
-    top = ref_el.get_topology()
-    istart, iend = len(top[0]), len(top[0]) + len(Ktop[1])
-    sub = poly_set.take(range(istart, iend))
-    V = poly_set.tabulate(pts[istart:iend])[(0,)*dim]
-    print(f"PolySet at {pts[istart:iend]}\n", V)
-
-    fe = Lagrange(ref_el, degree)
-    phis = fe.tabulate(0, pts)[(0,)*dim]
-    print("Lagrange\n", phis)

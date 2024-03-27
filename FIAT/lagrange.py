@@ -48,7 +48,9 @@ class Lagrange(finite_element.CiarletElement):
 
     def __init__(self, ref_el, degree, variant="equispaced"):
         dual = LagrangeDualSet(ref_el, degree, variant=variant)
-        if ref_el.shape == LINE and False:
+        sd = ref_el.get_spatial_dimension()
+        num_cells = len(ref_el.get_topology()[sd])
+        if ref_el.shape == LINE and num_cells == 1:
             # In 1D we can use the primal basis as the expansion set,
             # avoiding any round-off coming from a basis transformation
             points = []
@@ -56,8 +58,10 @@ class Lagrange(finite_element.CiarletElement):
                 # Assert singleton point for each node.
                 pt, = node.get_point_dict().keys()
                 points.append(pt)
+            # FIXME macro-ize LagrangePolynomial set
             poly_set = LagrangePolynomialSet(ref_el, points)
         else:
-            poly_set = polynomial_set.ONPolynomialSet(ref_el, degree, variant="integral", scale="L2 piola")
+            variant = "integral" if num_cells > 1 else None
+            poly_set = polynomial_set.ONPolynomialSet(ref_el, degree, variant=variant)
         formdegree = 0  # 0-form
         super(Lagrange, self).__init__(poly_set, dual, degree, formdegree)

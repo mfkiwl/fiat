@@ -13,6 +13,7 @@ from FIAT import polynomial_set, functional
 
 class DualSet(object):
     def __init__(self, nodes, ref_el, entity_ids, entity_permutations=None):
+        ref_el, entity_ids = merge_entity_ids(ref_el, entity_ids)
         self.nodes = nodes
         self.ref_el = ref_el
         self.entity_ids = entity_ids
@@ -193,3 +194,21 @@ def make_entity_closure_ids(ref_el, entity_ids):
             entity_closure_ids[d][e] = ids
 
     return entity_closure_ids
+
+
+def merge_entity_ids(ref_el, entity_ids):
+    """Collect DOFs from simplicial complex onto facets of parent cell"""
+    try:
+        parent_cell = ref_el.parent
+    except AttributeError:
+        return ref_el, entity_ids
+
+    parent_top = parent_cell.get_topology()
+    parent_ids = {dim: {entity: [] for entity in parent_top[dim]} for dim in parent_top}
+    child_to_parent = ref_el.get_child_to_parent()
+    for dim in child_to_parent:
+        for entity in child_to_parent[dim]:
+            parent_dim, parent_id = child_to_parent[dim][entity]
+            dofs_cur = entity_ids[dim][entity]
+            parent_ids[parent_dim][parent_id].extend(dofs_cur)
+    return parent_cell, parent_ids
