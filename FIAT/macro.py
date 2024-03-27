@@ -16,15 +16,13 @@ def xy_to_bary(verts, pts, result=None):
     # verts is (sdim + 1) x sdim so verts[i, :] is i:th vertex
     # result is [npts, sdim]
     # bary is [npts, sdim + 1]
+    verts = numpy.asarray(verts)
     npts = pts.shape[0]
     sdim = verts.shape[1]
 
     mat = numpy.vstack((verts.T, numpy.ones((1, sdim+1))))
-
     b = numpy.vstack((pts.T, numpy.ones((1, npts))))
-
     foo = numpy.linalg.solve(mat, b)
-
     if result is None:
         return numpy.copy(foo.T)
     else:
