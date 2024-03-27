@@ -46,9 +46,9 @@ class SplitSimplicialComplex(SimplicialComplex):
     """Abstract class to implement a split on a Simplex
     """
 
-    def __init__(self, ref_el):
+    def __init__(self, ref_el, splits=1):
         self.parent = ref_el
-        vertices, topology = self.split_topology(ref_el)
+        vertices, topology = self.split_topology(ref_el, splits=splits)
         super(SplitSimplicialComplex, self).__init__(ref_el.shape, vertices, topology)
 
     def split_topology(self, ref_el):
@@ -79,32 +79,40 @@ class SplitSimplicialComplex(SimplicialComplex):
         """
         return self.parent.construct_subelement(dimension)
 
+    def get_entity_transform(self, dim, entity):
+        # This is to trick FiniteElement.tabulate
+        return self.parent.get_entity_transform(dim, entity)
+
 
 class AlfeldSplit(SplitSimplicialComplex):
 
-    def split_topology(self, ref_el):
+    def split_topology(self, ref_el, splits=1):
+        assert splits == 1
         sd = ref_el.get_spatial_dimension()
-        new_topology = copy.deepcopy(ref_el.topology)
+        top = ref_el.get_topology()
+        new_topology = copy.deepcopy(top)
         new_topology[sd] = {}
 
         barycenter = ref_el.make_points(sd, 0, sd+1)
-        new_verts = ref_el.vertices + tuple(barycenter)
-        new_vert_id = len(ref_el.vertices)
+        old_verts = ref_el.get_vertices()
+        new_verts = old_verts + tuple(barycenter)
+        new_vert_id = len(old_verts)
 
         new_topology[0][new_vert_id] = (new_vert_id,)
         for dim in range(1, sd + 1):
             offset = len(new_topology[dim])
-            for entity, ids in ref_el.topology[dim-1].items():
+            for entity, ids in top[dim-1].items():
                 new_topology[dim][offset+entity] = ids + (new_vert_id,)
         return new_verts, new_topology
 
 
 class UniformSplit(SplitSimplicialComplex):
 
-    def split_topology(self, ref_el):
+    def split_topology(self, ref_el, splits=1):
+        depth = splits + 1
         sd = ref_el.get_spatial_dimension()
         old_verts = ref_el.get_vertices()
-        new_verts = make_lattice(old_verts, 2)
+        new_verts = make_lattice(old_verts, depth)
 
         new_topology = {}
         new_topology[0] = {i: (i,) for i in range(len(new_verts))}
@@ -115,17 +123,18 @@ class UniformSplit(SplitSimplicialComplex):
         # Place a new edge when the two lattice multiindices are at Manhattan distance < 3,
         # this connects the midpoints of edges within a face
         # Only include diagonal edges that are parallel to the simplex edges,
-        # we take the diagonal that goes through vertices of the same multiindex sum
+        # we take the diagonal that goes through vertices at the same depth
         cur = 0
         distance = lambda x, y: sum(abs(b-a) for a, b in zip(x, y))
-        for j, v1 in enumerate(lattice_iter(0, 3, sd)):
-            for i, v0 in enumerate(lattice_iter(0, 3, sd)):
+        for j, v1 in enumerate(lattice_iter(0, depth+1, sd)):
+            for i, v0 in enumerate(lattice_iter(0, depth+1, sd)):
                 if i < j and distance(v0, v1) < 3 and sum(v1) - sum(v0) <= 1:
                     new_topology[1][cur] = (i, j)
                     cur = cur + 1
         if sd == 3:
             # Cut the octahedron
             # FIXME do this more generically
+            assert splits == 1
             new_topology[1][cur] = (1, 8)
 
         # Get an adjacency list for each vertex

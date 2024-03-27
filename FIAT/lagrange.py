@@ -48,7 +48,7 @@ class Lagrange(finite_element.CiarletElement):
 
     def __init__(self, ref_el, degree, variant="equispaced"):
         dual = LagrangeDualSet(ref_el, degree, variant=variant)
-        if ref_el.shape == LINE:
+        if ref_el.shape == LINE and False:
             # In 1D we can use the primal basis as the expansion set,
             # avoiding any round-off coming from a basis transformation
             points = []
@@ -58,6 +58,6 @@ class Lagrange(finite_element.CiarletElement):
                 points.append(pt)
             poly_set = LagrangePolynomialSet(ref_el, points)
         else:
-            poly_set = polynomial_set.ONPolynomialSet(ref_el, degree)
+            poly_set = polynomial_set.ONPolynomialSet(ref_el, degree, variant="integral", scale="L2 piola")
         formdegree = 0  # 0-form
         super(Lagrange, self).__init__(poly_set, dual, degree, formdegree)

@@ -128,7 +128,7 @@ class ONPolynomialSet(PolynomialSet):
         else:
             flat_shape = numpy.ravel(shape)
             num_components = numpy.prod(flat_shape)
-        num_exp_functions = expansions.polynomial_dimension(ref_el, degree)
+        num_exp_functions = expansions.polynomial_dimension(ref_el, degree, variant)
         num_members = num_components * num_exp_functions
         embedded_degree = degree
         expansion_set = expansions.ExpansionSet(ref_el, scale=scale, variant=variant)
@@ -142,7 +142,7 @@ class ONPolynomialSet(PolynomialSet):
             # use functional's index_iterator function
             cur_bf = 0
             for idx in index_iterator(shape):
-                n = expansions.polynomial_dimension(ref_el, embedded_degree)
+                n = expansions.polynomial_dimension(ref_el, embedded_degree, variant)
                 for exp_bf in range(n):
                     cur_idx = (cur_bf, *idx, exp_bf)
                     coeffs[cur_idx] = 1.0
@@ -212,18 +212,18 @@ class ONSymTensorPolynomialSet(PolynomialSet):
 
     """
 
-    def __init__(self, ref_el, degree, size=None, scale=None):
+    def __init__(self, ref_el, degree, size=None, scale=None, variant=None):
 
         sd = ref_el.get_spatial_dimension()
         if size is None:
             size = sd
 
         shape = (size, size)
-        num_exp_functions = expansions.polynomial_dimension(ref_el, degree)
+        num_exp_functions = expansions.polynomial_dimension(ref_el, degree, variant)
         num_components = size * (size + 1) // 2
         num_members = num_components * num_exp_functions
         embedded_degree = degree
-        expansion_set = expansions.ExpansionSet(ref_el, scale=scale)
+        expansion_set = expansions.ExpansionSet(ref_el, scale=scale, variant=variant)
 
         # set up coefficients for symmetric tensors
         coeffs_shape = (num_members, *shape, num_exp_functions)

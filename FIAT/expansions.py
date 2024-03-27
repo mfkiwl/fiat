@@ -314,7 +314,6 @@ class ExpansionSet(object):
         """
         phis = []
         cell_point_map = self.get_cell_point_map(pts)
-        print(cell_point_map)
 
         sd = self.ref_el.get_spatial_dimension()
         for ipts, (A, b) in zip(cell_point_map, self.affine_mappings):
@@ -328,8 +327,8 @@ class ExpansionSet(object):
             return phis[0]
 
         results = []
+        num_phis = self.get_num_members(n)
         cell_node_map = self.get_cell_node_map(n)
-        num_phis = numpy.max(cell_node_map) + 1
         for k in range(order+1):
             result = numpy.zeros((num_phis,) + (sd,)*k + pts.shape[1:])
             shape_slices = (slice(None, None),)*k
@@ -516,9 +515,8 @@ def polynomial_cell_node_map(ref_el, n, variant=None):
     top = ref_el.get_topology()
     sd = ref_el.get_spatial_dimension()
 
-    ref_entity_ids = polynomial_entity_ids(ref_el.construct_subelement(sd), n, variant)
     entity_ids = polynomial_entity_ids(ref_el, n, variant)
-
+    ref_entity_ids = polynomial_entity_ids(ref_el.construct_subelement(sd), n, variant)
     num_cells = len(top[sd])
     dofs_per_cell = sum(len(ref_entity_ids[dim][entity])
                         for dim in ref_entity_ids for entity in ref_entity_ids[dim])
@@ -532,40 +530,62 @@ def polynomial_cell_node_map(ref_el, n, variant=None):
     return cell_node_map
 
 
-def compute_point_cell_map(ref_el, pts):
+def compute_point_cell_map(ref_el, pts, tol=1E-12):
     top = ref_el.get_topology()
     sd = ref_el.get_spatial_dimension()
 
+    low, high = -tol, 1 + tol
     bins = []
     ref_vertices = numpy.eye(sd+1, sd)
     for entity in top[sd]:
-        vertices = ref_el.get_vertices_of_subcomplex(top[dim][entity])
+        vertices = ref_el.get_vertices_of_subcomplex(top[sd][entity])
         A, b = reference_element.make_affine_mapping(vertices, ref_vertices)
+        A = numpy.vstack((A, numpy.sum(A, axis=0)))
+        b = numpy.hstack((b, numpy.sum(b, axis=0)))
         x = numpy.dot(A, pts) + b[:, None]
-        sx = numpy.sum(x, axis=0)
-        pts_on_cell = numpy.all(numpy.logical_and(numpy.logical_and(x >= 0, x <= 1),
-                                                  numpy.logical_and(sx >= 0, sx <= 1)),
-                                axis=0)
+
+        pts_on_cell = numpy.all(numpy.logical_and(x >= low, x <= high), axis=0)
         bins.append(numpy.where(pts_on_cell)[0])
     return bins
 
 
 if __name__ == "__main__":
     from reference_element import ufc_simplex
-    from quadrature_schemes import create_quadrature
-    from macro import AlfeldSplit
-    from macro import MacroQuadratureRule
-    dim = 3
+    from macro import AlfeldSplit, UniformSplit
+    from lagrange import Lagrange
+    from polynomial_set import ONPolynomialSet
+    dim = 2
     K = ufc_simplex(dim)
     ref_el = AlfeldSplit(K)
+    ref_el = UniformSplit(K)
 
     degree = 2
-    Q_ref = create_quadrature(ref_el.construct_subelement(dim), degree)
-    Q = MacroQuadratureRule(ref_el, Q_ref)
-    pts = Q.get_points().T
-    cells = compute_point_cell_map(ref_el, pts)
-    print(cells)
+    variant = "integral"
 
-    U = ExpansionSet(ref_el, variant="integral")
-    phis = U.tabulate(degree, Q.get_points())
-    print(phis)
+    pts = []
+    top = ref_el.get_topology()
+    for dim in sorted(top):
+        for entity in sorted(top[dim]):
+            pts.extend(ref_el.make_points(dim, entity, degree))
+
+    pt_array = numpy.asarray(pts)
+    pts_on_cell = pt_array[polynomial_cell_node_map(ref_el, degree, variant)]
+    print("points\n", pt_array)
+    print("points\n", pts_on_cell)
+
+    U = ExpansionSet(ref_el, variant=variant, scale="L2 piola")
+    V = U.tabulate(degree, pts)
+    print("ExpansionSet\n", V)
+
+    poly_set = ONPolynomialSet(ref_el, degree, variant=variant, scale="L2 piola")
+    V = poly_set.tabulate(pts)[(0,)*dim]
+    print("PolySet\n", V)
+
+    istart, iend = 4, 7
+    sub = poly_set.take(range(istart, iend))
+    V = poly_set.tabulate(pts[istart:iend])[(0,)*dim]
+    print(f"PolySet at {pts[istart:iend]}\n", V)
+
+    fe = Lagrange(ref_el, degree)
+    phis = fe.tabulate(0, pts)[(0,)*dim]
+    print("Lagrange\n", phis)
