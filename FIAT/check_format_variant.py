@@ -1,4 +1,5 @@
 import re
+from FIAT.macro import IsoSplit, AlfeldSplit
 
 
 def check_format_variant(variant, degree):
@@ -20,3 +21,29 @@ def check_format_variant(variant, degree):
                          'or variant="integral(q)"')
 
     return variant, interpolant_degree
+
+
+def parse_lagrange_variant(variant):
+    options = variant.replace(" ", "").split(",")
+    assert len(options) <= 2
+    supported_point_variants = ["equispaced", "gll", "spectral"]
+    point_variant = "spectral"
+
+    splitting = None
+
+    for pre_opt in options:
+        opt = pre_opt.lower()
+        if opt == "alfeld":
+            splitting = AlfeldSplit
+        elif opt == "iso":
+            splitting = IsoSplit
+        elif opt.startswith("iso"):
+            match = re.match(r"^iso(?:\((\d+)\))?$", opt)
+            k, = match.groups()
+            splitting = lambda T: IsoSplit(T, int(k))
+        elif opt in supported_point_variants:
+            point_variant = opt
+        else:
+            raise ValueError("Illegal variant option")
+
+    return splitting, point_variant

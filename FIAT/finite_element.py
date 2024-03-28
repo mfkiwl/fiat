@@ -108,6 +108,9 @@ class FiniteElement(object):
         """
         return False
 
+    def is_macroelement(self):
+        return self.ref_el.is_macrocell()
+
 
 class CiarletElement(FiniteElement):
     """Class implementing Ciarlet's abstraction of a finite element
