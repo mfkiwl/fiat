@@ -129,9 +129,9 @@ class CiarletElement(FiniteElement):
     basis generated from polynomials encoded in a `PolynomialSet`.
     """
 
-    def __init__(self, poly_set, dual, order, formdegree=None, mapping="affine", ref_el=None, ref_complex=None):
+    def __init__(self, poly_set, dual, order, formdegree=None, mapping="affine", ref_el=None):
         ref_el = ref_el or dual.get_reference_element()
-        ref_complex = ref_complex or ref_el
+        ref_complex = poly_set.get_reference_element()
         super(CiarletElement, self).__init__(ref_el, dual, order, formdegree, mapping, ref_complex)
 
         # build generalized Vandermonde matrix
@@ -156,7 +156,6 @@ class CiarletElement(FiniteElement):
         new_shp = new_coeffs_flat.shape[:1] + shp[1:]
         new_coeffs = new_coeffs_flat.reshape(new_shp)
 
-        # dual might advertise the parent cell but poly_set might be on a simplicial complex
         self.poly_set = PolynomialSet(poly_set.get_reference_element(),
                                       poly_set.get_degree(),
                                       poly_set.get_embedded_degree(),

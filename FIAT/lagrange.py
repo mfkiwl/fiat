@@ -79,4 +79,4 @@ class Lagrange(finite_element.CiarletElement):
             poly_variant = "bubble" if num_cells > 1 else None
             poly_set = polynomial_set.ONPolynomialSet(ref_el, degree, variant=poly_variant)
         formdegree = 0  # 0-form
-        super(Lagrange, self).__init__(poly_set, dual, degree, formdegree, ref_complex=ref_el)
+        super(Lagrange, self).__init__(poly_set, dual, degree, formdegree)

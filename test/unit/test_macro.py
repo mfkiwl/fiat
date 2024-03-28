@@ -9,9 +9,8 @@ from FIAT.lagrange import Lagrange
 
 @pytest.fixture(params=("I", "T", "S"))
 def cell(request):
-    return {"I": ufc_simplex(1),
-            "T": ufc_simplex(2),
-            "S": ufc_simplex(3)}[request.param]
+    dim = {"I": 1, "T": 2, "S": 3}[request.param]
+    return ufc_simplex(dim)
 
 
 @pytest.mark.parametrize("split", (AlfeldSplit, IsoSplit))
@@ -129,8 +128,12 @@ def test_macro_lagrange(variant, degree, split, cell):
     assert numpy.allclose(fe.V, V)
 
 
-def test_is_macro():
-    assert Lagrange(ufc_simplex(2), 3, "Alfeld,equispaced").is_macroelement()
-    assert not Lagrange(ufc_simplex(3), 2, "gll").is_macroelement()
-    
-    
+@pytest.mark.parametrize("variant", ("gll", "Alfeld,equispaced", "gll,iso"))
+def test_is_macro(variant):
+    is_macro = "alfeld" in variant.lower() or "iso" in variant.lower()
+
+    fe = Lagrange(ufc_simplex(2), 2, variant)
+    assert not fe.get_reference_element().is_macrocell()
+    assert fe.is_macroelement() == is_macro
+    assert fe.get_reference_complex().is_macrocell() == is_macro
+    assert fe.get_nodal_basis().get_reference_element().is_macrocell() == is_macro
