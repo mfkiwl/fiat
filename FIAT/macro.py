@@ -94,6 +94,9 @@ class SplitSimplicialComplex(SimplicialComplex):
         """
         return self.parent.construct_subelement(dimension)
 
+    def is_macrocell(self):
+        return True
+
 
 class AlfeldSplit(SplitSimplicialComplex):
 
