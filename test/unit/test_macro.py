@@ -1,10 +1,10 @@
 import numpy
 import pytest
-from FIAT.reference_element import ufc_simplex
-from FIAT.macro import AlfeldSplit, IsoSplit, MacroQuadratureRule
-from FIAT.quadrature_schemes import create_quadrature
-from FIAT.polynomial_set import ONPolynomialSet
 from FIAT.lagrange import Lagrange
+from FIAT.macro import AlfeldSplit, IsoSplit, MacroQuadratureRule
+from FIAT.polynomial_set import ONPolynomialSet
+from FIAT.quadrature_schemes import create_quadrature
+from FIAT.reference_element import ufc_simplex
 
 
 @pytest.fixture(params=("I", "T", "S"))

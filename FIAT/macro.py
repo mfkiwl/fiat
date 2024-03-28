@@ -1,8 +1,11 @@
 import copy
-import numpy
 from itertools import chain
-from FIAT.reference_element import make_lattice, lattice_iter, SimplicialComplex
-from FIAT.quadrature import QuadratureRule, FacetQuadratureRule
+
+import numpy
+
+from FIAT.quadrature import FacetQuadratureRule, QuadratureRule
+from FIAT.reference_element import (SimplicialComplex, lattice_iter,
+                                    make_lattice)
 
 
 def bary_to_xy(verts, bary, result=None):

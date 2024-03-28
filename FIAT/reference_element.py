@@ -255,6 +255,18 @@ class Cell(object):
     def get_parent(self):
         return None
 
+    def __gt__(self, other):
+        return self.get_parent() == other
+
+    def __lt__(self, other):
+        return self == other.get_parent()
+
+    def __ge__(self, other):
+        return self > other or self == other
+
+    def __le__(self, other):
+        return self < other or self == other
+
 
 class SimplicialComplex(Cell):
     r"""Abstract class for a simplicial complex.
