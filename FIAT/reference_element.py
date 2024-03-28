@@ -282,18 +282,16 @@ class SimplicialComplex(Cell):
         # case.
         cell = next(k for k, facets in enumerate(self.connectivity[(sd, sd-1)])
                     if facet_i in facets)
-        vertices = self.get_vertices_of_subcomplex(t[sd][cell])
+        verts = numpy.asarray(self.get_vertices_of_subcomplex(t[sd][cell]))
 
         # Interval case
         if self.get_shape() == LINE:
-            verts = numpy.asarray(vertices)
             v_i, = self.get_topology()[0][facet_i]
             n = verts[v_i] - verts[[1, 0][v_i]]
             return n / numpy.linalg.norm(n)
 
         # vectors from vertex 0 to each other vertex.
-        vert_vecs = numpy.asarray(vertices)
-        vert_vecs_from_v0 = vert_vecs[1:, :] - vert_vecs[:1, :]
+        vert_vecs_from_v0 = verts[1:, :] - verts[:1, :]
 
         (u, s, _) = numpy.linalg.svd(vert_vecs_from_v0)
         rank = len([si for si in s if si > 1.e-10])
@@ -306,7 +304,7 @@ class SimplicialComplex(Cell):
 
         # now I find everything normal to the facet.
         vcf = numpy.asarray(vert_coords_of_facet)
-        facet_span = vcf[1:, :] - vcf[0][None, :]
+        facet_span = vcf[1:, :] - vcf[:1, :]
         (_, sf, vft) = numpy.linalg.svd(facet_span)
 
         # now get the null space from vft
