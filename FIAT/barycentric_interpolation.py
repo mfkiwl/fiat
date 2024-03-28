@@ -49,8 +49,7 @@ def make_dmat(x):
 
 
 class LagrangeLineExpansionSet(expansions.LineExpansionSet):
-    """Lagrange polynomial set on the line
-    """
+    """Lagrange polynomial set for fixed points the line."""
     def __init__(self, ref_el, pts):
         self.points = pts
         self.x = numpy.array(pts).flatten()

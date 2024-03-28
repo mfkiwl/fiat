@@ -58,9 +58,8 @@ class Lagrange(finite_element.CiarletElement):
                 points.append(pt)
             poly_set = LagrangePolynomialSet(ref_el, points)
         else:
-            sd = ref_el.get_spatial_dimension()
-            num_cells = len(ref_el.get_topology()[sd])
-            variant = "integral" if num_cells > 1 else None
-            poly_set = polynomial_set.ONPolynomialSet(ref_el, degree, variant=variant)
+            num_cells = len(ref_el.get_topology()[ref_el.get_spatial_dimension()])
+            poly_variant = "bubble" if num_cells > 1 else None
+            poly_set = polynomial_set.ONPolynomialSet(ref_el, degree, variant=poly_variant)
         formdegree = 0  # 0-form
         super(Lagrange, self).__init__(poly_set, dual, degree, formdegree)

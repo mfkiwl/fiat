@@ -62,55 +62,6 @@ def jacobi_factors(x, y, z, dx, dy, dz):
     return fa, fb, fc, dfa, dfb, dfc
 
 
-def C0_basis(dim, n, phi):
-    idx = (lambda p: p, morton_index2, morton_index3)[dim-1]
-    # recover facet bubbles
-    icur = 0
-    phi[icur] *= -1
-    for inext in range(1, dim+1):
-        phi[icur] -= phi[inext]
-
-    if dim == 2:
-        for i in range(2, n+1):
-            phi[idx(0, i)] -= phi[idx(1, i-1)]
-
-    elif dim == 3:
-        for i in range(2, n+1):
-            for j in range(0, n+1-i):
-                phi[idx(0, i, j)] -= phi[idx(1, i-1, j)]
-            icur = idx(0, 0, i)
-            phi[icur] -= phi[idx(0, 1, i-1)]
-            phi[icur] -= phi[idx(1, 0, i-1)]
-
-    # reorder by dimension and entity on the reference simplex
-    dofs = list(range(dim+1))
-    if dim == 1:
-        dofs.extend(range(2, n+1))
-    elif dim == 2:
-        dofs.extend(idx(1, i-1) for i in range(2, n+1))
-        dofs.extend(idx(0, i) for i in range(2, n+1))
-        dofs.extend(idx(i, 0) for i in range(2, n+1))
-
-        dofs.extend(idx(i, j) for j in range(1, n+1) for i in range(2, n-j+1))
-    else:
-        dofs.extend(idx(0, 1, i-1) for i in range(2, n+1))
-        dofs.extend(idx(1, 0, i-1) for i in range(2, n+1))
-        dofs.extend(idx(1, i-1, 0) for i in range(2, n+1))
-        dofs.extend(idx(0, 0, i) for i in range(2, n+1))
-        dofs.extend(idx(0, i, 0) for i in range(2, n+1))
-        dofs.extend(idx(i, 0, 0) for i in range(2, n+1))
-
-        dofs.extend(idx(1, i-1, j) for j in range(1, n+1) for i in range(2, n-j+1))
-        dofs.extend(idx(0, i, j) for j in range(1, n+1) for i in range(2, n-j+1))
-        dofs.extend(idx(i, 0, j) for j in range(1, n+1) for i in range(2, n-j+1))
-        dofs.extend(idx(i, j, 0) for j in range(1, n+1) for i in range(2, n-j+1))
-
-        dofs.extend(idx(i, j, k) for k in range(1, n+1) for j in range(1, n-k+1) for i in range(2, n-j-k+1))
-
-    result = [phi[i] for i in dofs]
-    return result
-
-
 def dubiner_recurrence(dim, n, order, ref_pts, Jinv, scale, variant=None):
     """Tabulate a Dubiner expansion set using the recurrence from (Kirby 2010).
 
@@ -121,17 +72,17 @@ def dubiner_recurrence(dim, n, order, ref_pts, Jinv, scale, variant=None):
     :arg Jinv: The inverse of the Jacobian of the coordinate mapping from the default simplex.
     :arg scale: A scale factor that sets the first member of expansion set.
     :arg variant: Choose between the default (None) orthogonal basis,
-                  'integral' for integrated Jacobi polynomials,
+                  'bubble' for integrated Jacobi polynomials,
                   or 'dual' for the L2-duals of the integrated Jacobi polynomials.
 
     :returns: A tuple with tabulations of the expansion set and its derivatives.
     """
     if order > 2:
         raise ValueError("Higher order derivatives not supported")
-    if variant not in [None, "integral", "dual"]:
+    if variant not in [None, "bubble", "dual"]:
         raise ValueError(f"Invalid variant {variant}")
 
-    if variant == "integral":
+    if variant == "bubble":
         scale = -scale
     if n == 0:
         # Always return 1 for n=0 to make regression tests pass
@@ -157,7 +108,7 @@ def dubiner_recurrence(dim, n, order, ref_pts, Jinv, scale, variant=None):
         raise ValueError("Invalid number of spatial dimensions")
 
     beta = 1 if variant == "dual" else 0
-    coefficients = integrated_jrc if variant == "integral" else jrc
+    coefficients = integrated_jrc if variant == "bubble" else jrc
     X = pad_coordinates(ref_pts, pad_dim)
     idx = (lambda p: p, morton_index2, morton_index3)[dim-1]
     for codim in range(dim):
@@ -169,7 +120,7 @@ def dubiner_recurrence(dim, n, order, ref_pts, Jinv, scale, variant=None):
             icur = idx(*sub_index, 0)
             inext = idx(*sub_index, 1)
 
-            if variant == "integral":
+            if variant == "bubble":
                 alpha = 2 * sum(sub_index)
                 a = b = -0.5
             else:
@@ -220,10 +171,62 @@ def dubiner_recurrence(dim, n, order, ref_pts, Jinv, scale, variant=None):
             scale = math.sqrt(norm2)
             for result in results:
                 result[icur] *= scale
-
-    if variant == "integral":
-        results = tuple(C0_basis(dim, n, result) for result in results)
     return results
+
+
+def C0_basis(dim, n, tabulations):
+    """Modify a tabulation of a hierarchical basis to enforce C0-continitity.
+
+    :arg dim: The spatial dimension of the simplex.
+    :arg n: The polynomial degree.
+    :arg tabulations: An iterable tabulations of the hierarchical basis.
+
+    :returns: A tuple of tabulations of the C0 basis.
+    """
+    idx = (lambda p: p, morton_index2, morton_index3)[dim-1]
+    # Recover facet bubbles
+    for phi in tabulations:
+        icur = 0
+        phi[icur] *= -1
+        for inext in range(1, dim+1):
+            phi[icur] -= phi[inext]
+        if dim == 2:
+            for i in range(2, n+1):
+                phi[idx(0, i)] -= phi[idx(1, i-1)]
+        elif dim == 3:
+            for i in range(2, n+1):
+                for j in range(0, n+1-i):
+                    phi[idx(0, i, j)] -= phi[idx(1, i-1, j)]
+                icur = idx(0, 0, i)
+                phi[icur] -= phi[idx(0, 1, i-1)]
+                phi[icur] -= phi[idx(1, 0, i-1)]
+
+    # Reorder by dimension and entity on the reference simplex
+    dofs = list(range(dim+1))
+    if dim == 1:
+        dofs.extend(range(2, n+1))
+    elif dim == 2:
+        dofs.extend(idx(1, i-1) for i in range(2, n+1))
+        dofs.extend(idx(0, i) for i in range(2, n+1))
+        dofs.extend(idx(i, 0) for i in range(2, n+1))
+
+        dofs.extend(idx(i, j) for j in range(1, n+1) for i in range(2, n-j+1))
+    else:
+        dofs.extend(idx(0, 1, i-1) for i in range(2, n+1))
+        dofs.extend(idx(1, 0, i-1) for i in range(2, n+1))
+        dofs.extend(idx(1, i-1, 0) for i in range(2, n+1))
+        dofs.extend(idx(0, 0, i) for i in range(2, n+1))
+        dofs.extend(idx(0, i, 0) for i in range(2, n+1))
+        dofs.extend(idx(i, 0, 0) for i in range(2, n+1))
+
+        dofs.extend(idx(1, i-1, j) for j in range(1, n+1) for i in range(2, n-j+1))
+        dofs.extend(idx(0, i, j) for j in range(1, n+1) for i in range(2, n-j+1))
+        dofs.extend(idx(i, 0, j) for j in range(1, n+1) for i in range(2, n-j+1))
+        dofs.extend(idx(i, j, 0) for j in range(1, n+1) for i in range(2, n-j+1))
+
+        dofs.extend(idx(i, j, k) for k in range(1, n+1) for j in range(1, n-k+1) for i in range(2, n-j-k+1))
+
+    return tuple([phi[i] for i in dofs] for phi in tabulations)
 
 
 def xi_triangle(eta):
@@ -281,8 +284,6 @@ class ExpansionSet(object):
         self.affine_mappings = [reference_element.make_affine_mapping(
                                 ref_el.get_vertices_of_subcomplex(top[sd][cell]),
                                 base_verts) for cell in top[sd]]
-        self._dmats_cache = {}
-        self._cell_node_map_cache = {}
         if scale is None:
             scale = math.sqrt(1.0 / self.base_ref_el.volume())
         elif isinstance(scale, str):
@@ -292,15 +293,18 @@ class ExpansionSet(object):
             elif scale == "l2 piola":
                 scale = 1.0 / ref_el.volume()
         self.scale = scale
+        self.continuity = "C0" if variant == "bubble" else None
+        self._dmats_cache = {}
+        self._cell_node_map_cache = {}
 
     def get_num_members(self, n):
-        return polynomial_dimension(self.ref_el, n, self.variant)
+        return polynomial_dimension(self.ref_el, n, self.continuity)
 
     def get_cell_node_map(self, n):
         try:
             return self._cell_node_map_cache[n]
         except KeyError:
-            cell_node_map = polynomial_cell_node_map(self.ref_el, n, self.variant)
+            cell_node_map = polynomial_cell_node_map(self.ref_el, n, self.continuity)
             return self._cell_node_map_cache.setdefault(n, cell_node_map)
 
     def _tabulate(self, n, pts, order=0):
@@ -308,12 +312,15 @@ class ExpansionSet(object):
         """
         phis = []
         cell_point_map = compute_cell_point_map(self.ref_el, pts)
-
         sd = self.ref_el.get_spatial_dimension()
         for ipts, (A, b) in zip(cell_point_map, self.affine_mappings):
             ref_pts = apply_mapping(A, b, pts[:, ipts])
-            phis.append(dubiner_recurrence(sd, n, order, ref_pts, A,
-                                           self.scale, variant=self.variant))
+            phi = dubiner_recurrence(sd, n, order, ref_pts, A,
+                                     self.scale, variant=self.variant)
+            if self.continuity == "C0":
+                phi = C0_basis(sd, n, phi)
+            phis.append(phi)
+
         if len(self.affine_mappings) == 1:
             return phis[0]
 
@@ -334,15 +341,14 @@ class ExpansionSet(object):
         of the gradient of each member of the expansion set:
             d/dx_k phi_j = sum_i dmat[k, j, i] phi_i.
         """
-        cache = self._dmats_cache
         key = degree
+        cache = self._dmats_cache
         try:
             return cache[key]
         except KeyError:
             pass
         if degree == 0:
             return cache.setdefault(key, numpy.zeros((self.ref_el.get_spatial_dimension(), 1, 1), "d"))
-
         pts = reference_element.make_lattice(self.ref_el.get_vertices(), degree, variant="gl")
         v, dv = self._tabulate(degree, numpy.transpose(pts), order=1)
         dv = numpy.transpose(dv, (1, 2, 0))
@@ -467,7 +473,7 @@ class TetrahedronExpansionSet(ExpansionSet):
         super(TetrahedronExpansionSet, self).__init__(ref_el, **kwargs)
 
 
-def polynomial_dimension(ref_el, n, variant=None):
+def polynomial_dimension(ref_el, n, continuity=None):
     """Returns the dimension of the space of polynomials of degree no
     greater than degree on the reference element."""
     if ref_el.get_shape() == reference_element.POINT:
@@ -475,7 +481,7 @@ def polynomial_dimension(ref_el, n, variant=None):
             raise ValueError("Only degree zero polynomials supported on point elements.")
         return 1
     top = ref_el.get_topology()
-    if variant == "integral":
+    if continuity == "C0":
         space_dimension = sum(math.comb(n - 1, dim) * len(top[dim]) for dim in top)
     else:
         dim = ref_el.get_spatial_dimension()
@@ -483,14 +489,13 @@ def polynomial_dimension(ref_el, n, variant=None):
     return space_dimension
 
 
-def polynomial_entity_ids(ref_el, n, variant=None):
+def polynomial_entity_ids(ref_el, n, continuity=None):
     top = ref_el.get_topology()
     sd = ref_el.get_spatial_dimension()
     entity_ids = {}
     cur = 0
     for dim in sorted(top):
-        if variant == "integral":
-            # CG numbering
+        if continuity == "C0":
             dofs = math.comb(n - 1, dim)
         else:
             # DG numbering
@@ -502,12 +507,12 @@ def polynomial_entity_ids(ref_el, n, variant=None):
     return entity_ids
 
 
-def polynomial_cell_node_map(ref_el, n, variant=None):
+def polynomial_cell_node_map(ref_el, n, continuity=None):
     top = ref_el.get_topology()
     sd = ref_el.get_spatial_dimension()
 
-    entity_ids = polynomial_entity_ids(ref_el, n, variant)
-    ref_entity_ids = polynomial_entity_ids(ref_el.construct_subelement(sd), n, variant)
+    entity_ids = polynomial_entity_ids(ref_el, n, continuity)
+    ref_entity_ids = polynomial_entity_ids(ref_el.construct_subelement(sd), n, continuity)
 
     num_cells = len(top[sd])
     dofs_per_cell = sum(len(ref_entity_ids[dim][entity])

@@ -121,7 +121,7 @@ class IntegratedLegendre(finite_element.CiarletElement):
         if degree < 1:
             raise ValueError(f"{type(self).__name__} elements only valid for k >= 1")
 
-        poly_set = ONPolynomialSet(ref_el, degree, variant="integral")
+        poly_set = ONPolynomialSet(ref_el, degree, variant="bubble")
         dual = IntegratedLegendreDual(ref_el, degree)
         formdegree = 0  # 0-form
         super(IntegratedLegendre, self).__init__(poly_set, dual, degree, formdegree)

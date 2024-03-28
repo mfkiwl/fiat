@@ -45,11 +45,30 @@ def test_split_make_points(split, cell, degree, variant):
             assert numpy.allclose(mapped_pts, pts_entity)
 
 
-@pytest.mark.parametrize("split", (AlfeldSplit, IsoSplit))
-def test_split_child_to_parent(split, cell):
-    split_cell = split(cell)
-    mapping = split_cell.get_child_to_parent()
-    # TODO
+def test_split_child_to_parent(cell):
+    split_cell = IsoSplit(cell)
+
+    dim = cell.get_spatial_dimension()
+    degree = 2 if dim == 3 else 4
+    parent_degree = 2*degree
+
+    top = cell.get_topology()
+    parent_pts = {dim: {} for dim in top}
+    for dim in top:
+        for entity in top[dim]:
+            parent_pts[dim][entity] = cell.make_points(dim, entity, parent_degree)
+
+    top = split_cell.get_topology()
+    child_pts = {dim: {} for dim in top}
+    for dim in top:
+        for entity in top[dim]:
+            child_pts[dim][entity] = split_cell.make_points(dim, entity, degree)
+
+    child_to_parent = split_cell.get_child_to_parent()
+    for dim in top:
+        for entity in top[dim]:
+            parent_dim, parent_entity = child_to_parent[dim][entity]
+            assert set(child_pts[dim][entity]) <= set(parent_pts[parent_dim][parent_entity])
 
 
 @pytest.mark.parametrize("split", (AlfeldSplit, IsoSplit))
@@ -62,7 +81,7 @@ def test_macro_quadrature(split, cell):
     Q = MacroQuadratureRule(ref_el, Q_ref)
     pts, wts = Q.get_points(), Q.get_weights()
 
-    # Test that the mass matrix or an orthogonal basis is diagonal
+    # Test that the mass matrix for an orthogonal basis is diagonal
     U = ONPolynomialSet(ref_el, degree)
     phis = U.tabulate(pts)[(0,)*sd]
     M = numpy.dot(numpy.multiply(phis, wts), phis.T)
