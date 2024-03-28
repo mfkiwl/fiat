@@ -175,7 +175,7 @@ def dubiner_recurrence(dim, n, order, ref_pts, Jinv, scale, variant=None):
 
 
 def C0_basis(dim, n, tabulations):
-    """Modify a tabulation of a hierarchical basis to enforce C0-continitity.
+    """Modify a tabulation of a hierarchical basis to enforce C0-continuity.
 
     :arg dim: The spatial dimension of the simplex.
     :arg n: The polynomial degree.
@@ -247,6 +247,7 @@ def xi_tetrahedron(eta):
 
 
 def apply_mapping(A, b, pts):
+    """Apply an affine mapping to an d-by-npts array of points."""
     if isinstance(pts, numpy.ndarray) and len(pts.shape) == 2:
         return numpy.dot(A, pts) + b[:, None]
     else:
@@ -308,8 +309,7 @@ class ExpansionSet(object):
             return self._cell_node_map_cache.setdefault(n, cell_node_map)
 
     def _tabulate(self, n, pts, order=0):
-        """A version of tabulate() that also works for a single point.
-        """
+        """A version of tabulate() that also works for a single point."""
         phis = []
         cell_point_map = compute_cell_point_map(self.ref_el, pts)
         sd = self.ref_el.get_spatial_dimension()
@@ -475,7 +475,7 @@ class TetrahedronExpansionSet(ExpansionSet):
 
 def polynomial_dimension(ref_el, n, continuity=None):
     """Returns the dimension of the space of polynomials of degree no
-    greater than degree on the reference element."""
+    greater than n on the reference element."""
     if ref_el.get_shape() == reference_element.POINT:
         if n > 0:
             raise ValueError("Only degree zero polynomials supported on point elements.")
@@ -490,6 +490,13 @@ def polynomial_dimension(ref_el, n, continuity=None):
 
 
 def polynomial_entity_ids(ref_el, n, continuity=None):
+    """Maps facets to members of a polynomial basis.
+
+    :arg ref_el: a SimplicialComplex.
+    :arg n: the polynomial degree of the expansion set.
+    :arg continuity: the continuity of the expansion set.
+    :returns: a dict of dicts mapping dimension and entity id to basis functions.
+    """
     top = ref_el.get_topology()
     sd = ref_el.get_spatial_dimension()
     entity_ids = {}
@@ -508,6 +515,13 @@ def polynomial_entity_ids(ref_el, n, continuity=None):
 
 
 def polynomial_cell_node_map(ref_el, n, continuity=None):
+    """Maps cells on a simplicial complex to members of a polynomial basis.
+
+    :arg ref_el: a SimplicialComplex.
+    :arg n: the polynomial degree of the expansion set.
+    :arg continuity: the continuity of the expansion set.
+    :returns: a numpy array mapping cell id to basis functions supported on that cell.
+    """
     top = ref_el.get_topology()
     sd = ref_el.get_spatial_dimension()
 
@@ -528,6 +542,13 @@ def polynomial_cell_node_map(ref_el, n, continuity=None):
 
 
 def compute_cell_point_map(ref_el, pts, tol=1E-12):
+    """Maps cells on a simplicial complex to points.
+
+    :arg ref_el: a SimplicialComplex.
+    :arg pts: a d-by-npts array of physical coordinates.
+    :kwarg tol: the absolute tolerance.
+    :returns: a numpy array mapping cell id to points located on that cell.
+    """
     top = ref_el.get_topology()
     sd = ref_el.get_spatial_dimension()
     if len(top[sd]) == 1:
