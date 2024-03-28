@@ -67,7 +67,7 @@ def dubiner_recurrence(dim, n, order, ref_pts, Jinv, scale, variant=None):
 
     :arg dim: The spatial dimension of the simplex.
     :arg n: The polynomial degree.
-    :arg order: The maximum order of differenation.
+    :arg order: The maximum order of differentiation.
     :arg ref_pts: An ``ndarray`` with the coordinates on the default (-1, 1)^d simplex.
     :arg Jinv: The inverse of the Jacobian of the coordinate mapping from the default simplex.
     :arg scale: A scale factor that sets the first member of expansion set.
@@ -247,7 +247,7 @@ def xi_tetrahedron(eta):
 
 
 def apply_mapping(A, b, pts):
-    """Apply an affine mapping to an d-by-npts array of points."""
+    """Apply an affine mapping to an column-stacked array of points."""
     if isinstance(pts, numpy.ndarray) and len(pts.shape) == 2:
         return numpy.dot(A, pts) + b[:, None]
     else:
@@ -545,7 +545,7 @@ def compute_cell_point_map(ref_el, pts, tol=1E-12):
     """Maps cells on a simplicial complex to points.
 
     :arg ref_el: a SimplicialComplex.
-    :arg pts: a d-by-npts array of physical coordinates.
+    :arg pts: a column-stacked array of physical coordinates.
     :kwarg tol: the absolute tolerance.
     :returns: a numpy array mapping cell id to points located on that cell.
     """

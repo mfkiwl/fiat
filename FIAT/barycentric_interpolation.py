@@ -49,7 +49,7 @@ def make_dmat(x):
 
 
 class LagrangeLineExpansionSet(expansions.LineExpansionSet):
-    """Lagrange polynomial set for fixed points the line."""
+    """Lagrange polynomial expansion set for given points the line."""
     def __init__(self, ref_el, pts):
         self.points = pts
         self.x = numpy.array(pts).flatten()
@@ -67,6 +67,9 @@ class LagrangeLineExpansionSet(expansions.LineExpansionSet):
     def get_num_members(self, n):
         return len(self.points)
 
+    def get_cell_node_map(self, n):
+        return self.cell_node_map
+
     def get_points(self):
         return self.points
 
@@ -75,16 +78,20 @@ class LagrangeLineExpansionSet(expansions.LineExpansionSet):
 
     def _tabulate(self, n, pts, order=0):
         num_members = self.get_num_members(n)
-        cell_node_map = self.cell_node_map
+        cell_node_map = self.get_cell_node_map(n)
         cell_point_map = expansions.compute_cell_point_map(self.ref_el, pts)
         pts = numpy.asarray(pts).flatten()
-
-        results = [numpy.zeros((num_members, len(pts)), dtype=pts.dtype) for r in range(order+1)]
+        results = None
         for ibfs, ipts, wts, dmat in zip(cell_node_map, cell_point_map, self.weights, self.dmats):
             vals = barycentric_interpolation(self.x[ibfs], wts, dmat, pts[ipts], order=order)
-            indices = Ellipsis if len(cell_node_map) == 1 else numpy.ix_(ibfs, ipts)
-            for result, val in zip(results, vals):
-                result[indices] = val
+            if len(cell_node_map) == 1:
+                results = vals
+            else:
+                if results is None:
+                    results = [numpy.zeros((num_members, len(pts)), dtype=vals[0].dtype) for r in range(order+1)]
+                indices = numpy.ix_(ibfs, ipts)
+                for result, val in zip(results, vals):
+                    result[indices] = val
 
         for r in range(order+1):
             shape = results[r].shape
