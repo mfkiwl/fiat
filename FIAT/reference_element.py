@@ -280,10 +280,9 @@ class SimplicialComplex(Cell):
         # Find a subcell of which facet_i is on the boundary
         # Note: this is trivial and vastly overengineered for the single-cell
         # case.
-        for k, facets in enumerate(self.connectivity[(sd, sd-1)]):
-            if facet_i in facets:
-                break
-        vertices = self.get_vertices_of_subcomplex(t[sd][k])
+        cell = next(k for k, facets in enumerate(self.connectivity[(sd, sd-1)])
+                    if facet_i in facets)
+        vertices = self.get_vertices_of_subcomplex(t[sd][cell])
 
         # Interval case
         if self.get_shape() == LINE:
@@ -294,7 +293,7 @@ class SimplicialComplex(Cell):
 
         # vectors from vertex 0 to each other vertex.
         vert_vecs = numpy.asarray(vertices)
-        vert_vecs_from_v0 = vert_vecs[1:, :] - vert_vecs[0][None, :]
+        vert_vecs_from_v0 = vert_vecs[1:, :] - vert_vecs[:1, :]
 
         (u, s, _) = numpy.linalg.svd(vert_vecs_from_v0)
         rank = len([si for si in s if si > 1.e-10])
@@ -328,7 +327,7 @@ class SimplicialComplex(Cell):
         nfoo = foo[:, 0]
 
         # what is the vertex not in the facet?
-        verts_set = set(t[sd][k])
+        verts_set = set(t[sd][cell])
         verts_facet = set(t[sd - 1][facet_i])
         verts_diff = verts_set.difference(verts_facet)
         if len(verts_diff) != 1:

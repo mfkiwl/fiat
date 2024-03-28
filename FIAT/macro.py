@@ -53,14 +53,17 @@ def invert_cell_topology(T):
 
 
 class SplitSimplicialComplex(SimplicialComplex):
-    """Abstract class to implement a split on a Simplex
-    """
-    def __init__(self, ref_el, splits=1, variant=None):
-        self._parent = ref_el
-        vertices, topology = self.split_topology(ref_el, splits=splits, variant=variant)
+    """Abstract class to implement a split on a Simplex.
 
-        bary = xy_to_bary(numpy.asarray(ref_el.get_vertices()), numpy.asarray(vertices))
-        parent_top = ref_el.get_topology()
+    :arg parent: The parent Simplex to split.
+    :arg vertices: The vertices of the simplicial complex.
+    :arg topology: The topology of the simplicial complex.
+    """
+    def __init__(self, parent, vertices, topology):
+        self._parent = parent
+
+        bary = xy_to_bary(numpy.asarray(parent.get_vertices()), numpy.asarray(vertices))
+        parent_top = parent.get_topology()
         parent_inv_top = invert_cell_topology(parent_top)
 
         # dict mapping child facets to their parent facet
@@ -81,10 +84,10 @@ class SplitSimplicialComplex(SimplicialComplex):
         self._child_to_parent = child_to_parent
         self._parent_to_children = parent_to_children
 
-        sd = ref_el.get_spatial_dimension()
+        sd = parent.get_spatial_dimension()
         inv_top = invert_cell_topology(topology)
 
-        # dict mapping cells to boundary facets for each dimension,
+        # dict mapping cells to their boundary facets for each dimension,
         # while respecting the ordering on the parent simplex
         connectivity = {cell: {dim: [] for dim in topology} for cell in topology[sd]}
         for cell in topology[sd]:
@@ -96,10 +99,7 @@ class SplitSimplicialComplex(SimplicialComplex):
                     connectivity[cell][dim].append(inv_top[dim][global_verts])
         self._cell_connectivity = connectivity
 
-        super(SplitSimplicialComplex, self).__init__(ref_el.shape, vertices, topology)
-
-    def split_topology(self, ref_el):
-        raise NotImplementedError
+        super(SplitSimplicialComplex, self).__init__(parent.shape, vertices, topology)
 
     def get_child_to_parent(self):
         """Maps split complex facet tuple to its parent entity tuple."""
@@ -124,7 +124,7 @@ class SplitSimplicialComplex(SimplicialComplex):
 
         :arg dimension: subentity dimension (integer)
         """
-        return self.get_parent().construct_subelement(dimension)
+        return self._parent.construct_subelement(dimension)
 
     def is_macrocell(self):
         return True
@@ -134,10 +134,10 @@ class SplitSimplicialComplex(SimplicialComplex):
 
 
 class AlfeldSplit(SplitSimplicialComplex):
-    """Alfeld splitting of a simplex.
+    """Splits a simplex into the simplicial complex obtained by
+    connecting vertices to barycenter.
     """
-    def split_topology(self, ref_el, splits=1, variant=None):
-        assert splits == 1
+    def __init__(self, ref_el):
         sd = ref_el.get_spatial_dimension()
         top = ref_el.get_topology()
         # Keep old facets, respecting the old numbering
@@ -157,13 +157,18 @@ class AlfeldSplit(SplitSimplicialComplex):
             offset = len(new_topology[dim])
             for entity, ids in top[dim-1].items():
                 new_topology[dim][offset+entity] = ids + (new_vert_id,)
-        return new_verts, new_topology
+        super(AlfeldSplit, self).__init__(ref_el, new_verts, new_topology)
 
 
 class IsoSplit(SplitSimplicialComplex):
+    """Splits simplex into the simplicial complex obtained by
+    connecting points on a regular lattice.
 
-    def split_topology(self, ref_el, splits=1, variant=None):
-        depth = splits + 1
+    :arg ref_el: The parent Simplex to split.
+    :kwarg depth: The number of subdivisions along each edge of the simplex.
+    :kwarg variant: The point distribution variant.
+    """
+    def __init__(self, ref_el, depth=2, variant=None):
         sd = ref_el.get_spatial_dimension()
         old_verts = ref_el.get_vertices()
         new_verts = make_lattice(old_verts, depth, variant=variant)
@@ -188,7 +193,7 @@ class IsoSplit(SplitSimplicialComplex):
         if sd == 3:
             # Cut the octahedron
             # FIXME do this more generically
-            assert splits == 1
+            assert depth == 2
             new_topology[1][cur] = (1, 8)
 
         # Get an adjacency list for each vertex
@@ -206,7 +211,7 @@ class IsoSplit(SplitSimplicialComplex):
                     if set(facet) < adjacency[v]:
                         entities.append((v,) + facet)
             new_topology[dim] = dict(enumerate(entities))
-        return new_verts, new_topology
+        super(IsoSplit, self).__init__(ref_el, new_verts, new_topology)
 
 
 class MacroQuadratureRule(QuadratureRule):

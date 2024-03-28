@@ -36,8 +36,8 @@ def map_quadrature(pts_ref, wts_ref, source_cell, target_cell, jacobian=False):
 
 class QuadratureRule(object):
     """General class that models integration over a reference element
-    as the weighted sum of a function evaluated at a set of points."""
-
+    as the weighted sum of a function evaluated at a set of points.
+    """
     def __init__(self, ref_el, pts, wts):
         if len(wts) != len(pts):
             raise ValueError("Have %d weights, but %d points" % (len(wts), len(pts)))
