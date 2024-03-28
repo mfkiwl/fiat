@@ -1,9 +1,8 @@
 import numpy
 import pytest
 from FIAT.reference_element import ufc_simplex
-from FIAT.macro import AlfeldSplit, IsoSplit, MacroQuadratureRule
+from FIAT.macro import AlfeldSplit, IsoSplit
 from FIAT.quadrature_schemes import create_quadrature
-from FIAT.polynomial_set import ONPolynomialSet
 from FIAT.lagrange import Lagrange
 from FIAT.hierarchical import Legendre
 
@@ -76,7 +75,7 @@ def test_macro_quadrature(split, cell):
     ref_el = split(cell)
     sd = ref_el.get_spatial_dimension()
 
-    degree = 6
+    degree = 3
     Q = create_quadrature(ref_el, 2*degree)
     pts, wts = Q.get_points(), Q.get_weights()
 

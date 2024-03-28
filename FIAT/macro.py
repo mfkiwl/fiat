@@ -227,7 +227,7 @@ class MacroQuadratureRule(QuadratureRule):
     def __init__(self, ref_el, Q_ref, parent_facets=None):
         parent_dim = Q_ref.ref_el.get_spatial_dimension()
         if parent_facets is not None:
-            parent_cell = ref_el.parent
+            parent_cell = ref_el.get_parent()
             parent_to_children = parent_cell.get_parent_to_children()
             facets = []
             for parent_entity in parent_facets:
