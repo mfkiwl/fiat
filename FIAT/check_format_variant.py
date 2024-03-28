@@ -26,8 +26,10 @@ def check_format_variant(variant, degree):
 def parse_lagrange_variant(variant):
     options = variant.replace(" ", "").split(",")
     assert len(options) <= 2
-    supported_point_variants = ["equispaced", "gll", "spectral"]
-    point_variant = "spectral"
+    supported_point_variants = {"equispaced": "equispaced",
+                                "gll": "gll",
+                                "spectral": "gll"}
+    point_variant = "gll"
 
     splitting = None
 
@@ -42,7 +44,7 @@ def parse_lagrange_variant(variant):
             k, = match.groups()
             splitting = lambda T: IsoSplit(T, int(k))
         elif opt in supported_point_variants:
-            point_variant = opt
+            point_variant = supported_point_variants[opt]
         else:
             raise ValueError("Illegal variant option")
 

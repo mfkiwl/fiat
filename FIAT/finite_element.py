@@ -23,7 +23,7 @@ class FiniteElement(object):
     this class are non-nodal unless they are CiarletElement subclasses.
     """
 
-    def __init__(self, ref_el, dual, order, formdegree=None, mapping="affine"):
+    def __init__(self, ref_el, dual, order, formdegree=None, mapping="affine", ref_complex=None):
         # Relevant attributes that do not necessarily depend on a PolynomialSet object:
         # The order (degree) of the polynomial basis
         self.order = order
@@ -33,12 +33,21 @@ class FiniteElement(object):
         self.ref_el = ref_el
         self.dual = dual
 
+        # when the finite element is a macro-element, the basis will be defined over
+        # a partition of the reference element into some complex.
+        self.ref_complex = ref_complex or ref_el
+
         # The appropriate mapping for the finite element space
         self._mapping = mapping
 
     def get_reference_element(self):
         """Return the reference element for the finite element."""
         return self.ref_el
+
+    def get_reference_complex(self):
+        """Return the reference element complex, which is either the reference element or
+        its subdivision in the case of a macro element."""
+        return self.ref_complex
 
     def get_dual_set(self):
         """Return the dual for the finite element."""
@@ -109,7 +118,7 @@ class FiniteElement(object):
         return False
 
     def is_macroelement(self):
-        return self.ref_el.is_macrocell()
+        return self.ref_el is not self.ref_complex
 
 
 class CiarletElement(FiniteElement):
@@ -120,9 +129,10 @@ class CiarletElement(FiniteElement):
     basis generated from polynomials encoded in a `PolynomialSet`.
     """
 
-    def __init__(self, poly_set, dual, order, formdegree=None, mapping="affine", ref_el=None):
+    def __init__(self, poly_set, dual, order, formdegree=None, mapping="affine", ref_el=None, ref_complex=None):
         ref_el = ref_el or dual.get_reference_element()
-        super(CiarletElement, self).__init__(ref_el, dual, order, formdegree, mapping)
+        ref_complex = ref_complex or ref_el
+        super(CiarletElement, self).__init__(ref_el, dual, order, formdegree, mapping, ref_complex)
 
         # build generalized Vandermonde matrix
         old_coeffs = poly_set.get_coeffs()

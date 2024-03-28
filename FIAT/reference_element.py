@@ -250,9 +250,6 @@ class Cell(object):
         """Return the map indicating whether each possible cell orientation causes reflection (``1``) or not (``0``)."""
         raise NotImplementedError("Should be implemented in a subclass.")
 
-    def is_macrocell(self):
-        return False
-
 
 class SimplicialComplex(Cell):
     r"""Abstract class for a simplicial complex.
