@@ -56,6 +56,7 @@ class SplitSimplicialComplex(SimplicialComplex):
     """Abstract class to implement a split on a Simplex
     """
     def __init__(self, ref_el, splits=1, variant=None):
+        self._parent = ref_el
         vertices, topology = self.split_topology(ref_el, splits=splits, variant=variant)
 
         bary = xy_to_bary(numpy.asarray(ref_el.get_vertices()), numpy.asarray(vertices))
@@ -88,14 +89,14 @@ class SplitSimplicialComplex(SimplicialComplex):
         connectivity = {cell: {dim: [] for dim in topology} for cell in topology[sd]}
         for cell in topology[sd]:
             cell_verts = topology[sd][cell]
-            for dim in top:
+            for dim in parent_top:
                 for entity in parent_top[dim]:
                     ref_verts = parent_top[dim][entity]
                     global_verts = tuple(cell_verts[v] for v in ref_verts)
                     connectivity[cell][dim].append(inv_top[dim][global_verts])
         self._cell_connectivity = connectivity
 
-        super(SplitSimplicialComplex, self).__init__(ref_el.shape, vertices, topology, parent=ref_el)
+        super(SplitSimplicialComplex, self).__init__(ref_el.shape, vertices, topology)
 
     def split_topology(self, ref_el):
         raise NotImplementedError
@@ -123,10 +124,13 @@ class SplitSimplicialComplex(SimplicialComplex):
 
         :arg dimension: subentity dimension (integer)
         """
-        return self.parent.construct_subelement(dimension)
+        return self.get_parent().construct_subelement(dimension)
 
     def is_macrocell(self):
         return True
+
+    def get_parent(self):
+        return self._parent
 
 
 class AlfeldSplit(SplitSimplicialComplex):
