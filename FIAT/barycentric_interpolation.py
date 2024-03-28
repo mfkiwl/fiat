@@ -120,7 +120,6 @@ class LagrangePolynomialSet(polynomial_set.PolynomialSet):
             # use functional's index_iterator function
             cur_bf = 0
             for idx in index_iterator(shape):
-                n = expansion_set.get_num_members(embedded_degree)
                 for exp_bf in range(num_exp_functions):
                     cur_idx = (cur_bf, *idx, exp_bf)
                     coeffs[cur_idx] = 1.0
