@@ -106,7 +106,7 @@ def test_macro_lagrange(variant, degree, split, cell):
 
     # Test that parent entities are the ones exposed
     entity_ids = fe.entity_dofs()
-    parent_top = ref_el.parent.get_topology()
+    parent_top = ref_el.get_parent().get_topology()
     for dim in parent_top:
         assert len(entity_ids[dim]) == len(parent_top[dim])
 

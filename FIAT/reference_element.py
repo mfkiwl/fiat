@@ -124,7 +124,7 @@ class Cell(object):
     """Abstract class for a reference cell.  Provides accessors for
     geometry (vertex coordinates) as well as topology (orderings of
     vertices that make up edges, facecs, etc."""
-    def __init__(self, shape, vertices, topology, parent=None):
+    def __init__(self, shape, vertices, topology):
         """The constructor takes a shape code, the physical vertices expressed
         as a list of tuples of numbers, and the topology of a cell.
 
@@ -135,7 +135,6 @@ class Cell(object):
         self.shape = shape
         self.vertices = vertices
         self.topology = topology
-        self.parent = parent
 
         # Given the topology, work out for each entity in the cell,
         # which other entities it contains.
@@ -250,20 +249,26 @@ class Cell(object):
         """Return the map indicating whether each possible cell orientation causes reflection (``1``) or not (``0``)."""
         raise NotImplementedError("Should be implemented in a subclass.")
 
+    def is_macrocell(self):
+        return False
+
+    def get_parent(self):
+        return None
+
 
 class SimplicialComplex(Cell):
     r"""Abstract class for a simplicial complex.
 
     This consists of list of vertex locations and a topology map defining facets.
     """
-    def __init__(self, shape, vertices, topology, parent=None):
+    def __init__(self, shape, vertices, topology):
         # Make sure that every facet has the right number of vertices to be
         # a simplex.
         for dim in topology:
             for entity in topology[dim]:
                 assert len(topology[dim][entity]) == dim + 1
 
-        super(SimplicialComplex, self).__init__(shape, vertices, topology, parent=parent)
+        super(SimplicialComplex, self).__init__(shape, vertices, topology)
 
     def compute_normal(self, facet_i):
         """Returns the unit normal vector to facet i of codimension 1."""

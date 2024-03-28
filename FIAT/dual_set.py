@@ -198,7 +198,7 @@ def make_entity_closure_ids(ref_el, entity_ids):
 
 def merge_entity_ids(ref_el, entity_ids):
     """Collect DOFs from simplicial complex onto facets of parent cell"""
-    parent_cell = ref_el.parent
+    parent_cell = ref_el.get_parent()
     if parent_cell is None:
         return ref_el, entity_ids
 
