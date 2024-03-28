@@ -127,3 +127,10 @@ def test_macro_lagrange(variant, degree, split, cell):
     U = poly_set.get_expansion_set()
     V = U.tabulate(degree, pts).T
     assert numpy.allclose(fe.V, V)
+
+
+def test_is_macro():
+    assert Lagrange(ufc_simplex(2), 3, "Alfeld,equispaced").is_macroelement()
+    assert not Lagrange(ufc_simplex(3), 2, "gll").is_macroelement()
+    
+    
