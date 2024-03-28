@@ -36,6 +36,7 @@ from FIAT.quadrature import (QuadratureRule, make_quadrature,
 from FIAT.reference_element import (HEXAHEDRON, QUADRILATERAL, TENSORPRODUCT,
                                     TETRAHEDRON, TRIANGLE, UFCTetrahedron,
                                     UFCTriangle, symmetric_simplex)
+from FIAT.macro import MacroQuadratureRule
 
 
 def create_quadrature(ref_el, degree, scheme="default"):
@@ -52,6 +53,12 @@ def create_quadrature(ref_el, degree, scheme="default"):
     :arg degree: The degree of polynomial that the rule should
         integrate exactly.
     """
+    if ref_el.is_macrocell():
+        sd = ref_el.get_spatial_dimension()
+        cell = ref_el.construct_subelement(sd)
+        Q_ref = create_quadrature(cell, degree, scheme=scheme)
+        return MacroQuadratureRule(ref_el, Q_ref)
+
     if ref_el.get_shape() == TENSORPRODUCT:
         try:
             degree = tuple(degree)
