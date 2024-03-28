@@ -295,6 +295,7 @@ class ExpansionSet(object):
                 scale = 1.0 / ref_el.volume()
         self.scale = scale
         self.continuity = "C0" if variant == "bubble" else None
+        self.tabulate_order = 2
         self._dmats_cache = {}
         self._cell_node_map_cache = {}
 
@@ -357,11 +358,15 @@ class ExpansionSet(object):
 
     def _tabulate_jet(self, degree, pts, order=0):
         from FIAT.polynomial_set import mis
+        try:
+            vals = self._tabulate(degree, numpy.transpose(pts), order=order)
+        except ValueError:
+            vals = self._tabulate(degree, numpy.transpose(pts), order=2)
+
+        lorder = len(vals)
         D = self.ref_el.get_spatial_dimension()
-        lorder = min(2, order)
-        vals = self._tabulate(degree, numpy.transpose(pts), order=lorder)
         result = {(0,) * D: numpy.array(vals[0])}
-        for r in range(1, 1+lorder):
+        for r in range(1, lorder):
             vr = numpy.transpose(vals[r], tuple(range(1, r+1)) + (0, r+1))
             for indices in numpy.ndindex(vr.shape[:r]):
                 alpha = tuple(map(indices.count, range(D)))
@@ -371,8 +376,8 @@ class ExpansionSet(object):
         def distance(alpha, beta):
             return sum(ai != bi for ai, bi in zip(alpha, beta))
 
-        # Only use dmats if order > lorder
-        for i in range(lorder + 1, order + 1):
+        # Only use dmats if tabulate failed
+        for i in range(lorder, order + 1):
             dmats = self.get_dmats(degree)
             alphas = mis(D, i)
             for alpha in alphas:

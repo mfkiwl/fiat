@@ -1,5 +1,6 @@
 import numpy
 import pytest
+from FIAT.hierarchical import Legendre
 from FIAT.lagrange import Lagrange
 from FIAT.macro import AlfeldSplit, IsoSplit, MacroQuadratureRule
 from FIAT.polynomial_set import ONPolynomialSet
@@ -75,14 +76,13 @@ def test_macro_quadrature(split, cell):
     ref_el = split(cell)
     sd = ref_el.get_spatial_dimension()
 
-    degree = 6
-    Q_ref = create_quadrature(cell.construct_subelement(sd), 2*degree)
-    Q = MacroQuadratureRule(ref_el, Q_ref)
+    degree = 3
+    Q = create_quadrature(ref_el, 2*degree)
     pts, wts = Q.get_points(), Q.get_weights()
 
     # Test that the mass matrix for an orthogonal basis is diagonal
-    U = ONPolynomialSet(ref_el, degree)
-    phis = U.tabulate(pts)[(0,)*sd]
+    fe = Legendre(ref_el, degree)
+    phis = fe.tabulate(0, pts)[(0,)*sd]
     M = numpy.dot(numpy.multiply(phis, wts), phis.T)
     M = M - numpy.diag(M.diagonal())
     assert numpy.allclose(M, 0)
