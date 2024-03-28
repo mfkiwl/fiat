@@ -6,9 +6,10 @@ from FIAT.quadrature_schemes import create_quadrature
 from FIAT.lagrange import Lagrange
 
 
-@pytest.fixture(params=("T", "S"))
+@pytest.fixture(params=("I", "T", "S"))
 def cell(request):
-    return {"T": ufc_simplex(2),
+    return {"I": ufc_simplex(1),
+            "T": ufc_simplex(2),
             "S": ufc_simplex(3)}[request.param]
 
 

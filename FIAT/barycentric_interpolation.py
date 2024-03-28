@@ -11,6 +11,31 @@ from FIAT import reference_element, expansions, polynomial_set
 from FIAT.functional import index_iterator
 
 
+def barycentric_interpolation(nodes, wts, dmat, pts, order=0):
+    """Evaluates a Lagrange basis on a line reference element
+    via the second barycentric interpolation formula. See Berrut and Trefethen (2004)
+    https://doi.org/10.1137/S0036144502417715 Eq. (4.2) & (9.4)
+    """
+    if pts.dtype == object:
+        from sympy import simplify
+        sp_simplify = numpy.vectorize(simplify)
+    else:
+        sp_simplify = lambda x: x
+    phi = numpy.add.outer(-nodes, pts)
+    with numpy.errstate(divide='ignore', invalid='ignore'):
+        numpy.reciprocal(phi, out=phi)
+        numpy.multiply(phi, wts[:, None], out=phi)
+        numpy.multiply(1.0 / numpy.sum(phi, axis=0), phi, out=phi)
+    phi[phi != phi] = 1.0
+
+    phi = sp_simplify(phi)
+    results = [phi]
+    for r in range(order):
+        phi = sp_simplify(numpy.dot(dmat, phi))
+        results.append(phi)
+    return results
+
+
 def make_dmat(x):
     """Returns Lagrange differentiation matrix and barycentric weights
     associated with x[j]."""
@@ -24,14 +49,20 @@ def make_dmat(x):
 
 
 class LagrangeLineExpansionSet(expansions.LineExpansionSet):
-    """Evaluates a Lagrange basis on a line reference element
-    via the second barycentric interpolation formula. See Berrut and Trefethen (2004)
-    https://doi.org/10.1137/S0036144502417715 Eq. (4.2) & (9.4)
+    """Lagrange polynomial set on the line
     """
     def __init__(self, ref_el, pts):
         self.points = pts
         self.x = numpy.array(pts).flatten()
-        self.dmat, self.weights = make_dmat(self.x)
+        self.cell_node_map = expansions.compute_cell_point_map(ref_el, numpy.transpose(pts))
+        self.dmats = []
+        self.weights = []
+        for ibfs in self.cell_node_map:
+            dmat, wts = make_dmat(self.x[ibfs])
+            self.dmats.append(dmat)
+            self.weights.append(wts)
+
+        self.degree = max(len(wts) for wts in self.weights)-1
         super(LagrangeLineExpansionSet, self).__init__(ref_el)
 
     def get_num_members(self, n):
@@ -41,54 +72,44 @@ class LagrangeLineExpansionSet(expansions.LineExpansionSet):
         return self.points
 
     def get_dmats(self, degree):
-        return [self.dmat.T]
-
-    def tabulate(self, n, pts):
-        assert n == len(self.points)-1
-        results = numpy.add.outer(-self.x, numpy.array(pts).flatten())
-        with numpy.errstate(divide='ignore', invalid='ignore'):
-            numpy.reciprocal(results, out=results)
-            numpy.multiply(results, self.weights[:, None], out=results)
-            numpy.multiply(1.0 / numpy.sum(results, axis=0), results, out=results)
-
-        results[results != results] = 1.0
-        if results.dtype == object:
-            from sympy import simplify
-            results = numpy.vectorize(simplify)(results)
-        return results
+        return [dmat.T for dmat in self.dmats]
 
     def _tabulate(self, n, pts, order=0):
-        vals = self.tabulate(n, pts)
-        results = [vals]
-        for r in range(order):
-            vals = numpy.dot(self.dmat, vals)
-            if vals.dtype == object:
-                from sympy import simplify
-                vals = numpy.vectorize(simplify)(vals)
-            results.append(vals)
+        num_members = self.get_num_members(n)
+        cell_node_map = self.cell_node_map
+        cell_point_map = expansions.compute_cell_point_map(self.ref_el, pts)
+        pts = numpy.asarray(pts).flatten()
+
+        results = [numpy.zeros((num_members, len(pts)), dtype=pts.dtype) for r in range(order+1)]
+        for ibfs, ipts, wts, dmat in zip(cell_node_map, cell_point_map, self.weights, self.dmats):
+            vals = barycentric_interpolation(self.x[ibfs], wts, dmat, pts[ipts], order=order)
+            indices = Ellipsis if len(cell_node_map) == 1 else numpy.ix_(ibfs, ipts)
+            for result, val in zip(results, vals):
+                result[indices] = val
+
         for r in range(order+1):
             shape = results[r].shape
             shape = shape[:1] + (1,)*r + shape[1:]
             results[r] = numpy.reshape(results[r], shape)
-        return results
+        return tuple(results)
 
 
 class LagrangePolynomialSet(polynomial_set.PolynomialSet):
 
     def __init__(self, ref_el, pts, shape=tuple()):
-        degree = len(pts) - 1
+        if ref_el.get_shape() != reference_element.LINE:
+            raise ValueError("Invalid reference element type.")
+
+        expansion_set = LagrangeLineExpansionSet(ref_el, pts)
+        degree = expansion_set.degree
         if shape == tuple():
             num_components = 1
         else:
             flat_shape = numpy.ravel(shape)
             num_components = numpy.prod(flat_shape)
-        num_exp_functions = expansions.polynomial_dimension(ref_el, degree)
+        num_exp_functions = expansion_set.get_num_members(degree)
         num_members = num_components * num_exp_functions
         embedded_degree = degree
-        if ref_el.get_shape() == reference_element.LINE:
-            expansion_set = LagrangeLineExpansionSet(ref_el, pts)
-        else:
-            raise ValueError("Invalid reference element type.")
 
         # set up coefficients
         if shape == tuple():
@@ -99,8 +120,8 @@ class LagrangePolynomialSet(polynomial_set.PolynomialSet):
             # use functional's index_iterator function
             cur_bf = 0
             for idx in index_iterator(shape):
-                n = expansions.polynomial_dimension(ref_el, embedded_degree)
-                for exp_bf in range(n):
+                n = expansion_set.get_num_members(embedded_degree)
+                for exp_bf in range(num_exp_functions):
                     cur_idx = (cur_bf, *idx, exp_bf)
                     coeffs[cur_idx] = 1.0
                     cur_bf += 1

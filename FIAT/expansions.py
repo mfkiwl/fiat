@@ -220,6 +220,9 @@ def dubiner_recurrence(dim, n, order, ref_pts, Jinv, scale, variant=None):
             scale = math.sqrt(norm2)
             for result in results:
                 result[icur] *= scale
+
+    if variant == "integral":
+        results = tuple(C0_basis(dim, n, result) for result in results)
     return results
 
 
@@ -309,11 +312,8 @@ class ExpansionSet(object):
         sd = self.ref_el.get_spatial_dimension()
         for ipts, (A, b) in zip(cell_point_map, self.affine_mappings):
             ref_pts = apply_mapping(A, b, pts[:, ipts])
-            cur_phis = dubiner_recurrence(sd, n, order, ref_pts, A,
-                                          self.scale, variant=self.variant)
-            if self.variant == "integral":
-                cur_phis = tuple(C0_basis(sd, n, cur_phi) for cur_phi in cur_phis)
-            phis.append(cur_phis)
+            phis.append(dubiner_recurrence(sd, n, order, ref_pts, A,
+                                           self.scale, variant=self.variant))
         if len(self.affine_mappings) == 1:
             return phis[0]
 
@@ -503,7 +503,6 @@ def polynomial_entity_ids(ref_el, n, variant=None):
 
 
 def polynomial_cell_node_map(ref_el, n, variant=None):
-    assert hasattr(ref_el, "parent")
     top = ref_el.get_topology()
     sd = ref_el.get_spatial_dimension()
 
@@ -535,8 +534,9 @@ def compute_cell_point_map(ref_el, pts, tol=1E-12):
     for entity in top[sd]:
         vertices = ref_el.get_vertices_of_subcomplex(top[sd][entity])
         A, b = reference_element.make_affine_mapping(vertices, ref_vertices)
-        A = numpy.vstack((A, numpy.sum(A, axis=0)))
-        b = numpy.hstack((b, numpy.sum(b, axis=0)))
+        if sd > 1:
+            A = numpy.vstack((A, numpy.sum(A, axis=0)))
+            b = numpy.hstack((b, numpy.sum(b, axis=0)))
         x = numpy.dot(A, pts) + b[:, None]
 
         pts_on_cell = numpy.all(numpy.logical_and(x >= low, x <= high), axis=0)

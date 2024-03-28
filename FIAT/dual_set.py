@@ -198,9 +198,8 @@ def make_entity_closure_ids(ref_el, entity_ids):
 
 def merge_entity_ids(ref_el, entity_ids):
     """Collect DOFs from simplicial complex onto facets of parent cell"""
-    try:
-        parent_cell = ref_el.parent
-    except AttributeError:
+    parent_cell = ref_el.parent
+    if parent_cell is None:
         return ref_el, entity_ids
 
     parent_top = parent_cell.get_topology()

@@ -45,9 +45,8 @@ class SplitSimplicialComplex(SimplicialComplex):
     """
 
     def __init__(self, ref_el, splits=1, variant=None):
-        self.parent = ref_el
         vertices, topology = self.split_topology(ref_el, splits=splits, variant=variant)
-        super(SplitSimplicialComplex, self).__init__(ref_el.shape, vertices, topology)
+        super(SplitSimplicialComplex, self).__init__(ref_el.shape, vertices, topology, parent=ref_el)
 
     def split_topology(self, ref_el):
         raise NotImplementedError
