@@ -3,6 +3,7 @@ import pytest
 from FIAT.reference_element import ufc_simplex
 from FIAT.macro import AlfeldSplit, IsoSplit, MacroQuadratureRule
 from FIAT.quadrature_schemes import create_quadrature
+from FIAT.polynomial_set import ONPolynomialSet
 from FIAT.lagrange import Lagrange
 
 
@@ -48,33 +49,25 @@ def test_split_make_points(split, cell, degree, variant):
 def test_split_child_to_parent(split, cell):
     split_cell = split(cell)
     mapping = split_cell.get_child_to_parent()
-    print("")
-    for dim in mapping:
-        print(mapping[dim])
+    # TODO
 
 
 @pytest.mark.parametrize("split", (AlfeldSplit, IsoSplit))
 def test_macro_quadrature(split, cell):
-    split_cell = split(cell)
+    ref_el = split(cell)
+    sd = ref_el.get_spatial_dimension()
 
-    degree = 12
-    Q_ref = create_quadrature(cell.construct_subelement(1), degree)
-    Q = MacroQuadratureRule(split_cell, Q_ref)
-    Q.get_points()
+    degree = 6
+    Q_ref = create_quadrature(cell.construct_subelement(sd), 2*degree)
+    Q = MacroQuadratureRule(ref_el, Q_ref)
+    pts, wts = Q.get_points(), Q.get_weights()
 
-    # import matplotlib.pyplot as plt
-    # fig = plt.figure()
-    # sdim = cell.get_spatial_dimension()
-    # if sdim == 3:
-    #     ax = fig.add_subplot(projection='3d')
-    # else:
-    #     ax = fig.add_subplot()
-    # for i, vert in enumerate(split_cell.vertices):
-    #     ax.text(*vert, str(i))
-    #
-    # ax.scatter(*Q.get_points().T)
-    # ax.axis("equal")
-    # plt.show()
+    # Test that the mass matrix or an orthogonal basis is diagonal
+    U = ONPolynomialSet(ref_el, degree)
+    phis = U.tabulate(pts)[(0,)*sd]
+    M = numpy.dot(numpy.multiply(phis, wts), phis.T)
+    M = M - numpy.diag(M.diagonal())
+    assert numpy.allclose(M, 0)
 
 
 @pytest.mark.parametrize("degree", range(1, 5))
@@ -86,7 +79,7 @@ def test_macro_lagrange(variant, degree, split, cell):
     fe = Lagrange(ref_el, degree, variant=variant)
     poly_set = fe.get_nodal_basis()
 
-    # Test that the poly set is defined on the split and not on the parent cell
+    # Test that the polynomial set is defined on the split and not on the parent cell
     assert poly_set.get_reference_element() is ref_el
 
     # Test that the finite element is defined on the parent cell and not on the split
