@@ -295,7 +295,7 @@ class ExpansionSet(object):
                 scale = 1.0 / ref_el.volume()
         self.scale = scale
         self.continuity = "C0" if variant == "bubble" else None
-        self.tabulate_order = 2
+        self.recurrence_order = 2
         self._dmats_cache = {}
         self._cell_node_map_cache = {}
 
@@ -328,12 +328,12 @@ class ExpansionSet(object):
         results = []
         num_phis = self.get_num_members(n)
         cell_node_map = self.get_cell_node_map(n)
-        for k in range(order+1):
-            result = numpy.zeros((num_phis,) + (sd,)*k + pts.shape[1:])
-            shape_slices = (slice(None, None),)*k
+        for r in range(order+1):
+            result = numpy.zeros((num_phis,) + (sd,)*r + pts.shape[1:])
             for ibfs, ipts, phi in zip(cell_node_map, cell_point_map, phis):
-                indices = (ibfs,) + shape_slices + (ipts,)
-                result[numpy.ix_(*indices)] = phi[k]
+                shape_indices = tuple(range(sd) for _ in range(r))
+                indices = (ibfs,) + shape_indices + (ipts,)
+                result[numpy.ix_(*indices)] = phi[r]
             results.append(result)
         return tuple(results)
 
@@ -358,11 +358,7 @@ class ExpansionSet(object):
 
     def _tabulate_jet(self, degree, pts, order=0):
         from FIAT.polynomial_set import mis
-        try:
-            vals = self._tabulate(degree, numpy.transpose(pts), order=order)
-        except ValueError:
-            vals = self._tabulate(degree, numpy.transpose(pts), order=2)
-
+        vals = self._tabulate(degree, numpy.transpose(pts), order=min(order, self.recurrence_order))
         lorder = len(vals)
         D = self.ref_el.get_spatial_dimension()
         result = {(0,) * D: numpy.array(vals[0])}

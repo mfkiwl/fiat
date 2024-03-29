@@ -2,8 +2,7 @@ import numpy
 import pytest
 from FIAT.hierarchical import Legendre
 from FIAT.lagrange import Lagrange
-from FIAT.macro import AlfeldSplit, IsoSplit, MacroQuadratureRule
-from FIAT.polynomial_set import ONPolynomialSet
+from FIAT.macro import AlfeldSplit, IsoSplit
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.reference_element import ufc_simplex
 
