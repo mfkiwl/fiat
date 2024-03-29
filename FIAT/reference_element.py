@@ -249,6 +249,9 @@ class Cell(object):
         """Return the map indicating whether each possible cell orientation causes reflection (``1``) or not (``0``)."""
         raise NotImplementedError("Should be implemented in a subclass.")
 
+    def is_simplex(self):
+        return False
+
     def is_macrocell(self):
         return False
 
@@ -539,6 +542,9 @@ class Simplex(SimplicialComplex):
 
     o = (1 * 2!) + (1 * 1!) + (0 * 0!) = 3
     """
+    def is_simplex(self):
+        return True
+
     def symmetry_group_size(self, dim):
         return numpy.math.factorial(dim + 1)
 

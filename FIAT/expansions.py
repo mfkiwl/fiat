@@ -332,8 +332,7 @@ class ExpansionSet(object):
             result = numpy.zeros((num_phis,) + (sd,)*r + pts.shape[1:])
             for ibfs, ipts, phi in zip(cell_node_map, cell_point_map, phis):
                 shape_indices = tuple(range(sd) for _ in range(r))
-                indices = (ibfs,) + shape_indices + (ipts,)
-                result[numpy.ix_(*indices)] = phi[r]
+                result[numpy.ix_(ibfs, *shape_indices, ipts)] = phi[r]
             results.append(result)
         return tuple(results)
 
