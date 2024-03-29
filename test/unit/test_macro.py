@@ -118,8 +118,8 @@ def test_macro_lagrange(variant, degree, split, cell):
         for entity in sorted(top[dim]):
             pts.extend(ref_el.make_points(dim, entity, degree, variant=variant))
 
-    phis = fe.tabulate(0, pts)[(0,)*sd]
-    assert numpy.allclose(phis, numpy.eye(fe.space_dimension()))
+    phis = fe.tabulate(2, pts)
+    assert numpy.allclose(phis[(0,)*sd], numpy.eye(fe.space_dimension()))
 
     # Test that we can reproduce the Vandermonde matrix by tabulating the expansion set
     U = poly_set.get_expansion_set()

@@ -13,7 +13,7 @@ from FIAT import polynomial_set, functional
 
 class DualSet(object):
     def __init__(self, nodes, ref_el, entity_ids, entity_permutations=None):
-        ref_el, entity_ids = merge_entity_ids(ref_el, entity_ids)
+        ref_el, entity_ids, entity_permutations = merge_entities(ref_el, entity_ids, entity_permutations)
         self.nodes = nodes
         self.ref_el = ref_el
         self.entity_ids = entity_ids
@@ -196,11 +196,12 @@ def make_entity_closure_ids(ref_el, entity_ids):
     return entity_closure_ids
 
 
-def merge_entity_ids(ref_el, entity_ids):
+def merge_entities(ref_el, entity_ids, entity_permutations):
     """Collect DOFs from simplicial complex onto facets of parent cell"""
+    from FIAT.orientation_utils import make_entity_permutations_simplex
     parent_cell = ref_el.get_parent()
     if parent_cell is None:
-        return ref_el, entity_ids
+        return ref_el, entity_ids, entity_permutations
 
     parent_top = parent_cell.get_topology()
     parent_ids = {dim: {entity: [] for entity in parent_top[dim]} for dim in parent_top}
@@ -210,4 +211,17 @@ def merge_entity_ids(ref_el, entity_ids):
             parent_dim, parent_id = child_to_parent[dim][entity]
             dofs_cur = entity_ids[dim][entity]
             parent_ids[parent_dim][parent_id].extend(dofs_cur)
-    return parent_cell, parent_ids
+
+    if entity_permutations is None:
+        parent_permutations = None
+    else:
+        parent_permutations = {}
+        npoints = 0
+        for dim in sorted(parent_top):
+            if dim <= 1:
+                npoints = len(parent_ids[dim][0])
+            perms = make_entity_permutations_simplex(dim, npoints)
+            parent_permutations[dim] = {entity: perms for entity in parent_top[dim]}
+            npoints -= 1
+
+    return parent_cell, parent_ids, parent_permutations

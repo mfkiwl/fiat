@@ -62,6 +62,7 @@ class LagrangeLineExpansionSet(expansions.LineExpansionSet):
             self.weights.append(wts)
 
         self.degree = max(len(wts) for wts in self.weights)-1
+        self.recurrence_order = self.degree + 1
         super(LagrangeLineExpansionSet, self).__init__(ref_el)
 
     def get_num_members(self, n):
