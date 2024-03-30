@@ -198,7 +198,6 @@ def make_entity_closure_ids(ref_el, entity_ids):
 
 def merge_entities(ref_el, entity_ids, entity_permutations):
     """Collect DOFs from simplicial complex onto facets of parent cell"""
-    from FIAT.orientation_utils import make_entity_permutations_simplex
     parent_cell = ref_el.get_parent()
     if parent_cell is None:
         return ref_el, entity_ids, entity_permutations
@@ -212,16 +211,5 @@ def merge_entities(ref_el, entity_ids, entity_permutations):
             dofs_cur = entity_ids[dim][entity]
             parent_ids[parent_dim][parent_id].extend(dofs_cur)
 
-    if entity_permutations is None:
-        parent_permutations = None
-    else:
-        parent_permutations = {}
-        npoints = 0
-        for dim in sorted(parent_top):
-            if dim <= 1:
-                npoints = len(parent_ids[dim][0])
-            perms = make_entity_permutations_simplex(dim, npoints)
-            parent_permutations[dim] = {entity: perms for entity in parent_top[dim]}
-            npoints -= 1
-
+    parent_permutations = None
     return parent_cell, parent_ids, parent_permutations

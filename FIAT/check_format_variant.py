@@ -23,13 +23,17 @@ def check_format_variant(variant, degree):
     return variant, interpolant_degree
 
 
-def parse_lagrange_variant(variant):
+def parse_lagrange_variant(variant, discontinuous=False):
     options = variant.replace(" ", "").split(",")
     assert len(options) <= 2
+    spectral = "gl" if discontinuous else "gll"
     supported_point_variants = {"equispaced": "equispaced",
                                 "gll": "gll",
-                                "spectral": "gll"}
-    point_variant = "gll"
+                                "spectral": spectral}
+    if discontinuous:
+        supported_point_variants["gl"] = "gl"
+
+    point_variant = spectral
 
     splitting = None
 
