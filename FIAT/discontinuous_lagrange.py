@@ -9,6 +9,7 @@ import itertools
 import numpy as np
 from FIAT import finite_element, polynomial_set, dual_set, functional, P0
 from FIAT.polynomial_set import mis
+from FIAT.check_format_variant import parse_lagrange_variant
 
 
 def make_entity_permutations(dim, npoints):
@@ -145,7 +146,7 @@ class DiscontinuousLagrangeDualSet(dual_set.DualSet):
     equispaced points.  This is the discontinuous version where
     all nodes are topologically associated with the cell itself"""
 
-    def __init__(self, ref_el, degree):
+    def __init__(self, ref_el, degree, point_variant="equispaced"):
         entity_ids = {}
         nodes = []
         entity_permutations = {}
@@ -160,7 +161,7 @@ class DiscontinuousLagrangeDualSet(dual_set.DualSet):
             entity_permutations[dim] = {}
             perms = make_entity_permutations(dim, degree + 1 if dim == len(top) - 1 else -1)
             for entity in sorted(top[dim]):
-                pts_cur = ref_el.make_points(dim, entity, degree)
+                pts_cur = ref_el.make_points(dim, entity, degree, variant=point_variant)
                 nodes_cur = [functional.PointEvaluation(ref_el, x)
                              for x in pts_cur]
                 nnodes_cur = len(nodes_cur)
@@ -174,17 +175,20 @@ class DiscontinuousLagrangeDualSet(dual_set.DualSet):
 
 
 class HigherOrderDiscontinuousLagrange(finite_element.CiarletElement):
-    """The discontinuous Lagrange finite element.  It is what it is."""
+    """The discontinuous Lagrange finite element."""
 
-    def __init__(self, ref_el, degree):
+    def __init__(self, ref_el, degree, variant="equispaced"):
+        splitting, point_variant = parse_lagrange_variant(variant)
+        if splitting is not None:
+            ref_el = splitting(ref_el)
+        dual = DiscontinuousLagrangeDualSet(ref_el, degree, point_variant=point_variant)
         poly_set = polynomial_set.ONPolynomialSet(ref_el, degree)
-        dual = DiscontinuousLagrangeDualSet(ref_el, degree)
         formdegree = ref_el.get_spatial_dimension()  # n-form
         super(HigherOrderDiscontinuousLagrange, self).__init__(poly_set, dual, degree, formdegree)
 
 
-def DiscontinuousLagrange(ref_el, degree):
+def DiscontinuousLagrange(ref_el, degree, variant="equispaced"):
     if degree == 0:
         return P0.P0(ref_el)
     else:
-        return HigherOrderDiscontinuousLagrange(ref_el, degree)
+        return HigherOrderDiscontinuousLagrange(ref_el, degree, variant)
