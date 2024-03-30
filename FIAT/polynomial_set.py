@@ -235,19 +235,22 @@ class ONSymTensorPolynomialSet(PolynomialSet):
                                                        expansion_set, coeffs)
 
 
-def make_bubbles(ref_el, degree, shape=()):
-    """Construct a polynomial set with interior bubbles up to the given degree.
+def make_bubbles(ref_el, degree, codim=0, shape=()):
+    """Construct a polynomial set with codim bubbles up to the given degree.
     """
-    dim = ref_el.get_spatial_dimension()
     poly_set = ONPolynomialSet(ref_el, degree, shape=shape, scale="L2 piola", variant="bubble")
+    entity_ids = expansions.polynomial_entity_ids(ref_el, degree, continuity="C0")
+    sd = ref_el.get_spatial_dimension()
+    dim = sd - codim
     if dim == 1:
-        # odd / even reordering
-        degrees = chain(range(dim+1, degree+1, 2), range(dim+2, degree+1, 2))
-        indices = list(degrees)
+        # Apply even / odd reordering on edge bubbles
+        indices = []
+        for entity in entity_ids[dim]:
+            ids = entity_ids[dim][entity]
+            indices.extend(ids[::2])
+            indices.extend(ids[1::2])
     else:
-        idofs = expansions.polynomial_dimension(ref_el, degree-dim-1)
-        ndofs = poly_set.get_num_members()
-        indices = list(range(ndofs-idofs, ndofs))
+        indices = list(chain(*entity_ids[dim].values()))
 
     if shape != ():
         ncomp = numpy.prod(shape)

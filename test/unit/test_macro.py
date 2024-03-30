@@ -1,3 +1,4 @@
+import math
 import numpy
 import pytest
 from FIAT.hierarchical import Legendre
@@ -5,6 +6,8 @@ from FIAT.lagrange import Lagrange
 from FIAT.macro import AlfeldSplit, IsoSplit
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.reference_element import ufc_simplex
+from FIAT.expansions import polynomial_entity_ids
+from FIAT.polynomial_set import make_bubbles, PolynomialSet, ONPolynomialSet
 
 
 @pytest.fixture(params=("I", "T", "S"))
@@ -136,3 +139,71 @@ def test_is_macro(variant):
     assert fe.is_macroelement() == is_macro
     assert fe.get_reference_complex().is_macrocell() == is_macro
     assert fe.get_nodal_basis().get_reference_element().is_macrocell() == is_macro
+
+
+@pytest.mark.parametrize('split', [None, AlfeldSplit])
+@pytest.mark.parametrize('codim', range(3))
+def test_make_bubbles(cell, split, codim):
+    sd = cell.get_spatial_dimension()
+    if codim > sd:
+        return
+    degree = 5
+    if split is not None:
+        cell = split(cell)
+    B = make_bubbles(cell, degree, codim=codim)
+
+    # basic tests
+    assert isinstance(B, PolynomialSet)
+    assert B.degree == degree
+    num_members = B.get_num_members()
+    top = cell.get_topology()
+    assert num_members == math.comb(degree-1, sd-codim) * len(top[sd - codim])
+
+    # tabulate onto a lattice
+    points = []
+    for dim in range(sd+1-codim):
+        for entity in sorted(top[dim]):
+            points.extend(cell.make_points(dim, entity, degree))
+    values = B.tabulate(points)[(0,) * sd]
+
+    # test that bubbles vanish on the boundary
+    num_pts_on_facet = len(points) - num_members
+    facet_values = values[:, :num_pts_on_facet]
+    assert numpy.allclose(facet_values, 0, atol=1E-12)
+
+    # test linear independence
+    interior_values = values[:, num_pts_on_facet:]
+    assert numpy.linalg.matrix_rank(interior_values.T, tol=1E-12) == num_members
+
+    # test trace similarity
+    dim = sd - codim
+    nfacets = len(top[dim])
+    if nfacets > 1 and dim > 0:
+        ref_facet = cell.construct_subelement(dim)
+        ref_bubbles = make_bubbles(ref_facet, degree)
+        ref_points = ref_facet.make_points(dim, 0, degree)
+        ref_values = ref_bubbles.tabulate(ref_points)[(0,) * dim]
+
+        bubbles_per_entity = ref_bubbles.get_num_members()
+        cur = 0
+        for entity in sorted(top[dim]):
+            indices = list(range(cur, cur + bubbles_per_entity))
+            cur_values = interior_values[numpy.ix_(indices, indices)]
+            scale = numpy.max(abs(cur_values)) / numpy.max(abs(ref_values))
+            assert numpy.allclose(ref_values * scale, cur_values)
+            cur += bubbles_per_entity
+
+    # test that bubbles do not have components in span(P_{degree+2} \ P_{degree})
+    Pkdim = math.comb(degree + sd, sd)
+    entity_ids = polynomial_entity_ids(cell, degree + 2)
+    indices = []
+    for entity in top[sd]:
+        indices.extend(entity_ids[sd][entity][Pkdim:])
+    P = ONPolynomialSet(cell, degree + 2)
+    P = P.take(indices)
+
+    Q = create_quadrature(cell, P.degree + B.degree)
+    qpts, qwts = Q.get_points(), Q.get_weights()
+    P_at_qpts = P.tabulate(qpts)[(0,) * sd]
+    B_at_qpts = B.tabulate(qpts)[(0,) * sd]
+    assert numpy.allclose(numpy.dot(numpy.multiply(P_at_qpts, qwts), B_at_qpts.T), 0.0)
