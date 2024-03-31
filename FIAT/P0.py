@@ -18,7 +18,7 @@ class P0Dual(dual_set.DualSet):
     def __init__(self, ref_el):
         entity_ids = {}
         entity_permutations = {}
-        sd = ref_el.get_spatial_dimension()
+        sd = ref_el.get_dimension()
         top = ref_el.get_topology()
         if sd == 0:
             pts = [tuple() for entity in sorted(top[sd])]
