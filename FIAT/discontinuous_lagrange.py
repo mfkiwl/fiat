@@ -178,7 +178,7 @@ class DiscontinuousLagrangeDualSet(dual_set.DualSet):
         nodes = []
         entity_ids = {}
         entity_permutations = {}
-        sd = ref_el.get_spatial_dimension()
+        sd = ref_el.get_dimension()
         top = ref_el.get_topology()
         for dim in sorted(top):
             entity_ids[dim] = {}
