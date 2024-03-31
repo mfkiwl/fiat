@@ -205,8 +205,8 @@ def merge_entities(ref_el, entity_ids, entity_permutations):
     parent_top = parent_cell.get_topology()
     parent_ids = {dim: {entity: [] for entity in parent_top[dim]} for dim in parent_top}
     child_to_parent = ref_el.get_child_to_parent()
-    for dim in child_to_parent:
-        for entity in child_to_parent[dim]:
+    for dim in sorted(child_to_parent):
+        for entity in sorted(child_to_parent[dim]):
             parent_dim, parent_id = child_to_parent[dim][entity]
             dofs_cur = entity_ids[dim][entity]
             parent_ids[parent_dim][parent_id].extend(dofs_cur)
