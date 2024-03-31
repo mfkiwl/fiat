@@ -78,11 +78,14 @@ def make_lattice(verts, n, interior=0, variant=None):
     and interior = 0, this function will return the vertices and
     midpoint, but with interior = 1, it will only return the
     midpoint."""
-    if variant is None or variant == "equispaced":
-        variant = "equi"
-    elif variant == "gll":
-        variant = "lgl"
-    family = _decode_family(variant)
+    if variant is None:
+        variant = "equispaced"
+    recursivenodes_families = {
+        "equispaced": "equi",
+        "equispaced_interior": "equi_interior",
+        "gll": "lgl"}
+    family = recursivenodes_families.get(variant, variant)
+    family = _decode_family(family)
     D = len(verts)
     X = numpy.array(verts)
     get_point = lambda alpha: tuple(numpy.dot(_recursive(D - 1, n, alpha, family), X))

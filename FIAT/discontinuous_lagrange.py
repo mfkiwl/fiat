@@ -150,27 +150,21 @@ class BrokenLagrangeDualSet(dual_set.DualSet):
     all nodes are topologically associated with the cell itself"""
 
     def __init__(self, ref_el, degree, point_variant="equispaced"):
-        entity_ids = {}
         nodes = []
+        entity_ids = {}
         entity_permutations = {}
 
         # make nodes by getting points
         # need to do this dimension-by-dimension, facet-by-facet
         top = ref_el.get_topology()
-
-        cur = 0
         for dim in sorted(top):
             entity_ids[dim] = {}
             entity_permutations[dim] = {}
             perms = make_entity_permutations(dim, degree + 1 if dim == len(top) - 1 else -1)
             for entity in sorted(top[dim]):
                 pts_cur = ref_el.make_points(dim, entity, degree, variant=point_variant)
-                nodes_cur = [functional.PointEvaluation(ref_el, x)
-                             for x in pts_cur]
-                nnodes_cur = len(nodes_cur)
-                nodes += nodes_cur
+                nodes.extend(functional.PointEvaluation(ref_el, x) for x in pts_cur)
                 entity_ids[dim][entity] = []
-                cur += nnodes_cur
                 entity_permutations[dim][entity] = perms
         entity_ids[dim][0] = list(range(len(nodes)))
 
@@ -178,8 +172,8 @@ class BrokenLagrangeDualSet(dual_set.DualSet):
 
 
 class DiscontinuousLagrangeDualSet(dual_set.DualSet):
-    """The dual basis for discontinuous elements with nodes at recursively-defined points."""
-
+    """The dual basis for discontinuous elements with nodes at recursively-defined points.
+    """
     def __init__(self, ref_el, degree, point_variant="equispaced"):
         nodes = []
         entity_ids = {}
@@ -194,7 +188,7 @@ class DiscontinuousLagrangeDualSet(dual_set.DualSet):
                 entity_ids[dim][entity] = []
                 entity_permutations[dim][entity] = perms
 
-        # make nodes by getting points
+        # make nodes by getting points on the interior facets
         for entity in top[sd]:
             cur = len(nodes)
             pts = make_lattice(ref_el.get_vertices_of_subcomplex(top[sd][entity]),
@@ -205,20 +199,36 @@ class DiscontinuousLagrangeDualSet(dual_set.DualSet):
 
 
 class DiscontinuousLagrange(finite_element.CiarletElement):
-    """Simplicial discontinuous element with nodes at the (recursive) Gauss-Legendre points."""
-    def __new__(cls, ref_el, degree, variant="equsipaced"):
+    """The discontinuous Lagrange finite element.
+
+    :arg ref_el:  The reference element, which could be a standard FIAT simplex or a split complex
+    :arg degree:  The polynomial degree
+    :arg variant: A comma-separated string that may specify the type of point distribution
+                  and the splitting strategy if a macro element is desired.
+                  Either option may be omitted.  The default point type is equispaced
+                  and the default splitting strategy is None.
+                  Example: variant='gl' gives a standard unsplit point distribution with
+                              spectral points.
+                           variant='equispaced,Iso(2)' with degree=1 gives the P2:P1 iso element.
+                           variant='Alfeld' can be used to obtain a barycentrically refined
+                              macroelement for Scott-Vogelius.
+    """
+    def __new__(cls, ref_el, degree, variant="equispaced"):
         if degree == 0:
-            return P0.P0(ref_el)
+            splitting, _ = parse_lagrange_variant(variant, discontinuous=True)
+            if splitting is None:
+                # FIXME P0 on the split requires implementing SplitSimplicialComplex.symmetry_group_size()
+                return P0.P0(ref_el)
         return super(DiscontinuousLagrange, cls).__new__(cls)
 
     def __init__(self, ref_el, degree, variant="equispaced"):
         splitting, point_variant = parse_lagrange_variant(variant, discontinuous=True)
         if splitting is not None:
             ref_el = splitting(ref_el)
-        if point_variant in ["equispaced", "gll"]:
-            dual = BrokenLagrangeDualSet(ref_el, degree, point_variant)
+        if point_variant in ("equispaced", "gll", "lgc"):
+            dual = BrokenLagrangeDualSet(ref_el, degree, point_variant=point_variant)
         else:
-            dual = DiscontinuousLagrangeDualSet(ref_el, degree, point_variant)
+            dual = DiscontinuousLagrangeDualSet(ref_el, degree, point_variant=point_variant)
         if ref_el.shape == LINE:
             # In 1D we can use the primal basis as the expansion set,
             # avoiding any round-off coming from a basis transformation

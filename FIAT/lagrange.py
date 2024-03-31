@@ -15,8 +15,8 @@ from FIAT.check_format_variant import parse_lagrange_variant
 class LagrangeDualSet(dual_set.DualSet):
     """The dual basis for Lagrange elements.  This class works for
     simplices of any dimension.  Nodes are point evaluation at
-    equispaced points."""
-
+    recursively-defined points.
+    """
     def __init__(self, ref_el, degree, point_variant="equispaced"):
         entity_ids = {}
         nodes = []
@@ -58,7 +58,6 @@ class Lagrange(finite_element.CiarletElement):
                            variant='Alfeld' can be used to obtain a barycentrically refined
                               macroelement for Scott-Vogelius.
     """
-
     def __init__(self, ref_el, degree, variant="equispaced"):
         splitting, point_variant = parse_lagrange_variant(variant)
         if splitting is not None:

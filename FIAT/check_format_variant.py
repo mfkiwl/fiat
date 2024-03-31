@@ -1,5 +1,20 @@
 import re
-from FIAT.macro import IsoSplit, AlfeldSplit
+from FIAT.macro import AlfeldSplit, IsoSplit
+
+# dicts mapping Lagrange variant names to recursivenodes family names
+supported_cg_variants = {
+    "spectral": "gll",
+    "chebyshev": "lgc",
+    "equispaced": "equispaced",
+    "gll": "gll"}
+
+supported_dg_variants = {
+    "spectral": "gl",
+    "chebyshev": "gc",
+    "equispaced": "equispaced",
+    "equispaced_interior": "equispaced_interior",
+    "gll": "gll",
+    "gl": "gl"}
 
 
 def check_format_variant(variant, degree):
@@ -24,18 +39,19 @@ def check_format_variant(variant, degree):
 
 
 def parse_lagrange_variant(variant, discontinuous=False):
+    if variant is None:
+        variant = "equispaced"
     options = variant.replace(" ", "").split(",")
     assert len(options) <= 2
-    spectral = "gl" if discontinuous else "gll"
-    supported_point_variants = {"equispaced": "equispaced",
-                                "gll": "gll",
-                                "spectral": spectral}
+
     if discontinuous:
-        supported_point_variants["gl"] = "gl"
+        supported_point_variants = supported_dg_variants
+    else:
+        supported_point_variants = supported_cg_variants
 
-    point_variant = spectral
-
+    # defaults
     splitting = None
+    point_variant = supported_point_variants["spectral"]
 
     for pre_opt in options:
         opt = pre_opt.lower()
@@ -52,4 +68,6 @@ def parse_lagrange_variant(variant, discontinuous=False):
         else:
             raise ValueError("Illegal variant option")
 
+    if discontinuous and splitting is not None and point_variant in supported_cg_variants.values():
+        raise ValueError("Illegal variant. DG macroelements with DOFs on subcell boundaries are not unisolvent.")
     return splitting, point_variant

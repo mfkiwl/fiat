@@ -9,13 +9,13 @@
 import numpy
 import scipy
 
-from FIAT import finite_element, dual_set, functional
-from FIAT.reference_element import (POINT, LINE, TRIANGLE, TETRAHEDRON,
-                                    symmetric_simplex)
+from FIAT import finite_element, dual_set, functional, P0
+from FIAT.reference_element import symmetric_simplex
 from FIAT.orientation_utils import make_entity_permutations_simplex
 from FIAT.quadrature import FacetQuadratureRule
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.polynomial_set import ONPolynomialSet, make_bubbles
+from FIAT.check_format_variant import parse_lagrange_variant
 
 
 class LegendreDual(dual_set.DualSet):
@@ -54,10 +54,18 @@ class LegendreDual(dual_set.DualSet):
 
 class Legendre(finite_element.CiarletElement):
     """Simplicial discontinuous element with Legendre polynomials."""
+    def __new__(cls, ref_el, degree, variant=None):
+        if degree == 0:
+            splitting, _ = parse_lagrange_variant(variant, discontinuous=True)
+            if splitting is None:
+                # FIXME P0 on the split requires implementing SplitSimplicialComplex.symmetry_group_size()
+                return P0.P0(ref_el)
+        return super(Legendre, cls).__new__(cls)
 
-    def __init__(self, ref_el, degree):
-        if ref_el.shape not in {POINT, LINE, TRIANGLE, TETRAHEDRON}:
-            raise ValueError("%s is only defined on simplices." % type(self))
+    def __init__(self, ref_el, degree, variant=None):
+        splitting, _ = parse_lagrange_variant(variant, discontinuous=True)
+        if splitting is not None:
+            ref_el = splitting(ref_el)
         poly_set = ONPolynomialSet(ref_el, degree)
         dual = LegendreDual(ref_el, degree)
         formdegree = ref_el.get_spatial_dimension()  # n-form
@@ -123,13 +131,12 @@ class IntegratedLegendreDual(dual_set.DualSet):
 
 class IntegratedLegendre(finite_element.CiarletElement):
     """Simplicial continuous element with integrated Legendre polynomials."""
-
     def __init__(self, ref_el, degree, variant=None):
-        if ref_el.shape not in {POINT, LINE, TRIANGLE, TETRAHEDRON}:
-            raise ValueError("%s is only defined on simplices." % type(self))
+        splitting, _ = parse_lagrange_variant(variant)
+        if splitting is not None:
+            ref_el = splitting(ref_el)
         if degree < 1:
             raise ValueError(f"{type(self).__name__} elements only valid for k >= 1")
-
         poly_set = ONPolynomialSet(ref_el, degree, variant="bubble")
         dual = IntegratedLegendreDual(ref_el, degree)
         formdegree = 0  # 0-form

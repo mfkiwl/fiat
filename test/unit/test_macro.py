@@ -1,8 +1,7 @@
 import math
 import numpy
 import pytest
-from FIAT.hierarchical import Legendre
-from FIAT.lagrange import Lagrange
+from FIAT import DiscontinuousLagrange, Lagrange, Legendre, P0
 from FIAT.macro import AlfeldSplit, IsoSplit
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.reference_element import ufc_simplex
@@ -131,10 +130,24 @@ def test_macro_lagrange(variant, degree, split, cell):
 
 
 @pytest.mark.parametrize("variant", ("gll", "Alfeld,equispaced", "gll,iso"))
-def test_is_macro(variant):
+def test_is_macro_lagrange(variant):
     is_macro = "alfeld" in variant.lower() or "iso" in variant.lower()
 
     fe = Lagrange(ufc_simplex(2), 2, variant)
+    assert not fe.get_reference_element().is_macrocell()
+    assert fe.is_macroelement() == is_macro
+    assert fe.get_reference_complex().is_macrocell() == is_macro
+    assert fe.get_nodal_basis().get_reference_element().is_macrocell() == is_macro
+
+
+@pytest.mark.parametrize("variant", ("gl", "Alfeld,equispaced_interior", "chebyshev,iso"))
+@pytest.mark.parametrize("degree", (0, 2))
+def test_is_macro_discontinuous_lagrange(degree, variant):
+    is_macro = "alfeld" in variant.lower() or "iso" in variant.lower()
+
+    fe = DiscontinuousLagrange(ufc_simplex(2), degree, variant)
+    if degree == 0 and not is_macro:
+        assert isinstance(fe, P0)
     assert not fe.get_reference_element().is_macrocell()
     assert fe.is_macroelement() == is_macro
     assert fe.get_reference_complex().is_macrocell() == is_macro
