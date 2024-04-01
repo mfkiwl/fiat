@@ -5,7 +5,7 @@ from FIAT import DiscontinuousLagrange, Lagrange, Legendre, P0
 from FIAT.macro import AlfeldSplit, IsoSplit
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.reference_element import ufc_simplex
-from FIAT.expansions import polynomial_entity_ids
+from FIAT.expansions import polynomial_entity_ids, polynomial_cell_node_map
 from FIAT.polynomial_set import make_bubbles, PolynomialSet, ONPolynomialSet
 
 
@@ -220,3 +220,38 @@ def test_make_bubbles(cell, split, codim):
     P_at_qpts = P.tabulate(qpts)[(0,) * sd]
     B_at_qpts = B.tabulate(qpts)[(0,) * sd]
     assert numpy.allclose(numpy.dot(numpy.multiply(P_at_qpts, qwts), B_at_qpts.T), 0.0)
+
+
+@pytest.mark.parametrize("degree", (4,))
+@pytest.mark.parametrize("variant", (None, "bubble"))
+@pytest.mark.parametrize("split", (AlfeldSplit, IsoSplit))
+def test_macro_expansion(cell, split, variant, degree):
+    ref_complex = split(cell)
+    top = ref_complex.get_topology()
+    sd = ref_complex.get_spatial_dimension()
+    P = ONPolynomialSet(ref_complex, degree, variant=variant, scale=1)
+
+    npoints = degree + sd + 1
+    cell_point_map = []
+    pts = []
+    for cell in top[sd]:
+        cur = len(pts)
+        pts.extend(ref_complex.make_points(sd, cell, npoints))
+        cell_point_map.append(list(range(cur, len(pts))))
+
+    order = 2
+    values = P.tabulate(pts, order)
+    cell_node_map = polynomial_cell_node_map(ref_complex, degree, continuity=P.expansion_set.continuity)
+    for cell in top[sd]:
+        sub_el = ref_complex.construct_subelement(sd)
+        sub_el.vertices = ref_complex.get_vertices_of_subcomplex(top[sd][cell])
+        Pcell = ONPolynomialSet(sub_el, degree, variant=variant, scale=1)
+
+        cell_pts = sub_el.make_points(sd, 0, npoints)
+        cell_values = Pcell.tabulate(cell_pts, order)
+
+        ibfs = cell_node_map[cell]
+        ipts = cell_point_map[cell]
+        indices = numpy.ix_(ibfs, ipts)
+        for alpha in values:
+            assert numpy.allclose(cell_values[alpha], values[alpha][indices])

@@ -40,6 +40,7 @@ class LagrangeDualSet(dual_set.DualSet):
                 entity_ids[dim][entity] = list(range(cur, cur + nnodes_cur))
                 cur += nnodes_cur
                 entity_permutations[dim][entity] = perms
+
         super(LagrangeDualSet, self).__init__(nodes, ref_el, entity_ids, entity_permutations)
 
 

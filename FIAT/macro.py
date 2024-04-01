@@ -4,8 +4,7 @@ from itertools import chain
 import numpy
 
 from FIAT.quadrature import FacetQuadratureRule, QuadratureRule
-from FIAT.reference_element import (SimplicialComplex, lattice_iter,
-                                    make_lattice)
+from FIAT.reference_element import SimplicialComplex, lattice_iter
 
 
 def bary_to_xy(verts, bary, result=None):
@@ -23,11 +22,12 @@ def xy_to_bary(verts, pts, result=None):
     """Maps physical points to barycentric coordinates.
 
     :arg verts: A tuple of points.
-    :arg ots: A row-stacked numpy array of physical points.
+    :arg pts: A row-stacked numpy array of physical points.
     :arg result: A row-stacked numpy array of barycentric coordinates.
     :returns: result
     """
     verts = numpy.asarray(verts)
+    pts = numpy.asarray(pts)
     npts = pts.shape[0]
     sdim = verts.shape[1]
 
@@ -168,36 +168,47 @@ class IsoSplit(SplitSimplicialComplex):
     connecting points on a regular lattice.
 
     :arg ref_el: The parent Simplex to split.
-    :kwarg depth: The number of subdivisions along each edge of the simplex.
+    :kwarg degree: The number of subdivisions along each edge of the simplex.
     :kwarg variant: The point distribution variant.
     """
-    def __init__(self, ref_el, depth=2, variant=None):
+    def __init__(self, ref_el, degree=2, variant=None):
+        # Construct new vertices entity-by-entity
         sd = ref_el.get_spatial_dimension()
-        old_verts = ref_el.get_vertices()
-        new_verts = make_lattice(old_verts, depth, variant=variant)
+        top = ref_el.get_topology()
+        new_verts = []
+        ref_lattice = []
+        for dim in top:
+            for entity in top[dim]:
+                new_verts.extend(ref_el.make_points(dim, entity, degree, variant=variant))
+                ref_lattice.extend(ref_el.make_points(dim, entity, degree))
+
+        bary = xy_to_bary(ref_el.get_vertices(), ref_lattice)
+        bary *= degree
+        alphas = numpy.rint(bary[:, :-1])
+        flat_index = {tuple(alpha): i for i, alpha in enumerate(alphas)}
 
         new_topology = {}
         new_topology[0] = {i: (i,) for i in range(len(new_verts))}
-        new_topology[1] = {}
+        # Loop through degree k-1 vertices
+        # Construct a P1 simplex by connecting edges between a vertex and
+        # its neighbors obtained by shifting each coordinate up by 1, forming a P1 simplex
+        edges = []
+        for alpha in lattice_iter(0, degree, sd):
+            simplex = []
+            for beta in lattice_iter(0, 2, sd):
+                v1 = flat_index[tuple(a+b for a, b in zip(alpha, beta))]
+                for v0 in simplex:
+                    edges.append(tuple(sorted((v0, v1))))
+                simplex.append(v1)
 
-        # Loop through vertex pairs
-        # Edges are oriented from low vertex id to high vertex id to avoid duplicates
-        # Place a new edge when the two lattice multiindices are at Manhattan distance < 3,
-        # this connects the midpoints of edges within a face
-        # Only include diagonal edges that are parallel to the simplex edges,
-        # we take the diagonal that goes through vertices at the same depth
-        cur = 0
-        distance = lambda x, y: sum(abs(b-a) for a, b in zip(x, y))
-        for j, v1 in enumerate(lattice_iter(0, depth+1, sd)):
-            for i, v0 in enumerate(lattice_iter(0, depth+1, sd)):
-                if i < j and distance(v0, v1) < 3 and sum(v1) - sum(v0) <= 1:
-                    new_topology[1][cur] = (i, j)
-                    cur = cur + 1
         if sd == 3:
             # Cut the octahedron
             # FIXME do this more generically
-            assert depth == 2
-            new_topology[1][cur] = (1, 8)
+            assert degree == 2
+            v0, v1 = flat_index[(1, 0, 0)], flat_index[(0, 1, 1)]
+            edges.append(tuple(sorted((v0, v1))))
+
+        new_topology[1] = dict(enumerate(sorted(edges)))
 
         # Get an adjacency list for each vertex
         edges = new_topology[1].values()
