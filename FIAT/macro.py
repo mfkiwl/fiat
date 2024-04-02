@@ -168,7 +168,7 @@ class IsoSplit(SplitSimplicialComplex):
     connecting points on a regular lattice.
 
     :arg ref_el: The parent Simplex to split.
-    :kwarg depth: The number of subdivisions along each edge of the simplex.
+    :kwarg degree: The number of subdivisions along each edge of the simplex.
     :kwarg variant: The point distribution variant.
     """
     def __init__(self, ref_el, degree=2, variant=None):
@@ -182,25 +182,23 @@ class IsoSplit(SplitSimplicialComplex):
                 new_verts.extend(ref_el.make_points(dim, entity, degree, variant=variant))
                 ref_lattice.extend(ref_el.make_points(dim, entity, degree))
 
-        bary = xy_to_bary(ref_el.vertices, ref_lattice)
+        bary = xy_to_bary(ref_el.get_vertices(), ref_lattice)
         bary *= degree
         alphas = numpy.rint(bary[:, :-1])
         flat_index = {tuple(alpha): i for i, alpha in enumerate(alphas)}
 
         new_topology = {}
         new_topology[0] = {i: (i,) for i in range(len(new_verts))}
-        new_topology[1] = {}
         # Loop through degree k-1 vertices
-        # Construct a P1 simplex by connecting edges between this vertex and each of its neighbors by shifing each coordinate up by 1,
-        # forming a P1 simplex
-        cur = 0
+        # Construct a P1 simplex by connecting edges between a vertex and
+        # its neighbors obtained by shifting each coordinate up by 1, forming a P1 simplex
+        edges = []
         for alpha in lattice_iter(0, degree, sd):
             simplex = []
             for beta in lattice_iter(0, 2, sd):
                 v1 = flat_index[tuple(a+b for a, b in zip(alpha, beta))]
                 for v0 in simplex:
-                    new_topology[1][cur] = tuple(sorted((v0, v1)))
-                    cur = cur + 1
+                    edges.append(tuple(sorted((v0, v1))))
                 simplex.append(v1)
 
         if sd == 3:
@@ -208,7 +206,9 @@ class IsoSplit(SplitSimplicialComplex):
             # FIXME do this more generically
             assert degree == 2
             v0, v1 = flat_index[(1, 0, 0)], flat_index[(0, 1, 1)]
-            new_topology[1][cur] = tuple(sorted((v0, v1)))
+            edges.append(tuple(sorted((v0, v1))))
+
+        new_topology[1] = dict(enumerate(sorted(edges)))
 
         # Get an adjacency list for each vertex
         edges = new_topology[1].values()
