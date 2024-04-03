@@ -30,13 +30,13 @@ Background on the schemes:
 # NumPy
 import numpy
 
+from FIAT.macro import MacroQuadratureRule
 from FIAT.quadrature import (QuadratureRule, make_quadrature,
                              make_tensor_product_quadrature, map_quadrature)
 # FIAT
 from FIAT.reference_element import (HEXAHEDRON, QUADRILATERAL, TENSORPRODUCT,
                                     TETRAHEDRON, TRIANGLE, UFCTetrahedron,
                                     UFCTriangle, symmetric_simplex)
-from FIAT.macro import MacroQuadratureRule
 
 
 def create_quadrature(ref_el, degree, scheme="default"):
@@ -49,7 +49,7 @@ def create_quadrature(ref_el, degree, scheme="default"):
     Gauss scheme on simplices.  On tensor-product cells, it is a
     tensor-product quadrature rule of the subcells.
 
-    :arg cell: The FIAT cell to create the quadrature for.
+    :arg ref_el: The FIAT cell to create the quadrature for.
     :arg degree: The degree of polynomial that the rule should
         integrate exactly.
     """
