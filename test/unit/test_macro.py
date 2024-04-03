@@ -147,6 +147,11 @@ def test_lagrange_iso_duals(cell, degree):
         for entity in iso_ids[dim]:
             assert iso_ids[dim][entity] == P2_ids[dim][entity]
 
+    poly_set = iso.get_nodal_basis()
+    assert numpy.allclose(numpy.eye(iso.space_dimension()),
+                          numpy.dot(P2.get_dual_set().to_riesz(poly_set),
+                                    poly_set.get_coeffs().T))
+
 
 @pytest.mark.parametrize("variant", ("gll", "Alfeld,equispaced", "gll,iso"))
 def test_is_macro_lagrange(variant):
