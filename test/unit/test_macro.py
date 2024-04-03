@@ -110,8 +110,6 @@ def test_macro_lagrange(variant, degree, split, cell):
     for dim in parent_top:
         assert len(entity_ids[dim]) == len(parent_top[dim])
 
-    # TODO more thorough checks on entity_ids
-
     # Test that tabulation onto lattice points gives the identity
     sd = ref_el.get_spatial_dimension()
     top = ref_el.get_topology()
@@ -127,6 +125,27 @@ def test_macro_lagrange(variant, degree, split, cell):
     U = poly_set.get_expansion_set()
     V = U.tabulate(degree, pts).T
     assert numpy.allclose(fe.V, V)
+
+
+@pytest.mark.parametrize("degree", (1, 2,))
+def test_lagrange_iso_duals(cell, degree):
+    iso = Lagrange(IsoSplit(cell), degree, variant="equispaced")
+    P2 = Lagrange(cell, 2*degree, variant="equispaced")
+
+    def get_points(fe):
+        points = []
+        for node in fe.dual_basis():
+            pt, = node.get_point_dict()
+            points.append(pt)
+        return points
+
+    assert numpy.allclose(get_points(iso), get_points(P2))
+
+    iso_ids = iso.entity_dofs()
+    P2_ids = P2.entity_dofs()
+    for dim in iso_ids:
+        for entity in iso_ids[dim]:
+            assert iso_ids[dim][entity] == P2_ids[dim][entity]
 
 
 @pytest.mark.parametrize("variant", ("gll", "Alfeld,equispaced", "gll,iso"))

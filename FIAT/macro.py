@@ -4,7 +4,7 @@ from itertools import chain
 import numpy
 
 from FIAT.quadrature import FacetQuadratureRule, QuadratureRule
-from FIAT.reference_element import SimplicialComplex, lattice_iter
+from FIAT.reference_element import SimplicialComplex, lattice_iter, make_lattice
 
 
 def bary_to_xy(verts, bary, result=None):
@@ -65,7 +65,7 @@ class SplitSimplicialComplex(SimplicialComplex):
     def __init__(self, parent, vertices, topology):
         self._parent = parent
 
-        bary = xy_to_bary(numpy.asarray(parent.get_vertices()), numpy.asarray(vertices))
+        bary = xy_to_bary(parent.get_vertices(), vertices)
         parent_top = parent.get_topology()
         parent_inv_top = invert_cell_topology(parent_top)
 
@@ -83,6 +83,24 @@ class SplitSimplicialComplex(SimplicialComplex):
                 parent_entity = parent_inv_top[parent_dim][parent_verts]
                 child_to_parent[dim][entity] = (parent_dim, parent_entity)
                 parent_to_children[parent_dim][parent_entity].append((dim, entity))
+
+        for dim in parent_to_children:
+            for entity in parent_to_children[dim]:
+                children = parent_to_children[dim][entity]
+                if len(children) > 1:
+                    # sort children lexicographically
+                    parent_verts = parent.get_vertices_of_subcomplex(parent_top[dim][entity])
+                    children_verts = [tuple(numpy.average([vertices[i] for i in topology[cdim][centity]], 0))
+                                      for cdim, centity in children]
+
+                    B = numpy.transpose(children_verts)
+                    A = numpy.transpose(parent_verts[::-1])
+                    B = B - A[:, -1:]
+                    A = A[:, :-1] - A[:, -1:]
+                    coords = numpy.linalg.solve(numpy.dot(A.T, A), numpy.dot(A.T, B)).T
+                    coords = list(map(tuple, coords))
+                    children = (c for _, c in sorted(zip(coords, children)))
+                parent_to_children[dim][entity] = tuple(children)
 
         self._child_to_parent = child_to_parent
         self._parent_to_children = parent_to_children
@@ -180,33 +198,23 @@ class IsoSplit(SplitSimplicialComplex):
     def __init__(self, ref_el, degree=2, variant=None):
         self.degree = degree
         self.variant = variant
-        # Construct new vertices entity-by-entity
+        # Place new vertices on a lattice
         sd = ref_el.get_spatial_dimension()
-        top = ref_el.get_topology()
-        new_verts = []
-        ref_lattice = []
-        for dim in top:
-            for entity in top[dim]:
-                new_verts.extend(ref_el.make_points(dim, entity, degree, variant=variant))
-                ref_lattice.extend(ref_el.make_points(dim, entity, degree))
-
-        bary = xy_to_bary(ref_el.get_vertices(), ref_lattice)
-        bary *= degree
-        alphas = numpy.rint(bary[:, :-1])
-        flat_index = {tuple(alpha): i for i, alpha in enumerate(alphas)}
+        new_verts = make_lattice(ref_el.vertices, degree, variant=variant)
+        flat_index = {tuple(alpha): i for i, alpha in enumerate(lattice_iter(0, degree+1, sd))}
 
         new_topology = {}
         new_topology[0] = {i: (i,) for i in range(len(new_verts))}
-        # Loop through degree k-1 vertices
+        # Loop through degree-1 vertices
         # Construct a P1 simplex by connecting edges between a vertex and
-        # its neighbors obtained by shifting each coordinate up by 1, forming a P1 simplex
+        # its neighbors obtained by shifting each coordinate up by 1
         edges = []
         for alpha in lattice_iter(0, degree, sd):
             simplex = []
             for beta in lattice_iter(0, 2, sd):
                 v1 = flat_index[tuple(a+b for a, b in zip(alpha, beta))]
                 for v0 in simplex:
-                    edges.append(tuple(sorted((v0, v1))))
+                    edges.append((v0, v1))
                 simplex.append(v1)
 
         if sd == 3:
@@ -216,7 +224,7 @@ class IsoSplit(SplitSimplicialComplex):
             v0, v1 = flat_index[(1, 0, 0)], flat_index[(0, 1, 1)]
             edges.append(tuple(sorted((v0, v1))))
 
-        new_topology[1] = dict(enumerate(sorted(edges)))
+        new_topology[1] = dict(enumerate(edges))
 
         # Get an adjacency list for each vertex
         edges = new_topology[1].values()

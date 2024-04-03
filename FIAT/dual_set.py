@@ -13,7 +13,7 @@ from FIAT import polynomial_set, functional
 
 class DualSet(object):
     def __init__(self, nodes, ref_el, entity_ids, entity_permutations=None):
-        ref_el, entity_ids, entity_permutations = merge_entities(ref_el, entity_ids, entity_permutations)
+        nodes, ref_el, entity_ids, entity_permutations = merge_entities(nodes, ref_el, entity_ids, entity_permutations)
         self.nodes = nodes
         self.ref_el = ref_el
         self.entity_ids = entity_ids
@@ -196,20 +196,21 @@ def make_entity_closure_ids(ref_el, entity_ids):
     return entity_closure_ids
 
 
-def merge_entities(ref_el, entity_ids, entity_permutations):
+def merge_entities(nodes, ref_el, entity_ids, entity_permutations):
     """Collect DOFs from simplicial complex onto facets of parent cell"""
     parent_cell = ref_el.get_parent()
     if parent_cell is None:
-        return ref_el, entity_ids, entity_permutations
-
-    parent_top = parent_cell.get_topology()
-    parent_ids = {dim: {entity: [] for entity in parent_top[dim]} for dim in parent_top}
-    child_to_parent = ref_el.get_child_to_parent()
-    for dim in sorted(child_to_parent):
-        for entity in sorted(child_to_parent[dim]):
-            parent_dim, parent_id = child_to_parent[dim][entity]
-            dofs_cur = entity_ids[dim][entity]
-            parent_ids[parent_dim][parent_id].extend(dofs_cur)
-
+        return nodes, ref_el, entity_ids, entity_permutations
+    parent_nodes = []
+    parent_ids = {}
     parent_permutations = None
-    return parent_cell, parent_ids, parent_permutations
+
+    parent_to_children = ref_el.get_parent_to_children()
+    for dim in sorted(parent_to_children):
+        parent_ids[dim] = {}
+        for entity in sorted(parent_to_children[dim]):
+            cur = len(parent_nodes)
+            for child_dim, child_entity in parent_to_children[dim][entity]:
+                parent_nodes.extend(nodes[i] for i in entity_ids[child_dim][child_entity])
+            parent_ids[dim][entity] = list(range(cur, len(parent_nodes)))
+    return parent_nodes, parent_cell, parent_ids, parent_permutations
