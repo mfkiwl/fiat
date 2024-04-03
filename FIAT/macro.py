@@ -162,6 +162,12 @@ class AlfeldSplit(SplitSimplicialComplex):
                 new_topology[dim][offset+entity] = ids + (new_vert_id,)
         super(AlfeldSplit, self).__init__(ref_el, new_verts, new_topology)
 
+    def construct_subcomplex(self, dimension):
+        if dimension == self.get_dimension():
+            return self
+        # Alfed on facets is just a simplex
+        return self.construct_subelement(dimension)
+
 
 class IsoSplit(SplitSimplicialComplex):
     """Splits simplex into the simplicial complex obtained by
@@ -172,6 +178,8 @@ class IsoSplit(SplitSimplicialComplex):
     :kwarg variant: The point distribution variant.
     """
     def __init__(self, ref_el, degree=2, variant=None):
+        self.degree = degree
+        self.variant = variant
         # Construct new vertices entity-by-entity
         sd = ref_el.get_spatial_dimension()
         top = ref_el.get_topology()
@@ -226,6 +234,16 @@ class IsoSplit(SplitSimplicialComplex):
                         entities.append((v,) + facet)
             new_topology[dim] = dict(enumerate(entities))
         super(IsoSplit, self).__init__(ref_el, new_verts, new_topology)
+
+    def construct_subcomplex(self, dimension):
+        if dimension == self.get_dimension():
+            return self
+        ref_el = self.construct_subelement(dimension)
+        if dimension == 0:
+            return ref_el
+        else:
+            # Iso on facets is Iso
+            return IsoSplit(ref_el, self.degree, self.variant)
 
 
 class MacroQuadratureRule(QuadratureRule):

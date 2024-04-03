@@ -54,9 +54,9 @@ def create_quadrature(ref_el, degree, scheme="default"):
         integrate exactly.
     """
     if ref_el.is_macrocell():
-        sd = ref_el.get_spatial_dimension()
-        cell = ref_el.construct_subelement(sd)
-        Q_ref = create_quadrature(cell, degree, scheme=scheme)
+        dimension = ref_el.get_dimension()
+        sub_el = ref_el.construct_subelement(dimension)
+        Q_ref = create_quadrature(sub_el, degree, scheme=scheme)
         return MacroQuadratureRule(ref_el, Q_ref)
 
     if ref_el.get_shape() == TENSORPRODUCT:

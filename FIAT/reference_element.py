@@ -234,6 +234,16 @@ class Cell(object):
         """
         raise NotImplementedError("Should be implemented in a subclass.")
 
+    def construct_subcomplex(self, dimension):
+        """Constructs the reference subcomplex of the parent cell subentity
+        specified by subcomplex dimension.
+
+        :arg dimension: `tuple` for tensor product cells, `int` otherwise
+        """
+        if self.get_parent() is None:
+            return self.construct_subelement(dimension)
+        raise NotImplementedError("Should be implemented in a subclass.")
+
     def get_entity_transform(self, dim, entity_i):
         """Returns a mapping of point coordinates from the
         `entity_i`-th subentity of dimension `dim` to the cell.
@@ -992,6 +1002,15 @@ class TensorProductCell(Cell):
         :arg dimension: dimension in each "direction" (tuple)
         """
         return TensorProductCell(*[c.construct_subelement(d)
+                                   for c, d in zip(self.cells, dimension)])
+
+    def construct_subcomplex(self, dimension):
+        """Constructs the reference subcomplex of the parent cell subentity
+        specified by subcomplex dimension.
+
+        :arg dimension: dimension in each "direction" (tuple)
+        """
+        return TensorProductCell(*[c.construct_subcomplex(d)
                                    for c, d in zip(self.cells, dimension)])
 
     def get_entity_transform(self, dim, entity_i):
