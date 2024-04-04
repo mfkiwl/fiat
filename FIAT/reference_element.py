@@ -1101,17 +1101,25 @@ class TensorProductCell(Cell):
         """Return the map indicating whether each possible cell orientation causes reflection (``1``) or not (``0``)."""
         return make_cell_orientation_reflection_map_tensorproduct(self.cells)
 
+    def compare(self, op, other):
+        if hasattr(other, "product"):
+            other = other.product
+        if isinstance(other, type(self)):
+            return all(op(a, b) for a, b in zip(self.cells, other.cells))
+        else:
+            return op(self, other)
+
     def __gt__(self, other):
-        return all(a > b for a, b in zip(self.cells, other.cells))
+        return self.compare(operator.gt, other)
 
     def __lt__(self, other):
-        return all(a < b for a, b in zip(self.cells, other.cells))
+        return self.compare(operator.lt, other)
 
     def __ge__(self, other):
-        return all(a >= b for a, b in zip(self.cells, other.cells))
+        return self.compare(operator.ge, other)
 
     def __le__(self, other):
-        return all(a <= b for a, b in zip(self.cells, other.cells))
+        return self.compare(operator.le, other)
 
 
 class UFCQuadrilateral(Cell):
