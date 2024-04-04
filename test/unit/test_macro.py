@@ -112,11 +112,12 @@ def test_macro_lagrange(variant, degree, split, cell):
 
     # Test that tabulation onto lattice points gives the identity
     sd = ref_el.get_spatial_dimension()
-    top = ref_el.get_topology()
+    parent_to_children = ref_el.get_parent_to_children()
     pts = []
-    for dim in sorted(top):
-        for entity in sorted(top[dim]):
-            pts.extend(ref_el.make_points(dim, entity, degree, variant=variant))
+    for dim in sorted(parent_to_children):
+        for entity in sorted(parent_to_children[dim]):
+            for cdim, centity in parent_to_children[dim][entity]:
+                pts.extend(ref_el.make_points(cdim, centity, degree, variant=variant))
 
     phis = fe.tabulate(2, pts)
     assert numpy.allclose(phis[(0,)*sd], numpy.eye(fe.space_dimension()))

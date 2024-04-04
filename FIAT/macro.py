@@ -227,7 +227,6 @@ class IsoSplit(SplitSimplicialComplex):
         new_topology[1] = dict(enumerate(edges))
 
         # Get an adjacency list for each vertex
-        edges = new_topology[1].values()
         adjacency = {v: set(chain.from_iterable(verts for verts in edges if v in verts))
                      for v in new_topology[0]}
 
