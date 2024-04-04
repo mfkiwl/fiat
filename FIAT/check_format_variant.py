@@ -38,20 +38,23 @@ def check_format_variant(variant, degree):
     return variant, interpolant_degree
 
 
-def parse_lagrange_variant(variant, discontinuous=False):
+def parse_lagrange_variant(variant, discontinuous=False, integral=False):
     if variant is None:
-        variant = "equispaced"
+        variant = "integral" if integral else "equispaced"
     options = variant.replace(" ", "").split(",")
     assert len(options) <= 2
 
-    if discontinuous:
+    default = "integral" if integral else "spectral"
+    if integral:
+        supported_point_variants = {"integral": None}
+    elif discontinuous:
         supported_point_variants = supported_dg_variants
     else:
         supported_point_variants = supported_cg_variants
 
     # defaults
     splitting = None
-    point_variant = supported_point_variants["spectral"]
+    point_variant = supported_point_variants[default]
 
     for pre_opt in options:
         opt = pre_opt.lower()

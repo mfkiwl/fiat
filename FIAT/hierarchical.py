@@ -63,7 +63,7 @@ class Legendre(finite_element.CiarletElement):
         return super(Legendre, cls).__new__(cls)
 
     def __init__(self, ref_el, degree, variant=None):
-        splitting, _ = parse_lagrange_variant(variant, discontinuous=True)
+        splitting, _ = parse_lagrange_variant(variant, integral=True)
         if splitting is not None:
             ref_el = splitting(ref_el)
         poly_set = ONPolynomialSet(ref_el, degree)
@@ -132,7 +132,7 @@ class IntegratedLegendreDual(dual_set.DualSet):
 class IntegratedLegendre(finite_element.CiarletElement):
     """Simplicial continuous element with integrated Legendre polynomials."""
     def __init__(self, ref_el, degree, variant=None):
-        splitting, _ = parse_lagrange_variant(variant)
+        splitting, _ = parse_lagrange_variant(variant, integral=True)
         if splitting is not None:
             ref_el = splitting(ref_el)
         if degree < 1:
