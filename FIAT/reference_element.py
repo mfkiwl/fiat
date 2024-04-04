@@ -1541,3 +1541,11 @@ def compute_unflattening_map(topology_dict):
             unflattening_map[(flat_dim, flat_entity)] = (dim, entity)
 
     return unflattening_map
+
+
+def max_complex(complexes):
+    max_cell = max(complexes)
+    if all(max_cell >= b for b in complexes):
+        return max_cell
+    else:
+        return None
