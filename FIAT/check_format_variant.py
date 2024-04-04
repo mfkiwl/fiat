@@ -54,6 +54,7 @@ def parse_lagrange_variant(variant, discontinuous=False, integral=False):
 
     # defaults
     splitting = None
+    splitting_args = tuple()
     point_variant = supported_point_variants[default]
 
     for pre_opt in options:
@@ -65,7 +66,8 @@ def parse_lagrange_variant(variant, discontinuous=False, integral=False):
         elif opt.startswith("iso"):
             match = re.match(r"^iso(?:\((\d+)\))?$", opt)
             k, = match.groups()
-            splitting = lambda T: IsoSplit(T, int(k))
+            call_split = IsoSplit
+            splitting_args = (int(k),)
         elif opt in supported_point_variants:
             point_variant = supported_point_variants[opt]
         else:
@@ -73,4 +75,6 @@ def parse_lagrange_variant(variant, discontinuous=False, integral=False):
 
     if discontinuous and splitting is not None and point_variant in supported_cg_variants.values():
         raise ValueError("Illegal variant. DG macroelements with DOFs on subcell boundaries are not unisolvent.")
+    if len(splitting_args) > 0:
+        splitting = lambda T: call_split(T, *splitting_args, point_variant or "gll")
     return splitting, point_variant
