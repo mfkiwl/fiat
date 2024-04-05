@@ -309,22 +309,27 @@ class ExpansionSet(object):
             cell_node_map = polynomial_cell_node_map(self.ref_el, n, self.continuity)
             return self._cell_node_map_cache.setdefault(n, cell_node_map)
 
+    def _tabulate_on_cell(self, n, pts, order, cell=0, direction=None):
+        A, b = self.affine_mappings[cell]
+        ref_pts = apply_mapping(A, b, pts)
+        Jinv = A if direction is None else numpy.dot(A, direction)[:, None]
+        sd = self.ref_el.get_spatial_dimension()
+        phi = dubiner_recurrence(sd, n, order, ref_pts, Jinv,
+                                 self.scale, variant=self.variant)
+        if self.continuity == "C0":
+            phi = C0_basis(sd, n, phi)
+        return phi
+
     def _tabulate(self, n, pts, order=0):
         """A version of tabulate() that also works for a single point."""
-        phis = []
         cell_point_map = compute_cell_point_map(self.ref_el, pts)
-        sd = self.ref_el.get_spatial_dimension()
-        for ipts, (A, b) in zip(cell_point_map, self.affine_mappings):
-            ref_pts = apply_mapping(A, b, pts[:, ipts])
-            phi = dubiner_recurrence(sd, n, order, ref_pts, A,
-                                     self.scale, variant=self.variant)
-            if self.continuity == "C0":
-                phi = C0_basis(sd, n, phi)
-            phis.append(phi)
+        phis = [self._tabulate_on_cell(n, pts[:, ipts], order, cell=k)
+                for k, ipts in enumerate(cell_point_map)]
 
-        if len(self.affine_mappings) == 1:
+        if len(phis) == 1:
             return phis[0]
 
+        sd = self.ref_el.get_spatial_dimension()
         results = []
         num_phis = self.get_num_members(n)
         cell_node_map = self.get_cell_node_map(n)
@@ -335,6 +340,24 @@ class ExpansionSet(object):
                 result[numpy.ix_(ibfs, *shape_indices, ipts)] = phi[r]
             results.append(result)
         return tuple(results)
+
+    def tabulate_normal_derivative_jump(self, n, ref_pts, facet, order=1):
+        """Tabulate the normal derivative jump on refernece points on a facet"""
+        assert order == 1
+        sd = self.ref_el.get_spatial_dimension()
+        transform = self.ref_el.get_entity_transform(sd-1, facet)
+        pts = numpy.transpose(list(map(transform, ref_pts)))
+        cell_point_map = compute_cell_point_map(self.ref_el, pts)
+        cell_node_map = self.get_cell_node_map(n)
+
+        num_phis = self.get_num_members(n)
+        result = numpy.zeros((num_phis,) + pts.shape[1:])
+        for k, (ibfs, ipts) in enumerate(zip(cell_node_map, cell_point_map)):
+            if len(ipts) > 0:
+                normal = self.ref_el.compute_normal(facet, cell=k)
+                phi = self._tabulate_on_cell(n, pts[:, ipts], order, cell=k, direction=normal)
+                result[numpy.ix_(ibfs, ipts)] += numpy.asarray(phi[order])[:, 0, :]
+        return result
 
     def get_dmats(self, degree):
         """Returns a numpy array with the expansion coefficients dmat[k, j, i]

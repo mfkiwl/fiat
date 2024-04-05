@@ -298,7 +298,7 @@ class SimplicialComplex(Cell):
 
         super(SimplicialComplex, self).__init__(shape, vertices, topology)
 
-    def compute_normal(self, facet_i):
+    def compute_normal(self, facet_i, cell=None):
         """Returns the unit normal vector to facet i of codimension 1."""
 
         t = self.get_topology()
@@ -308,13 +308,13 @@ class SimplicialComplex(Cell):
         # Find a subcell of which facet_i is on the boundary
         # Note: this is trivial and vastly overengineered for the single-cell
         # case.
-        cell = next(k for k, facets in enumerate(self.connectivity[(sd, sd-1)])
-                    if facet_i in facets)
+        if cell is None:
+            cell = next(k for k, facets in enumerate(self.connectivity[(sd, sd-1)])
+                        if facet_i in facets)
         verts = numpy.asarray(self.get_vertices_of_subcomplex(t[sd][cell]))
-
         # Interval case
         if self.get_shape() == LINE:
-            v_i, = self.get_topology()[0][facet_i]
+            v_i = t[1][cell].index(t[0][facet_i][0])
             n = verts[v_i] - verts[[1, 0][v_i]]
             return n / numpy.linalg.norm(n)
 

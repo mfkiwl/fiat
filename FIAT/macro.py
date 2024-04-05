@@ -5,6 +5,7 @@ import numpy
 
 from FIAT.quadrature import FacetQuadratureRule, QuadratureRule
 from FIAT.reference_element import SimplicialComplex, lattice_iter, make_lattice
+from FIAT import expansions, polynomial_set
 
 
 def bary_to_xy(verts, bary, result=None):
@@ -285,3 +286,37 @@ class MacroQuadratureRule(QuadratureRule):
         pts = tuple(pts)
         wts = tuple(wts)
         super(MacroQuadratureRule, self).__init__(ref_el, pts, wts)
+
+
+class C1PolynomialSet(polynomial_set.PolynomialSet):
+    """Constructs a C1-continuous PolynomialSet on a simplicial complex.
+
+    :arg ref_el: The simplicial complex.
+    :arg degree: The polynomial degree.
+    """
+    def __init__(self, ref_el, degree):
+        from FIAT.quadrature_schemes import create_quadrature
+        expansion_set = expansions.ExpansionSet(ref_el, variant="bubble")
+
+        sd = ref_el.get_spatial_dimension()
+        facet_el = ref_el.construct_subelement(sd-1)
+
+        phi_deg = 0 if sd == 1 else degree-1
+        phi = polynomial_set.ONPolynomialSet(facet_el, phi_deg)
+        Q = create_quadrature(facet_el, 2 * phi_deg)
+        qpts, qwts = Q.get_points(), Q.get_weights()
+        phi_at_qpts = phi.tabulate(qpts)[(0,) * (sd-1)]
+        weights = numpy.multiply(phi_at_qpts, qwts)
+
+        rows = []
+        child_to_parent = ref_el.get_child_to_parent()
+        for facet in child_to_parent[sd-1]:
+            if child_to_parent[sd-1][facet][0] == sd:
+                jumps = expansion_set.tabulate_normal_derivative_jump(degree, qpts, facet)
+                rows.append(numpy.dot(weights, jumps.T))
+
+        dual_mat = numpy.row_stack(rows)
+        _, sig, vt = numpy.linalg.svd(dual_mat, full_matrices=True)
+        num_sv = len([s for s in sig if abs(s) > 1.e-10])
+        coeffs = vt[num_sv:]
+        super(C1PolynomialSet, self).__init__(ref_el, degree, degree, expansion_set, coeffs)
