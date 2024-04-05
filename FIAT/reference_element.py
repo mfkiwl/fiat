@@ -1580,4 +1580,4 @@ def max_complex(complexes):
     if all(max_cell >= b for b in complexes):
         return max_cell
     else:
-        return None
+        raise ValueError("Cannot find the maximal complex")

@@ -56,7 +56,7 @@ class Legendre(finite_element.CiarletElement):
     """Simplicial discontinuous element with Legendre polynomials."""
     def __new__(cls, ref_el, degree, variant=None):
         if degree == 0:
-            splitting, _ = parse_lagrange_variant(variant, discontinuous=True)
+            splitting, _ = parse_lagrange_variant(variant, integral=True)
             if splitting is None:
                 # FIXME P0 on the split requires implementing SplitSimplicialComplex.symmetry_group_size()
                 return P0.P0(ref_el)
