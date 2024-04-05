@@ -1252,6 +1252,18 @@ class UFCQuadrilateral(Cell):
         """Return the map indicating whether each possible cell orientation causes reflection (``1``) or not (``0``)."""
         return self.product.cell_orientation_reflection_map()
 
+    def __gt__(self, other):
+        return self.product > other
+
+    def __lt__(self, other):
+        return self.product < other
+
+    def __ge__(self, other):
+        return self.product >= other
+
+    def __le__(self, other):
+        return self.product <= other
+
 
 class UFCHexahedron(Cell):
     """This is the reference hexahedron with vertices
@@ -1344,6 +1356,18 @@ class UFCHexahedron(Cell):
     def cell_orientation_reflection_map(self):
         """Return the map indicating whether each possible cell orientation causes reflection (``1``) or not (``0``)."""
         return self.product.cell_orientation_reflection_map()
+
+    def __gt__(self, other):
+        return self.product > other
+
+    def __lt__(self, other):
+        return self.product < other
+
+    def __ge__(self, other):
+        return self.product >= other
+
+    def __le__(self, other):
+        return self.product <= other
 
 
 def make_affine_mapping(xs, ys):
