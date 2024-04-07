@@ -7,6 +7,7 @@ from FIAT.quadrature_schemes import create_quadrature
 from FIAT.reference_element import ufc_simplex
 from FIAT.expansions import polynomial_entity_ids, polynomial_cell_node_map
 from FIAT.polynomial_set import make_bubbles, PolynomialSet, ONPolynomialSet
+from FIAT.hsieh_clough_tocher import HsiehCloughTocher
 
 
 @pytest.fixture(params=("I", "T", "S"))
@@ -287,3 +288,25 @@ def test_C1_basis(cell):
     ref_el = AlfeldSplit(cell)
     P = C1PolynomialSet(ref_el, degree)
     print(P.expansion_set.get_num_members(degree), P.get_num_members())
+
+    child_to_parent = ref_el.get_child_to_parent()
+    sd = ref_el.get_spatial_dimension()
+    for facet in child_to_parent[sd-1]:
+        if child_to_parent[sd-1][facet][0] == sd:
+            pass
+            # TODO
+
+
+def test_HCT():
+    # FIXME move this test to its own file
+    ref_el = ufc_simplex(2)
+    fe = HsiehCloughTocher(ref_el)
+    degree = fe.degree()
+    assert degree == 3
+    assert fe.is_macroelement()
+    assert fe.space_dimension() == 12
+
+    order = 2
+    Q = create_quadrature(ref_el, 2*(degree-order))
+    pts = Q.get_points()
+    fe.tabulate(order, pts)
