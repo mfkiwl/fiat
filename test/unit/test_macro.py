@@ -7,7 +7,7 @@ from FIAT.quadrature_schemes import create_quadrature
 from FIAT.reference_element import ufc_simplex
 from FIAT.expansions import polynomial_entity_ids, polynomial_cell_node_map
 from FIAT.polynomial_set import make_bubbles, PolynomialSet, ONPolynomialSet
-from FIAT.hsieh_clough_tocher import HsiehCloughTocher
+from FIAT.hct import HsiehCloughTocher
 
 
 @pytest.fixture(params=("I", "T", "S"))

@@ -1,5 +1,6 @@
 from FIAT.functional import PointEvaluation, PointDerivative, IntegralMomentOfNormalDerivative
 from FIAT import finite_element, dual_set, macro, polynomial_set
+from FIAT.reference_element import ufc_simplex
 from FIAT.jacobi import eval_jacobi
 from FIAT.quadrature_schemes import create_quadrature
 
@@ -23,13 +24,10 @@ class HCTDualSet(dual_set.DualSet):
             nodes.extend(PointDerivative(ref_el, pt, alpha) for alpha in alphas)
             entity_ids[0][v].extend(range(cur, len(nodes)))
 
-        rline = ref_el.construct_subelement(1)
-        rline_verts = rline.get_vertices()
-        x0, = rline_verts[0]
-        x1, = rline_verts[1]
+        rline = ufc_simplex(1)
         Q = create_quadrature(rline, 2*(degree-1))
         qpts = Q.get_points()
-        leg2_at_qpts = eval_jacobi(0, 0, degree-1, 2.0*(qpts-x0)/(x1-x0) - 1)
+        leg2_at_qpts = eval_jacobi(0, 0, degree-1, 2.0*qpts - 1)
         for e in sorted(top[1]):
             cur = len(nodes)
             nodes.append(IntegralMomentOfNormalDerivative(ref_el, e, Q, leg2_at_qpts))
