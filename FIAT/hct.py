@@ -3,6 +3,7 @@ from FIAT import finite_element, dual_set, macro, polynomial_set
 from FIAT.reference_element import ufc_simplex
 from FIAT.jacobi import eval_jacobi
 from FIAT.quadrature_schemes import create_quadrature
+import numpy
 
 
 class HCTDualSet(dual_set.DualSet):
@@ -27,10 +28,10 @@ class HCTDualSet(dual_set.DualSet):
         rline = ufc_simplex(1)
         Q = create_quadrature(rline, 2*(degree-1))
         qpts = Q.get_points()
-        leg2_at_qpts = eval_jacobi(0, 0, degree-1, 2.0*qpts - 1)
+        scale = numpy.ones(qpts.shape)
         for e in sorted(top[1]):
             cur = len(nodes)
-            nodes.append(IntegralMomentOfNormalDerivative(ref_el, e, Q, leg2_at_qpts))
+            nodes.append(IntegralMomentOfNormalDerivative(ref_el, e, Q, scale))
             entity_ids[1][e].extend(range(cur, len(nodes)))
 
         return super(HCTDualSet, self).__init__(nodes, ref_el, entity_ids)
