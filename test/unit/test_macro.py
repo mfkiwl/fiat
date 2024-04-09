@@ -129,22 +129,46 @@ def test_macro_lagrange(variant, degree, split, cell):
     assert numpy.allclose(fe.V, V)
 
 
+def get_lagrange_points(fe):
+    points = []
+    for node in fe.dual_basis():
+        pt, = node.get_point_dict()
+        points.append(pt)
+    return points
+
+
+@pytest.mark.parametrize("degree", (1, 4,))
+@pytest.mark.parametrize("variant", ("equispaced", "gll"))
+def test_lagrange_alfeld_duals(cell, degree, variant):
+    Pk = Lagrange(cell, degree, variant=variant)
+    alfeld = Lagrange(AlfeldSplit(cell), degree, variant=variant)
+
+    Pk_dofs = Pk.entity_dofs()
+    alfeld_dofs = alfeld.entity_dofs()
+
+    Pk_pts = numpy.asarray(get_lagrange_points(Pk))
+    alfeld_pts = numpy.asarray(get_lagrange_points(alfeld))
+
+    sd = cell.get_dimension()
+    top = cell.get_topology()
+    for dim in sorted(top):
+        if dim == sd:
+            continue
+        for entity in sorted(top[dim]):
+            assert alfeld_dofs[dim][entity] == Pk_dofs[dim][entity]
+            assert numpy.allclose(Pk_pts[Pk_dofs[dim][entity]],
+                                  alfeld_pts[alfeld_dofs[dim][entity]])
+
+
 @pytest.mark.parametrize("degree", (1, 2,))
 def test_lagrange_iso_duals(cell, degree):
-    iso = Lagrange(IsoSplit(cell), degree, variant="equispaced")
     P2 = Lagrange(cell, 2*degree, variant="equispaced")
+    iso = Lagrange(IsoSplit(cell), degree, variant="equispaced")
 
-    def get_points(fe):
-        points = []
-        for node in fe.dual_basis():
-            pt, = node.get_point_dict()
-            points.append(pt)
-        return points
+    assert numpy.allclose(get_lagrange_points(iso), get_lagrange_points(P2))
 
-    assert numpy.allclose(get_points(iso), get_points(P2))
-
-    iso_ids = iso.entity_dofs()
     P2_ids = P2.entity_dofs()
+    iso_ids = iso.entity_dofs()
     for dim in iso_ids:
         for entity in iso_ids[dim]:
             assert iso_ids[dim][entity] == P2_ids[dim][entity]
