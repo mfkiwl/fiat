@@ -137,7 +137,16 @@ def get_lagrange_points(fe):
     return points
 
 
-@pytest.mark.parametrize("degree", (1, 4,))
+def make_mass_matrix(fe, order=0):
+    sd = fe.ref_el.get_spatial_dimension()
+    Q = create_quadrature(fe.ref_complex, 2*fe.degree())
+    qpts, qwts = Q.get_points(), Q.get_weights()
+    phi = fe.tabulate(order, qpts)[(0,) * sd]
+    M = numpy.dot(numpy.multiply(phi, qwts), phi.T)
+    return M
+
+
+@pytest.mark.parametrize("degree", (1, 2, 4,))
 @pytest.mark.parametrize("variant", ("equispaced", "gll"))
 def test_lagrange_alfeld_duals(cell, degree, variant):
     Pk = Lagrange(cell, degree, variant=variant)
@@ -158,6 +167,12 @@ def test_lagrange_alfeld_duals(cell, degree, variant):
             assert alfeld_dofs[dim][entity] == Pk_dofs[dim][entity]
             assert numpy.allclose(Pk_pts[Pk_dofs[dim][entity]],
                                   alfeld_pts[alfeld_dofs[dim][entity]])
+
+    phi = Pk.tabulate(0, alfeld_pts)[(0,) * sd]
+    M_Pk = make_mass_matrix(Pk)
+    M_alfeld = make_mass_matrix(alfeld)
+    M_galerkin = numpy.dot(numpy.dot(phi, M_alfeld), phi.T)
+    assert numpy.allclose(M_Pk, M_galerkin)
 
 
 @pytest.mark.parametrize("degree", (1, 2,))
@@ -238,6 +253,14 @@ def test_make_bubbles(cell, split, codim):
     interior_values = values[:, num_pts_on_facet:]
     assert numpy.linalg.matrix_rank(interior_values.T, tol=1E-12) == num_members
 
+    # test block diagonal tabulation
+    bubbles_per_entity = num_members // len(top[sd-codim])
+    for entity in top[sd-codim]:
+        i0 = entity * bubbles_per_entity
+        i1 = (entity+1) * bubbles_per_entity
+        assert numpy.allclose(interior_values[i0:i1, :i0], 0, atol=1E-12)
+        assert numpy.allclose(interior_values[i0:i1, i1:], 0, atol=1E-12)
+
     # test trace similarity
     dim = sd - codim
     nfacets = len(top[dim])
@@ -247,12 +270,14 @@ def test_make_bubbles(cell, split, codim):
         ref_points = ref_facet.make_points(dim, 0, degree)
         ref_values = ref_bubbles.tabulate(ref_points)[(0,) * dim]
 
+        scale = None
         bubbles_per_entity = ref_bubbles.get_num_members()
         cur = 0
         for entity in sorted(top[dim]):
             indices = list(range(cur, cur + bubbles_per_entity))
             cur_values = interior_values[numpy.ix_(indices, indices)]
-            scale = numpy.max(abs(cur_values)) / numpy.max(abs(ref_values))
+            if scale is None:
+                scale = numpy.max(abs(cur_values)) / numpy.max(abs(ref_values))
             assert numpy.allclose(ref_values * scale, cur_values)
             cur += bubbles_per_entity
 

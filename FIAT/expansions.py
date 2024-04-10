@@ -162,10 +162,9 @@ def dubiner_recurrence(dim, n, order, ref_pts, Jinv, scale, variant=None):
             if variant is not None:
                 p = index[-1] + shift
                 alpha = 2 * (sum(index[:-1]) + d * shift) - 1
-                norm2 = 1.0
+                norm2 = (2*d+1) / (2*d)
                 if p > 0 and p + alpha > 0:
-                    norm2 = (p + alpha) * (2*p + alpha) / p
-                    norm2 *= (2*d+1) / (2*d)
+                    norm2 *= (p + alpha) * (2*p + alpha) / p
             else:
                 norm2 = (2*sum(index) + d) / d
             scale = math.sqrt(norm2)
