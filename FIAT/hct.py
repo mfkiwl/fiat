@@ -25,7 +25,7 @@ class HCTDualSet(dual_set.DualSet):
             entity_ids[0][v].extend(range(cur, len(nodes)))
 
         rline = ufc_simplex(1)
-        Q = create_quadrature(rline, 2*(degree-1))
+        Q = create_quadrature(rline, degree-1)
         qpts = Q.get_points()
         scale = numpy.ones(qpts.shape)
         for e in sorted(top[1]):
