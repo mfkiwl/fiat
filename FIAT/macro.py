@@ -335,10 +335,13 @@ class CkPolynomialSet(polynomial_set.PolynomialSet):
                 dimPk = 1 if sd == 1 else expansions.polynomial_dimension(facet_el, degree - r)
                 rows.append(numpy.dot(weights[:dimPk], jumps[r].T))
 
-        dual_mat = numpy.row_stack(rows)
-        _, sig, vt = numpy.linalg.svd(dual_mat, full_matrices=True)
-        num_sv = len([s for s in sig if abs(s) > 1.e-10])
-        coeffs = vt[num_sv:]
+        if len(rows) == 0:
+            coeffs = numpy.eye(expansion_set.get_num_members(degree))
+        else:
+            dual_mat = numpy.row_stack(rows)
+            _, sig, vt = numpy.linalg.svd(dual_mat, full_matrices=True)
+            num_sv = len([s for s in sig if abs(s) > 1.e-10])
+            coeffs = vt[num_sv:]
 
         if shape != tuple():
             m, n = coeffs.shape

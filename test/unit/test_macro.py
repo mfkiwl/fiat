@@ -331,9 +331,9 @@ def test_macro_expansion(cell, split, variant, degree):
             assert numpy.allclose(cell_values[alpha], values[alpha][indices])
 
 
+@pytest.mark.parametrize("order", (0, 1))
 @pytest.mark.parametrize("variant", (None, "bubble"))
 @pytest.mark.parametrize("degree", (1, 4))
-@pytest.mark.parametrize("order", (0, 1))
 def test_Ck_basis(cell, order, degree, variant):
     # Test that we can correctly tabulate on points on facets.
     # This breaks if we were binning points into more than one cell.
@@ -341,12 +341,11 @@ def test_Ck_basis(cell, order, degree, variant):
     A = AlfeldSplit(cell)
     Ck = CkPolynomialSet(A, degree, order=order, variant=variant)
     U = Ck.get_expansion_set()
+    cell_node_map = U.get_cell_node_map(degree)
 
     sd = A.get_spatial_dimension()
     top = A.get_topology()
     coeffs = Ck.get_coeffs()
-    coeffs = coeffs.reshape((Ck.get_num_members(), len(top[sd]), -1))
-
     phis = Ck.tabulate(A.get_vertices())[(0,)*sd]
 
     for cell in top[sd]:
@@ -354,5 +353,5 @@ def test_Ck_basis(cell, order, degree, variant):
         verts = A.get_vertices_of_subcomplex(top[sd][cell])
         pts = numpy.transpose(verts)
         Uvals, = U._tabulate_on_cell(degree, pts, 0, cell=cell)
-        local_phis = numpy.dot(coeffs[:, cell, :], Uvals)
+        local_phis = numpy.dot(coeffs[:, cell_node_map[cell]], Uvals)
         assert numpy.allclose(local_phis, phis[:, ipts])
