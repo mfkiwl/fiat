@@ -42,5 +42,5 @@ class HsiehCloughTocher(finite_element.CiarletElement):
 
     def __init__(self, ref_el, degree=3):
         dual = HCTDualSet(ref_el, degree)
-        poly_set = macro.C1PolynomialSet(macro.AlfeldSplit(ref_el), degree)
+        poly_set = macro.C1PolynomialSet(macro.AlfeldSplit(ref_el), degree, variant="bubble")
         super(HsiehCloughTocher, self).__init__(poly_set, dual, degree)

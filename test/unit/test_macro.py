@@ -334,12 +334,9 @@ def test_macro_expansion(cell, split, variant, degree):
 def test_C1_basis(cell):
     degree = 3
     ref_el = AlfeldSplit(cell)
-    P = C1PolynomialSet(ref_el, degree, shape=(2,))
+    P = C1PolynomialSet(ref_el, degree)
     print(P.expansion_set.get_num_members(degree), P.get_num_members())
 
-    child_to_parent = ref_el.get_child_to_parent()
-    sd = ref_el.get_spatial_dimension()
-    for facet in child_to_parent[sd-1]:
-        if child_to_parent[sd-1][facet][0] == sd:
-            pass
-            # TODO
+    for facet in ref_el.get_interior_facets():
+        pass
+        # TODO

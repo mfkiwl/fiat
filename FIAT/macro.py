@@ -301,14 +301,15 @@ class C1PolynomialSet(polynomial_set.PolynomialSet):
     :arg ref_el: The simplicial complex.
     :arg degree: The polynomial degree.
     """
-    def __init__(self, ref_el, degree, shape=()):
+    def __init__(self, ref_el, degree, order=1, shape=(), **kwargs):
         from FIAT.quadrature_schemes import create_quadrature
-        expansion_set = expansions.ExpansionSet(ref_el, variant="bubble")
+        expansion_set = expansions.ExpansionSet(ref_el, **kwargs)
+        k = 1 if expansion_set.continuity == "C0" else 0
 
         sd = ref_el.get_spatial_dimension()
         facet_el = ref_el.construct_subelement(sd-1)
 
-        phi_deg = 0 if sd == 1 else degree-1
+        phi_deg = 0 if sd == 1 else degree - k
         phi = polynomial_set.ONPolynomialSet(facet_el, phi_deg)
         Q = create_quadrature(facet_el, 2 * phi_deg)
         qpts, qwts = Q.get_points(), Q.get_weights()
@@ -316,9 +317,10 @@ class C1PolynomialSet(polynomial_set.PolynomialSet):
         weights = numpy.multiply(phi_at_qpts, qwts)
 
         rows = []
-        for facet in ref_el.get_interior_facets(sd-1):
-            jumps = expansion_set.tabulate_normal_derivative_jump(degree, qpts, facet)
-            rows.append(numpy.dot(weights, jumps.T))
+        for r in range(k, order+1):
+            for facet in ref_el.get_interior_facets(sd-1):
+                jumps = expansion_set.tabulate_normal_derivative_jump(degree, qpts, facet, order=r)
+                rows.append(numpy.dot(weights, jumps.T))
 
         dual_mat = numpy.row_stack(rows)
         _, sig, vt = numpy.linalg.svd(dual_mat, full_matrices=True)
