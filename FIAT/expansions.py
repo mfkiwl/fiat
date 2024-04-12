@@ -340,25 +340,37 @@ class ExpansionSet(object):
             results.append(result)
         return tuple(results)
 
-    def tabulate_normal_derivative_jump(self, n, ref_pts, facet, order=1):
-        """Tabulate the normal derivative jump on refernece points on a facet"""
+    def tabulate_normal_jumps(self, n, ref_pts, facet, order=0):
+        """Tabulates the normal derivative jumps on reference points on a facet.
+
+        :arg n: the polynomial degree.
+        :arg ref_pts: an iterable of points on the reference facet.
+        :arg facet: the facet id.
+        :kwarg order: the order of differentiation.
+
+        :returns: a numpy array of tabulations of normal derivative jumps.
+        """
         sd = self.ref_el.get_spatial_dimension()
         transform = self.ref_el.get_entity_transform(sd-1, facet)
         pts = numpy.transpose(list(map(transform, ref_pts)))
         cell_point_map = compute_cell_point_map(self.ref_el, pts, unique=False)
         cell_node_map = self.get_cell_node_map(n)
 
+        num_jumps = order + 1
         num_phis = self.get_num_members(n)
-        result = numpy.zeros((num_phis,) + pts.shape[1:])
+        results = numpy.zeros((num_jumps, num_phis) + pts.shape[1:])
         for k, (ibfs, ipts) in enumerate(zip(cell_node_map, cell_point_map)):
             if len(ipts) > 0:
                 normal = self.ref_el.compute_normal(facet, cell=k)
+                side = numpy.dot(normal, self.ref_el.compute_normal(facet))
                 phi = self._tabulate_on_cell(n, pts[:, ipts], order, cell=k, direction=normal)
-                V = numpy.reshape(phi[order], (len(ibfs), len(ipts)))
-                if order % 2 == 0:
-                    V *= numpy.dot(normal, self.ref_el.compute_normal(facet))
-                result[numpy.ix_(ibfs, ipts)] += V
-        return result
+                for r in range(order+1):
+                    V = numpy.reshape(phi[r], (len(ibfs), len(ipts)))
+                    if r % 2 == 0 and side < 0:
+                        results[r][numpy.ix_(ibfs, ipts)] -= V
+                    else:
+                        results[r][numpy.ix_(ibfs, ipts)] += V
+        return results
 
     def get_dmats(self, degree):
         """Returns a numpy array with the expansion coefficients dmat[k, j, i]
@@ -375,7 +387,7 @@ class ExpansionSet(object):
             return cache.setdefault(key, numpy.zeros((self.ref_el.get_spatial_dimension(), 1, 1), "d"))
 
         if self.ref_el.is_macrocell() and self.continuity is not None:
-            raise ValueError("Cannot create a differenation matrix on a continuous macroelement.")
+            raise ValueError("Cannot create a differentiation matrix on a continuous macroelement.")
         sd = self.ref_el.get_spatial_dimension()
         top = self.ref_el.get_topology()
         pts = []

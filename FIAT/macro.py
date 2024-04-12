@@ -295,11 +295,15 @@ class MacroQuadratureRule(QuadratureRule):
         super(MacroQuadratureRule, self).__init__(ref_el, pts, wts)
 
 
-class C1PolynomialSet(polynomial_set.PolynomialSet):
-    """Constructs a C1-continuous PolynomialSet on a simplicial complex.
+class CkPolynomialSet(polynomial_set.PolynomialSet):
+    """Constructs a C^k-continuous PolynomialSet on a simplicial complex.
 
     :arg ref_el: The simplicial complex.
     :arg degree: The polynomial degree.
+    :kwarg order: The differentiation order of continuity across subcells.
+    :kwarg shape: The value shape.
+    :kwarg variant: The variant for the underlying ExpansionSet.
+    :kwarg scale: The scale for the underlying ExpansionSet.
     """
     def __init__(self, ref_el, degree, order=1, shape=(), **kwargs):
         from FIAT.quadrature_schemes import create_quadrature
@@ -317,10 +321,11 @@ class C1PolynomialSet(polynomial_set.PolynomialSet):
         weights = numpy.multiply(phi_at_qpts, qwts)
 
         rows = []
-        for r in range(k, order+1):
-            for facet in ref_el.get_interior_facets(sd-1):
-                jumps = expansion_set.tabulate_normal_derivative_jump(degree, qpts, facet, order=r)
-                rows.append(numpy.dot(weights, jumps.T))
+        for facet in ref_el.get_interior_facets(sd-1):
+            jumps = expansion_set.tabulate_normal_jumps(degree, qpts, facet, order=order)
+            for r in range(k, order+1):
+                dimPk = 1 if sd == 1 else expansions.polynomial_dimension(facet_el, degree - r)
+                rows.append(numpy.dot(weights[:dimPk], jumps[r].T))
 
         dual_mat = numpy.row_stack(rows)
         _, sig, vt = numpy.linalg.svd(dual_mat, full_matrices=True)
@@ -332,4 +337,4 @@ class C1PolynomialSet(polynomial_set.PolynomialSet):
             coeffs = coeffs.reshape((m,) + (1,)*len(shape) + (n,))
             coeffs = numpy.tile(coeffs, (1,) + shape + (1,))
 
-        super(C1PolynomialSet, self).__init__(ref_el, degree, degree, expansion_set, coeffs)
+        super(CkPolynomialSet, self).__init__(ref_el, degree, degree, expansion_set, coeffs)

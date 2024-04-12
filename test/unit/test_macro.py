@@ -2,7 +2,7 @@ import math
 import numpy
 import pytest
 from FIAT import DiscontinuousLagrange, Lagrange, Legendre, P0
-from FIAT.macro import AlfeldSplit, IsoSplit, C1PolynomialSet
+from FIAT.macro import AlfeldSplit, IsoSplit, CkPolynomialSet
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.reference_element import ufc_simplex
 from FIAT.expansions import polynomial_entity_ids, polynomial_cell_node_map
@@ -334,7 +334,7 @@ def test_macro_expansion(cell, split, variant, degree):
 def test_C1_basis(cell):
     degree = 3
     ref_el = AlfeldSplit(cell)
-    P = C1PolynomialSet(ref_el, degree)
+    P = CkPolynomialSet(ref_el, degree)
     print(P.expansion_set.get_num_members(degree), P.get_num_members())
 
     sd = ref_el.get_spatial_dimension()
