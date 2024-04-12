@@ -331,13 +331,28 @@ def test_macro_expansion(cell, split, variant, degree):
             assert numpy.allclose(cell_values[alpha], values[alpha][indices])
 
 
-def test_C1_basis(cell):
-    degree = 3
-    ref_el = AlfeldSplit(cell)
-    P = CkPolynomialSet(ref_el, degree)
-    print(P.expansion_set.get_num_members(degree), P.get_num_members())
+@pytest.mark.parametrize("variant", (None, "bubble"))
+@pytest.mark.parametrize("degree", (1, 4))
+@pytest.mark.parametrize("order", (0, 1))
+def test_Ck_basis(cell, order, degree, variant):
+    # Test that we can correctly tabulate on points on facets.
+    # This breaks if we were binning points into more than one cell.
+    # It suffices to tabulate on the vertices of the simplicial complex.
+    A = AlfeldSplit(cell)
+    Ck = CkPolynomialSet(A, degree, order=order)
+    U = Ck.get_expansion_set()
 
-    sd = ref_el.get_spatial_dimension()
-    for facet in ref_el.get_interior_facets(sd-1):
-        pass
-        # TODO
+    sd = A.get_spatial_dimension()
+    top = A.get_topology()
+    coeffs = Ck.get_coeffs()
+    coeffs = coeffs.reshape((Ck.get_num_members(), len(top[sd]), -1))
+
+    phis = Ck.tabulate(A.get_vertices())[(0,)*sd]
+
+    for cell in top[sd]:
+        ipts = list(top[sd][cell])
+        verts = A.get_vertices_of_subcomplex(top[sd][cell])
+        pts = numpy.transpose(verts)
+        Uvals, = U._tabulate_on_cell(degree, pts, 0, cell=cell)
+        local_phis = numpy.dot(coeffs[:, cell, :], Uvals)
+        assert numpy.allclose(local_phis, phis[:, ipts])
