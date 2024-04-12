@@ -345,7 +345,7 @@ class ExpansionSet(object):
         sd = self.ref_el.get_spatial_dimension()
         transform = self.ref_el.get_entity_transform(sd-1, facet)
         pts = numpy.transpose(list(map(transform, ref_pts)))
-        cell_point_map = compute_cell_point_map(self.ref_el, pts)
+        cell_point_map = compute_cell_point_map(self.ref_el, pts, unique=False)
         cell_node_map = self.get_cell_node_map(n)
 
         num_phis = self.get_num_members(n)
@@ -354,7 +354,7 @@ class ExpansionSet(object):
             if len(ipts) > 0:
                 normal = self.ref_el.compute_normal(facet, cell=k)
                 phi = self._tabulate_on_cell(n, pts[:, ipts], order, cell=k, direction=normal)
-                V = numpy.asarray(phi[order]).reshape((len(ibfs), len(ipts)))
+                V = numpy.reshape(phi[order], (len(ibfs), len(ipts)))
                 if order % 2 == 0:
                     V *= numpy.dot(normal, self.ref_el.compute_normal(facet))
                 result[numpy.ix_(ibfs, ipts)] += V
@@ -573,11 +573,12 @@ def polynomial_cell_node_map(ref_el, n, continuity=None):
     return cell_node_map
 
 
-def compute_cell_point_map(ref_el, pts, tol=1E-12):
+def compute_cell_point_map(ref_el, pts, unique=True, tol=1E-12):
     """Maps cells on a simplicial complex to points.
 
     :arg ref_el: a SimplicialComplex.
     :arg pts: a column-stacked array of physical coordinates.
+    :kwarg unique: Do we want facet points to have a unique bin?
     :kwarg tol: the absolute tolerance.
     :returns: a numpy array mapping cell id to points located on that cell.
     """
@@ -586,17 +587,22 @@ def compute_cell_point_map(ref_el, pts, tol=1E-12):
     if len(top[sd]) == 1:
         return (Ellipsis,)
 
+    binned_pts = []
     low, high = -tol, 1 + tol
     bins = []
     ref_vertices = reference_element.ufc_simplex(sd).get_vertices()
-    for entity in top[sd]:
-        vertices = ref_el.get_vertices_of_subcomplex(top[sd][entity])
-        A, b = reference_element.make_affine_mapping(vertices, ref_vertices)
+    for cell in top[sd]:
+        verts = ref_el.get_vertices_of_subcomplex(top[sd][cell])
+        A, b = reference_element.make_affine_mapping(verts, ref_vertices)
         if sd > 1:
             A = numpy.vstack((A, numpy.sum(A, axis=0)))
             b = numpy.hstack((b, numpy.sum(b, axis=0)))
         x = numpy.dot(A, pts) + b[:, None]
 
         pts_on_cell = numpy.all(numpy.logical_and(x >= low, x <= high), axis=0)
-        bins.append(numpy.where(pts_on_cell)[0])
+        ipts = numpy.where(pts_on_cell)[0]
+        if unique:
+            ipts = numpy.setdiff1d(ipts, binned_pts)
+            binned_pts.extend(ipts)
+        bins.append(ipts)
     return bins
