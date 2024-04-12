@@ -519,7 +519,7 @@ class TetrahedronExpansionSet(ExpansionSet):
 
 def polynomial_dimension(ref_el, n, continuity=None):
     """Returns the dimension of the space of polynomials of degree no
-    greater than n on the reference element."""
+    greater than n on the reference complex."""
     if ref_el.get_shape() == reference_element.POINT:
         if n > 0:
             raise ValueError("Only degree zero polynomials supported on point elements.")
@@ -534,7 +534,7 @@ def polynomial_dimension(ref_el, n, continuity=None):
 
 
 def polynomial_entity_ids(ref_el, n, continuity=None):
-    """Maps facets to members of a polynomial basis.
+    """Maps entites of a cell complex to members of a polynomial basis.
 
     :arg ref_el: a SimplicialComplex.
     :arg n: the polynomial degree of the expansion set.

@@ -269,6 +269,7 @@ class Cell(object):
         return False
 
     def get_parent(self):
+        """Return the parent cell if this cell is a split and None otherwise."""
         return None
 
     def __gt__(self, other):

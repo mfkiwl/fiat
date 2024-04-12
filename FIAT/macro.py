@@ -140,6 +140,15 @@ class SplitSimplicialComplex(SimplicialComplex):
         """
         return self._cell_connectivity
 
+    def get_interior_facets(self, dim):
+        """Returns the dim-dimensional facets supported on the parent's interior.
+        """
+        sd = self.get_spatial_dimension()
+        child_to_parent = self.get_child_to_parent()
+        interior_facets = [facet for facet in child_to_parent[dim]
+                           if child_to_parent[dim][facet][0] == sd]
+        return interior_facets
+
     def construct_subelement(self, dimension):
         """Constructs the reference element of a cell subentity
         specified by subelement dimension.
@@ -153,13 +162,6 @@ class SplitSimplicialComplex(SimplicialComplex):
 
     def get_parent(self):
         return self._parent
-
-    def get_interior_facets(self, dim):
-        sd = self.get_spatial_dimension()
-        child_to_parent = self.get_child_to_parent()
-        interior_facets = [facet for facet in child_to_parent[dim]
-                           if child_to_parent[dim][facet][0] == sd]
-        return interior_facets
 
 
 class AlfeldSplit(SplitSimplicialComplex):
@@ -189,6 +191,9 @@ class AlfeldSplit(SplitSimplicialComplex):
         super(AlfeldSplit, self).__init__(ref_el, new_verts, new_topology)
 
     def construct_subcomplex(self, dimension):
+        """Constructs the reference subcomplex of the parent cell subentity
+        specified by subcomplex dimension.
+        """
         if dimension == self.get_dimension():
             return self
         # Alfed on facets is just a simplex
@@ -251,6 +256,9 @@ class IsoSplit(SplitSimplicialComplex):
         super(IsoSplit, self).__init__(ref_el, new_verts, new_topology)
 
     def construct_subcomplex(self, dimension):
+        """Constructs the reference subcomplex of the parent cell subentity
+        specified by subcomplex dimension.
+        """
         if dimension == self.get_dimension():
             return self
         ref_el = self.construct_subelement(dimension)
