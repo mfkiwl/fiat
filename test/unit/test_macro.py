@@ -337,6 +337,7 @@ def test_C1_basis(cell):
     P = C1PolynomialSet(ref_el, degree)
     print(P.expansion_set.get_num_members(degree), P.get_num_members())
 
-    for facet in ref_el.get_interior_facets():
+    sd = ref_el.get_spatial_dimension()
+    for facet in ref_el.get_interior_facets(sd-1):
         pass
         # TODO
