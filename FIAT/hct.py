@@ -1,4 +1,5 @@
-from FIAT.functional import PointEvaluation, PointDerivative, IntegralMomentOfNormalDerivative
+from FIAT.functional import (PointEvaluation, PointDerivative,
+                             IntegralMomentOfNormalDerivative)
 from FIAT import finite_element, dual_set, macro, polynomial_set
 from FIAT.reference_element import ufc_simplex
 from FIAT.quadrature_schemes import create_quadrature

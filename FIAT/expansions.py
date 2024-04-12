@@ -342,7 +342,6 @@ class ExpansionSet(object):
 
     def tabulate_normal_derivative_jump(self, n, ref_pts, facet, order=1):
         """Tabulate the normal derivative jump on refernece points on a facet"""
-        assert order == 1
         sd = self.ref_el.get_spatial_dimension()
         transform = self.ref_el.get_entity_transform(sd-1, facet)
         pts = numpy.transpose(list(map(transform, ref_pts)))
@@ -355,7 +354,10 @@ class ExpansionSet(object):
             if len(ipts) > 0:
                 normal = self.ref_el.compute_normal(facet, cell=k)
                 phi = self._tabulate_on_cell(n, pts[:, ipts], order, cell=k, direction=normal)
-                result[numpy.ix_(ibfs, ipts)] += numpy.asarray(phi[order])[:, 0, :]
+                V = numpy.asarray(phi[order]).reshape((len(ibfs), len(ipts)))
+                if order % 2 == 0:
+                    V *= numpy.dot(normal, self.ref_el.compute_normal(facet))
+                result[numpy.ix_(ibfs, ipts)] += V
         return result
 
     def get_dmats(self, degree):
@@ -371,7 +373,15 @@ class ExpansionSet(object):
             pass
         if degree == 0:
             return cache.setdefault(key, numpy.zeros((self.ref_el.get_spatial_dimension(), 1, 1), "d"))
-        pts = reference_element.make_lattice(self.ref_el.get_vertices(), degree, variant="gl")
+
+        if self.ref_el.is_macrocell() and self.continuity is not None:
+            raise ValueError("Cannot create a differenation matrix on a continuous macroelement.")
+        sd = self.ref_el.get_spatial_dimension()
+        top = self.ref_el.get_topology()
+        pts = []
+        for cell in top[sd]:
+            verts = self.ref_el.get_vertices_of_subcomplex(top[sd][cell])
+            pts.extend(reference_element.make_lattice(verts, degree, variant="gl"))
         v, dv = self._tabulate(degree, numpy.transpose(pts), order=1)
         dv = numpy.transpose(dv, (1, 2, 0))
         dmats = numpy.linalg.solve(numpy.transpose(v), dv)

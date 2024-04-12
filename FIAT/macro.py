@@ -154,6 +154,13 @@ class SplitSimplicialComplex(SimplicialComplex):
     def get_parent(self):
         return self._parent
 
+    def get_interior_facets(self, dim):
+        sd = self.get_spatial_dimension()
+        child_to_parent = self.get_child_to_parent()
+        interior_facets = [facet for facet in child_to_parent[dim]
+                           if child_to_parent[dim][facet][0] == sd]
+        return interior_facets
+
 
 class AlfeldSplit(SplitSimplicialComplex):
     """Splits a simplex into the simplicial complex obtained by
@@ -294,7 +301,7 @@ class C1PolynomialSet(polynomial_set.PolynomialSet):
     :arg ref_el: The simplicial complex.
     :arg degree: The polynomial degree.
     """
-    def __init__(self, ref_el, degree):
+    def __init__(self, ref_el, degree, shape=()):
         from FIAT.quadrature_schemes import create_quadrature
         expansion_set = expansions.ExpansionSet(ref_el, variant="bubble")
 
@@ -309,14 +316,18 @@ class C1PolynomialSet(polynomial_set.PolynomialSet):
         weights = numpy.multiply(phi_at_qpts, qwts)
 
         rows = []
-        child_to_parent = ref_el.get_child_to_parent()
-        for facet in child_to_parent[sd-1]:
-            if child_to_parent[sd-1][facet][0] == sd:
-                jumps = expansion_set.tabulate_normal_derivative_jump(degree, qpts, facet)
-                rows.append(numpy.dot(weights, jumps.T))
+        for facet in ref_el.get_interior_facets(sd-1):
+            jumps = expansion_set.tabulate_normal_derivative_jump(degree, qpts, facet)
+            rows.append(numpy.dot(weights, jumps.T))
 
         dual_mat = numpy.row_stack(rows)
         _, sig, vt = numpy.linalg.svd(dual_mat, full_matrices=True)
         num_sv = len([s for s in sig if abs(s) > 1.e-10])
         coeffs = vt[num_sv:]
+
+        if shape != tuple():
+            m, n = coeffs.shape
+            coeffs = coeffs.reshape((m,) + (1,)*len(shape) + (n,))
+            coeffs = numpy.tile(coeffs, (1,) + shape + (1,))
+
         super(C1PolynomialSet, self).__init__(ref_el, degree, degree, expansion_set, coeffs)
