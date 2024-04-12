@@ -339,7 +339,7 @@ def test_Ck_basis(cell, order, degree, variant):
     # This breaks if we were binning points into more than one cell.
     # It suffices to tabulate on the vertices of the simplicial complex.
     A = AlfeldSplit(cell)
-    Ck = CkPolynomialSet(A, degree, order=order)
+    Ck = CkPolynomialSet(A, degree, order=order, variant=variant)
     U = Ck.get_expansion_set()
 
     sd = A.get_spatial_dimension()
