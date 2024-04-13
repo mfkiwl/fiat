@@ -162,7 +162,7 @@ def dubiner_recurrence(dim, n, order, ref_pts, Jinv, scale, variant=None):
             if variant is not None:
                 p = index[-1] + shift
                 alpha = 2 * (sum(index[:-1]) + d * shift) - 1
-                norm2 = (2*d+1) / (2*d)
+                norm2 = (0.5 + d) / d
                 if p > 0 and p + alpha > 0:
                     norm2 *= (p + alpha) * (2*p + alpha) / p
             else:
@@ -246,7 +246,7 @@ def xi_tetrahedron(eta):
 
 
 def apply_mapping(A, b, pts):
-    """Apply an affine mapping to an column-stacked array of points."""
+    """Apply an affine mapping to a column-stacked array of points."""
     if isinstance(pts, numpy.ndarray) and len(pts.shape) == 2:
         return numpy.dot(A, pts) + b[:, None]
     else:
@@ -308,7 +308,7 @@ class ExpansionSet(object):
             cell_node_map = polynomial_cell_node_map(self.ref_el, n, self.continuity)
             return self._cell_node_map_cache.setdefault(n, cell_node_map)
 
-    def _tabulate_on_cell(self, n, pts, order, cell=0, direction=None):
+    def _tabulate_on_cell(self, n, pts, order=0, cell=0, direction=None):
         A, b = self.affine_mappings[cell]
         ref_pts = apply_mapping(A, b, pts)
         Jinv = A if direction is None else numpy.dot(A, direction)[:, None]
@@ -356,20 +356,20 @@ class ExpansionSet(object):
         cell_point_map = compute_cell_point_map(self.ref_el, pts, unique=False)
         cell_node_map = self.get_cell_node_map(n)
 
-        num_jumps = order + 1
         num_phis = self.get_num_members(n)
-        results = numpy.zeros((num_jumps, num_phis) + pts.shape[1:])
+        results = numpy.zeros((order+1, num_phis) + pts.shape[1:])
         for k, (ibfs, ipts) in enumerate(zip(cell_node_map, cell_point_map)):
             if len(ipts) > 0:
                 normal = self.ref_el.compute_normal(facet, cell=k)
                 side = numpy.dot(normal, self.ref_el.compute_normal(facet))
                 phi = self._tabulate_on_cell(n, pts[:, ipts], order, cell=k, direction=normal)
+                indices = numpy.ix_(ibfs, ipts)
                 for r in range(order+1):
                     V = numpy.reshape(phi[r], (len(ibfs), len(ipts)))
                     if r % 2 == 0 and side < 0:
-                        results[r][numpy.ix_(ibfs, ipts)] -= V
+                        results[r][indices] -= V
                     else:
-                        results[r][numpy.ix_(ibfs, ipts)] += V
+                        results[r][indices] += V
         return results
 
     def get_dmats(self, degree):
@@ -418,8 +418,7 @@ class ExpansionSet(object):
         # Only use dmats if tabulate failed
         for i in range(lorder, order + 1):
             dmats = self.get_dmats(degree)
-            alphas = mis(D, i)
-            for alpha in alphas:
+            for alpha in mis(D, i):
                 base_alpha = next(a for a in result if sum(a) == i-1 and distance(alpha, a) == 1)
                 vals = result[base_alpha]
                 for dmat, start, end in zip(dmats, base_alpha, alpha):
@@ -590,7 +589,7 @@ def compute_cell_point_map(ref_el, pts, unique=True, tol=1E-12):
 
     :arg ref_el: a SimplicialComplex.
     :arg pts: a column-stacked array of physical coordinates.
-    :kwarg unique: Do we want facet points to have a unique bin?
+    :kwarg unique: Are we assigning a unique cell to points on facets?
     :kwarg tol: the absolute tolerance.
     :returns: a numpy array mapping cell id to points located on that cell.
     """
@@ -599,22 +598,20 @@ def compute_cell_point_map(ref_el, pts, unique=True, tol=1E-12):
     if len(top[sd]) == 1:
         return (Ellipsis,)
 
-    binned_pts = []
-    low, high = -tol, 1 + tol
-    bins = []
+    cell_point_map = []
     ref_vertices = reference_element.ufc_simplex(sd).get_vertices()
     for cell in top[sd]:
         verts = ref_el.get_vertices_of_subcomplex(top[sd][cell])
         A, b = reference_element.make_affine_mapping(verts, ref_vertices)
-        if sd > 1:
-            A = numpy.vstack((A, numpy.sum(A, axis=0)))
-            b = numpy.hstack((b, numpy.sum(b, axis=0)))
+        A = numpy.vstack((A, -numpy.sum(A, axis=0)))
+        b = numpy.hstack((b, 1-numpy.sum(b, axis=0)))
         x = numpy.dot(A, pts) + b[:, None]
 
-        pts_on_cell = numpy.all(numpy.logical_and(x >= low, x <= high), axis=0)
-        ipts = numpy.where(pts_on_cell)[0]
+        # Bin points based on l1 distance
+        pts_on_cell = abs(numpy.sum(abs(x) - x, axis=0)) < 2*tol
         if unique:
-            ipts = numpy.setdiff1d(ipts, binned_pts)
-            binned_pts.extend(ipts)
-        bins.append(ipts)
-    return bins
+            for other in cell_point_map:
+                pts_on_cell[other] = False
+        ipts = numpy.where(pts_on_cell)[0]
+        cell_point_map.append(ipts)
+    return cell_point_map

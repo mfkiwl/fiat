@@ -121,6 +121,12 @@ class SplitSimplicialComplex(SimplicialComplex):
                     connectivity[cell][dim].append(inv_top[dim][global_verts])
         self._cell_connectivity = connectivity
 
+        # dict mapping subentity dimension to interior facets
+        interior_facets = {dim: [entity for entity in child_to_parent[dim]
+                                 if child_to_parent[dim][entity][0] == sd]
+                           for dim in sorted(child_to_parent)}
+        self._interior_facets = interior_facets
+
         super(SplitSimplicialComplex, self).__init__(parent.shape, vertices, topology)
 
     def get_child_to_parent(self):
@@ -140,14 +146,13 @@ class SplitSimplicialComplex(SimplicialComplex):
         """
         return self._cell_connectivity
 
-    def get_interior_facets(self, dim):
-        """Returns the dim-dimensional facets supported on the parent's interior.
+    def get_interior_facets(self, dimension):
+        """Returns the list of entities of the given dimension that are
+        supported on the parent's interior.
+
+        :arg dimension: subentity dimension (integer)
         """
-        sd = self.get_spatial_dimension()
-        child_to_parent = self.get_child_to_parent()
-        interior_facets = [facet for facet in child_to_parent[dim]
-                           if child_to_parent[dim][facet][0] == sd]
-        return interior_facets
+        return self._interior_facets[dimension]
 
     def construct_subelement(self, dimension):
         """Constructs the reference element of a cell subentity
