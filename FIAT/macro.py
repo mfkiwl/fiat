@@ -170,30 +170,35 @@ class SplitSimplicialComplex(SimplicialComplex):
 
 
 class AlfeldSplit(SplitSimplicialComplex):
-    """Splits a simplex into the simplicial complex obtained by
-    connecting vertices to barycenter.
+    """Splits a simplicial complex by connecting subcell vertices to their
+    barycenter.
     """
     def __init__(self, ref_el):
         sd = ref_el.get_spatial_dimension()
         top = ref_el.get_topology()
         # Keep old facets, respecting the old numbering
         new_topology = copy.deepcopy(top)
-        # Discard the cell interior
+        # Discard the cell interiors
         new_topology[sd] = {}
+        new_verts = tuple(ref_el.get_vertices())
 
-        # Append the barycenter as the new vertex
-        barycenter = ref_el.make_points(sd, 0, sd+1)
-        old_verts = ref_el.get_vertices()
-        new_verts = old_verts + tuple(barycenter)
-        new_vert_id = len(old_verts)
-        new_topology[0][new_vert_id] = (new_vert_id,)
+        for cell in top[sd]:
+            # Append the barycenter as the new vertex
+            barycenter = ref_el.make_points(sd, cell, sd+1)
+            new_verts += tuple(barycenter)
+            new_vert_id = len(new_topology[0])
+            new_topology[0][new_vert_id] = (new_vert_id,)
 
-        # Append new facets by adding the barycenter to old facets
-        for dim in range(1, sd + 1):
-            offset = len(new_topology[dim])
-            for entity, ids in top[dim-1].items():
-                new_topology[dim][offset+entity] = ids + (new_vert_id,)
-        super(AlfeldSplit, self).__init__(ref_el, new_verts, new_topology)
+            # Append new facets by adding the barycenter to old facets
+            for dim in range(1, sd + 1):
+                cur = len(new_topology[dim])
+                for entity, ids in top[dim-1].items():
+                    if set(ids) < set(top[sd][cell]):
+                        new_topology[dim][cur] = ids + (new_vert_id,)
+                        cur = cur + 1
+
+        parent = ref_el.get_parent() or ref_el
+        super(AlfeldSplit, self).__init__(parent, new_verts, new_topology)
 
     def construct_subcomplex(self, dimension):
         """Constructs the reference subcomplex of the parent cell subentity
@@ -201,8 +206,8 @@ class AlfeldSplit(SplitSimplicialComplex):
         """
         if dimension == self.get_dimension():
             return self
-        # Alfed on facets is just a simplex
-        return self.construct_subelement(dimension)
+        # Alfeld on facets is just the parent subcomplex
+        return self._parent.construct_subcomplex(dimension)
 
 
 class IsoSplit(SplitSimplicialComplex):
@@ -258,7 +263,9 @@ class IsoSplit(SplitSimplicialComplex):
                     if set(facet) < adjacency[v]:
                         entities.append((v,) + facet)
             new_topology[dim] = dict(enumerate(entities))
-        super(IsoSplit, self).__init__(ref_el, new_verts, new_topology)
+
+        parent = ref_el.get_parent() or ref_el
+        super(IsoSplit, self).__init__(parent, new_verts, new_topology)
 
     def construct_subcomplex(self, dimension):
         """Constructs the reference subcomplex of the parent cell subentity
