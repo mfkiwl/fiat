@@ -1,15 +1,17 @@
 from FIAT.functional import (PointEvaluation, PointDerivative,
                              IntegralMomentOfNormalDerivative)
 from FIAT import finite_element, dual_set, macro, polynomial_set
-from FIAT.reference_element import ufc_simplex
+from FIAT.reference_element import TRIANGLE, ufc_simplex
 from FIAT.quadrature_schemes import create_quadrature
-import numpy
+from FIAT.jacobi import eval_jacobi
 
 
 class HCTDualSet(dual_set.DualSet):
-    def __init__(self, ref_el, degree):
+    def __init__(self, ref_el, degree, reduced=False):
         if degree != 3:
-            raise ValueError("HCT elements only defined for degree=3")
+            raise ValueError("HCT only defined for degree=3")
+        if ref_el.get_shape() != TRIANGLE:
+            raise ValueError("HCT only defined on triangles")
         top = ref_el.get_topology()
         verts = ref_el.get_vertices()
         sd = ref_el.get_spatial_dimension()
@@ -28,10 +30,11 @@ class HCTDualSet(dual_set.DualSet):
         rline = ufc_simplex(1)
         Q = create_quadrature(rline, degree-1)
         qpts = Q.get_points()
-        scale = numpy.ones(qpts.shape)
+        k = 2 if reduced else 0
+        f_at_qpts = eval_jacobi(0, 0, k, 2.0*qpts - 1)
         for e in sorted(top[1]):
             cur = len(nodes)
-            nodes.append(IntegralMomentOfNormalDerivative(ref_el, e, Q, scale))
+            nodes.append(IntegralMomentOfNormalDerivative(ref_el, e, Q, f_at_qpts))
             entity_ids[1][e].extend(range(cur, len(nodes)))
 
         return super(HCTDualSet, self).__init__(nodes, ref_el, entity_ids)
@@ -40,7 +43,7 @@ class HCTDualSet(dual_set.DualSet):
 class HsiehCloughTocher(finite_element.CiarletElement):
     """The HCT finite element."""
 
-    def __init__(self, ref_el, degree=3):
-        dual = HCTDualSet(ref_el, degree)
+    def __init__(self, ref_el, degree=3, reduced=False):
+        dual = HCTDualSet(ref_el, degree, reduced=reduced)
         poly_set = macro.CkPolynomialSet(macro.AlfeldSplit(ref_el), degree, variant=None)
         super(HsiehCloughTocher, self).__init__(poly_set, dual, degree)
