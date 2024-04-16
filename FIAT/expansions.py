@@ -357,19 +357,23 @@ class ExpansionSet(object):
         cell_node_map = self.get_cell_node_map(n)
 
         num_phis = self.get_num_members(n)
-        results = numpy.zeros((order+1, num_phis) + pts.shape[1:])
+        results = [numpy.zeros((num_phis,) + (sd,) * (r-1) + pts.shape[1:])
+                   for r in range(order+1)]
+
         for k, (ibfs, ipts) in enumerate(zip(cell_node_map, cell_point_map)):
             if len(ipts) > 0:
                 normal = self.ref_el.compute_normal(facet, cell=k)
                 side = numpy.dot(normal, self.ref_el.compute_normal(facet))
-                phi = self._tabulate_on_cell(n, pts[:, ipts], order, cell=k, direction=normal)
-                indices = numpy.ix_(ibfs, ipts)
-                for r in range(order+1):
-                    V = numpy.reshape(phi[r], (len(ibfs), len(ipts)))
-                    if r % 2 == 0 and side < 0:
-                        results[r][indices] -= V
+                phi = self._tabulate_on_cell(n, pts[:, ipts], order, cell=k)
+                for r, vr in enumerate(phi):
+                    shape_indices = tuple(range(sd) for _ in range(r-1))
+                    indices = numpy.ix_(ibfs, *shape_indices, ipts)
+                    if r > 0:
+                        vr = numpy.tensordot(normal, vr, axes=(0, 1))
+                    if r == 0 and side < 0:
+                        results[r][indices] -= vr
                     else:
-                        results[r][indices] += V
+                        results[r][indices] += vr
         return results
 
     def get_dmats(self, degree):

@@ -328,6 +328,7 @@ class CkPolynomialSet(polynomial_set.PolynomialSet):
     def __init__(self, ref_el, degree, order=1, shape=(), **kwargs):
         from FIAT.quadrature_schemes import create_quadrature
         expansion_set = expansions.ExpansionSet(ref_el, **kwargs)
+        num_members = expansion_set.get_num_members(degree)
         k = 1 if expansion_set.continuity == "C0" else 0
 
         sd = ref_el.get_spatial_dimension()
@@ -345,10 +346,11 @@ class CkPolynomialSet(polynomial_set.PolynomialSet):
             jumps = expansion_set.tabulate_normal_jumps(degree, qpts, facet, order=order)
             for r in range(k, order+1):
                 dimPk = 1 if sd == 1 else expansions.polynomial_dimension(facet_el, degree - r)
-                rows.append(numpy.dot(weights[:dimPk], jumps[r].T))
+                rows.append(numpy.tensordot(weights[:dimPk], jumps[r].T,
+                                            axes=(-1, 0)).reshape((-1, num_members)))
 
         if len(rows) == 0:
-            coeffs = numpy.eye(expansion_set.get_num_members(degree))
+            coeffs = numpy.eye(num_members)
         else:
             dual_mat = numpy.row_stack(rows)
             _, sig, vt = numpy.linalg.svd(dual_mat, full_matrices=True)
