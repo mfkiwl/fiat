@@ -28,9 +28,9 @@ class HCTDualSet(dual_set.DualSet):
             entity_ids[0][v].extend(range(cur, len(nodes)))
 
         rline = ufc_simplex(1)
-        Q = create_quadrature(rline, degree-1)
-        qpts = Q.get_points()
         k = 2 if reduced else 0
+        Q = create_quadrature(rline, degree-1+k)
+        qpts = Q.get_points()
         f_at_qpts = eval_jacobi(0, 0, k, 2.0*qpts - 1)
         for e in sorted(top[1]):
             cur = len(nodes)
