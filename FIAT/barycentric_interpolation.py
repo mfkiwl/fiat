@@ -74,8 +74,8 @@ class LagrangeLineExpansionSet(expansions.LineExpansionSet):
     def get_points(self):
         return self.points
 
-    def get_dmats(self, degree):
-        return [dmat.T for dmat in self.dmats]
+    def get_dmats(self, degree, cell=0):
+        return self.dmats[cell].T
 
     def _tabulate(self, n, pts, order=0):
         num_members = self.get_num_members(n)
@@ -93,12 +93,8 @@ class LagrangeLineExpansionSet(expansions.LineExpansionSet):
                 indices = numpy.ix_(ibfs, ipts)
                 for result, val in zip(results, vals):
                     result[indices] = val
-
-        for r in range(order+1):
-            shape = results[r].shape
-            shape = shape[:1] + (1,)*r + shape[1:]
-            results[r] = numpy.reshape(results[r], shape)
-        return tuple(results)
+        tabulations = {(r,): results[r] for r in range(order+1)}
+        return tabulations
 
 
 class LagrangePolynomialSet(polynomial_set.PolynomialSet):

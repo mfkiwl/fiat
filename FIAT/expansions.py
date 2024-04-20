@@ -309,15 +309,40 @@ class ExpansionSet(object):
             return self._cell_node_map_cache.setdefault(n, cell_node_map)
 
     def _tabulate_on_cell(self, n, pts, order=0, cell=0, direction=None):
+        from FIAT.polynomial_set import mis
+        lorder = min(order, self.recurrence_order)
         A, b = self.affine_mappings[cell]
         ref_pts = apply_mapping(A, b, pts)
         Jinv = A if direction is None else numpy.dot(A, direction)[:, None]
         sd = self.ref_el.get_spatial_dimension()
-        phi = dubiner_recurrence(sd, n, order, ref_pts, Jinv,
+        phi = dubiner_recurrence(sd, n, lorder, ref_pts, Jinv,
                                  self.scale, variant=self.variant)
         if self.continuity == "C0":
             phi = C0_basis(sd, n, phi)
-        return phi
+
+        # Pack linearly independent components into a dictionary
+        result = {(0,) * sd: numpy.asarray(phi[0])}
+        for r in range(1, len(phi)):
+            vr = numpy.transpose(phi[r], tuple(range(1, r+1)) + (0, r+1))
+            for indices in numpy.ndindex(vr.shape[:r]):
+                alpha = tuple(map(indices.count, range(sd)))
+                if alpha not in result:
+                    result[alpha] = vr[indices]
+
+        def distance(alpha, beta):
+            return sum(ai != bi for ai, bi in zip(alpha, beta))
+
+        # Only use dmats if tabulate failed
+        for i in range(len(phi), order + 1):
+            dmats = self.get_dmats(n, cell=cell)
+            for alpha in mis(sd, i):
+                base_alpha = next(a for a in result if sum(a) == i-1 and distance(alpha, a) == 1)
+                vals = result[base_alpha]
+                for dmat, start, end in zip(dmats, base_alpha, alpha):
+                    for j in range(start, end):
+                        vals = numpy.dot(dmat.T, vals)
+                result[alpha] = vals
+        return result
 
     def _tabulate(self, n, pts, order=0):
         """A version of tabulate() that also works for a single point."""
@@ -328,17 +353,14 @@ class ExpansionSet(object):
         if len(phis) == 1:
             return phis[0]
 
-        sd = self.ref_el.get_spatial_dimension()
-        results = []
         num_phis = self.get_num_members(n)
         cell_node_map = self.get_cell_node_map(n)
-        for r in range(order+1):
-            result = numpy.zeros((num_phis,) + (sd,)*r + pts.shape[1:])
+        result = {}
+        for alpha in phis[0]:
+            result[alpha] = numpy.zeros((num_phis,) + pts.shape[1:])
             for ibfs, ipts, phi in zip(cell_node_map, cell_point_map, phis):
-                shape_indices = tuple(range(sd) for _ in range(r))
-                result[numpy.ix_(ibfs, *shape_indices, ipts)] = phi[r]
-            results.append(result)
-        return tuple(results)
+                result[alpha][numpy.ix_(ibfs, ipts)] = phi[alpha]
+        return result
 
     def tabulate_normal_jumps(self, n, ref_pts, facet, order=0):
         """Tabulates the normal derivative jumps on reference points on a facet.
@@ -365,23 +387,29 @@ class ExpansionSet(object):
                 normal = self.ref_el.compute_normal(facet, cell=k)
                 side = numpy.dot(normal, self.ref_el.compute_normal(facet))
                 phi = self._tabulate_on_cell(n, pts[:, ipts], order, cell=k)
-                for r, vr in enumerate(phi):
+                v0 = phi[(0,)*sd]
+                for r in range(order+1):
+                    vr = numpy.zeros((sd,)*r + v0.shape, dtype=v0.dtype)
+                    for index in numpy.ndindex(vr.shape[:r]):
+                        vr[index] = phi[tuple(map(index.count, range(sd)))]
+                    if r > 0:
+                        vr = numpy.tensordot(normal, vr, axes=(0, 0))
+
                     shape_indices = tuple(range(sd) for _ in range(r-1))
                     indices = numpy.ix_(ibfs, *shape_indices, ipts)
-                    if r > 0:
-                        vr = numpy.tensordot(normal, vr, axes=(0, 1))
                     if r == 0 and side < 0:
                         results[r][indices] -= vr
                     else:
                         results[r][indices] += vr
         return results
 
-    def get_dmats(self, degree):
+    def get_dmats(self, degree, cell=0):
         """Returns a numpy array with the expansion coefficients dmat[k, j, i]
         of the gradient of each member of the expansion set:
             d/dx_k phi_j = sum_i dmat[k, j, i] phi_i.
         """
-        key = degree
+        from FIAT.polynomial_set import mis
+        key = (degree, cell)
         cache = self._dmats_cache
         try:
             return cache[key]
@@ -390,64 +418,33 @@ class ExpansionSet(object):
         if degree == 0:
             return cache.setdefault(key, numpy.zeros((self.ref_el.get_spatial_dimension(), 1, 1), "d"))
 
-        if self.ref_el.is_macrocell() and self.continuity is not None:
-            raise ValueError("Cannot create a differentiation matrix on a continuous macroelement.")
         sd = self.ref_el.get_spatial_dimension()
         top = self.ref_el.get_topology()
-        pts = []
-        for cell in top[sd]:
-            verts = self.ref_el.get_vertices_of_subcomplex(top[sd][cell])
-            pts.extend(reference_element.make_lattice(verts, degree, variant="gl"))
-        v, dv = self._tabulate(degree, numpy.transpose(pts), order=1)
-        dv = numpy.transpose(dv, (1, 2, 0))
-        dmats = numpy.linalg.solve(numpy.transpose(v), dv)
+        verts = self.ref_el.get_vertices_of_subcomplex(top[sd][cell])
+        pts = reference_element.make_lattice(verts, degree, variant="gl")
+        v = self._tabulate_on_cell(degree, numpy.transpose(pts), order=1, cell=cell)
+        dv = [numpy.transpose(v[alpha]) for alpha in mis(sd, 1)]
+        dmats = numpy.linalg.solve(numpy.transpose(v[(0,)*sd]), dv)
         return cache.setdefault(key, dmats)
-
-    def _tabulate_jet(self, degree, pts, order=0):
-        from FIAT.polynomial_set import mis
-        vals = self._tabulate(degree, numpy.transpose(pts), order=min(order, self.recurrence_order))
-        lorder = len(vals)
-        D = self.ref_el.get_spatial_dimension()
-        result = {(0,) * D: numpy.array(vals[0])}
-        for r in range(1, lorder):
-            vr = numpy.transpose(vals[r], tuple(range(1, r+1)) + (0, r+1))
-            for indices in numpy.ndindex(vr.shape[:r]):
-                alpha = tuple(map(indices.count, range(D)))
-                if alpha not in result:
-                    result[alpha] = vr[indices]
-
-        def distance(alpha, beta):
-            return sum(ai != bi for ai, bi in zip(alpha, beta))
-
-        # Only use dmats if tabulate failed
-        for i in range(lorder, order + 1):
-            dmats = self.get_dmats(degree)
-            for alpha in mis(D, i):
-                base_alpha = next(a for a in result if sum(a) == i-1 and distance(alpha, a) == 1)
-                vals = result[base_alpha]
-                for dmat, start, end in zip(dmats, base_alpha, alpha):
-                    for j in range(start, end):
-                        vals = numpy.dot(dmat.T, vals)
-                result[alpha] = vals
-        return result
 
     def tabulate(self, n, pts):
         if len(pts) == 0:
             return numpy.array([])
-        results, = self._tabulate(n, numpy.transpose(pts))
-        return numpy.asarray(results)
+        sd = self.ref_el.get_spatial_dimension()
+        return self._tabulate(n, numpy.transpose(pts))[(0,)*sd]
 
     def tabulate_derivatives(self, n, pts):
-        vals, deriv_vals = self._tabulate(n, numpy.transpose(pts), order=1)
+        from FIAT.polynomial_set import mis
+        vals = self._tabulate(n, numpy.transpose(pts), order=1)
         # Create the ordinary data structure.
         D = self.ref_el.get_spatial_dimension()
-        data = [[(vals[i][j], [deriv_vals[i][r][j] for r in range(D)])
+        data = [[(vals[(0,) * D][i, j], [vals[alpha][i, j] for alpha in mis(D, 1)])
                  for j in range(len(vals[0]))]
                 for i in range(len(vals))]
         return data
 
     def tabulate_jet(self, n, pts, order=1):
-        vals = self._tabulate_jet(n, pts, order=order)
+        vals = self._tabulate(n, pts, order=order)
         # Create the ordinary data structure.
         D = self.ref_el.get_spatial_dimension()
         v0 = vals[(0,)*D]
@@ -488,7 +485,7 @@ class LineExpansionSet(ExpansionSet):
 
         A, b = self.affine_mappings[0]
         xs = apply_mapping(A, b, pts).T
-        results = []
+        results = {}
         scale = self.scale * numpy.sqrt(2 * numpy.arange(n+1) + 1)
         for k in range(order+1):
             v = numpy.zeros((n + 1, len(xs)), xs.dtype)
@@ -497,10 +494,8 @@ class LineExpansionSet(ExpansionSet):
             for p in range(n + 1):
                 v[p] *= scale[p]
                 scale[p] *= 0.5 * (p + k + 1) * A[0, 0]
-            shape = v.shape
-            shape = shape[:1] + (1,) * k + shape[1:]
-            results.append(v.reshape(shape))
-        return tuple(results)
+            results[(k,)] = v
+        return results
 
 
 class TriangleExpansionSet(ExpansionSet):

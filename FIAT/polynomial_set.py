@@ -61,7 +61,6 @@ class PolynomialSet(object):
         self.embedded_degree = embedded_degree
         self.expansion_set = expansion_set
         self.coeffs = coeffs
-        self.dmats = []
 
     def tabulate_new(self, pts):
         return numpy.dot(self.coeffs,
@@ -69,12 +68,9 @@ class PolynomialSet(object):
 
     def tabulate(self, pts, jet_order=0):
         """Returns the values of the polynomial set."""
-        base_vals = self.expansion_set._tabulate_jet(self.embedded_degree, pts, order=jet_order)
-        D = self.ref_el.get_spatial_dimension()
-        result = {}
-        for i in range(jet_order + 1):
-            for alpha in mis(D, i):
-                result[alpha] = numpy.dot(self.coeffs, base_vals[alpha])
+        base_vals = self.expansion_set._tabulate(self.embedded_degree, numpy.transpose(pts), order=jet_order)
+
+        result = {alpha: numpy.dot(self.coeffs, base_vals[alpha]) for alpha in base_vals}
         return result
 
     def get_expansion_set(self):
@@ -92,10 +88,8 @@ class PolynomialSet(object):
     def get_embedded_degree(self):
         return self.embedded_degree
 
-    def get_dmats(self):
-        if len(self.dmats) == 0:
-            self.dmats = self.expansion_set.get_dmats(self.embedded_degree)
-        return self.dmats
+    def get_dmats(self, cell=0):
+        return self.expansion_set.get_dmats(self.embedded_degree, cell=cell)
 
     def get_reference_element(self):
         return self.ref_el

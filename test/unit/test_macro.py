@@ -352,6 +352,6 @@ def test_Ck_basis(cell, order, degree, variant):
         ipts = list(top[sd][cell])
         verts = A.get_vertices_of_subcomplex(top[sd][cell])
         pts = numpy.transpose(verts)
-        Uvals, = U._tabulate_on_cell(degree, pts, 0, cell=cell)
+        Uvals = U._tabulate_on_cell(degree, pts, 0, cell=cell)[(0,)*sd]
         local_phis = numpy.dot(coeffs[:, cell_node_map[cell]], Uvals)
         assert numpy.allclose(local_phis, phis[:, ipts])
