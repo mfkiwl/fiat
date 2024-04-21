@@ -430,21 +430,23 @@ class ExpansionSet(object):
     def tabulate(self, n, pts):
         if len(pts) == 0:
             return numpy.array([])
-        sd = self.ref_el.get_spatial_dimension()
-        return self._tabulate(n, numpy.transpose(pts))[(0,)*sd]
+        D = self.ref_el.get_spatial_dimension()
+        return self._tabulate(n, numpy.transpose(pts))[(0,) * D]
 
     def tabulate_derivatives(self, n, pts):
         from FIAT.polynomial_set import mis
         vals = self._tabulate(n, numpy.transpose(pts), order=1)
         # Create the ordinary data structure.
         D = self.ref_el.get_spatial_dimension()
-        data = [[(vals[(0,) * D][i, j], [vals[alpha][i, j] for alpha in mis(D, 1)])
-                 for j in range(len(vals[0]))]
-                for i in range(len(vals))]
+        v = vals[(0,) * D]
+        dv = [vals[alpha] for alpha in mis(D, 1)]
+        data = [[(v[i, j], [vi[i, j] for vi in dv])
+                 for j in range(v.shape[1])]
+                for i in range(v.shape[0])]
         return data
 
     def tabulate_jet(self, n, pts, order=1):
-        vals = self._tabulate(n, pts, order=order)
+        vals = self._tabulate(n, numpy.transpose(pts), order=order)
         # Create the ordinary data structure.
         D = self.ref_el.get_spatial_dimension()
         v0 = vals[(0,)*D]
