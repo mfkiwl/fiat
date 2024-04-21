@@ -53,7 +53,7 @@ class LagrangeLineExpansionSet(expansions.LineExpansionSet):
     def __init__(self, ref_el, pts):
         self.points = pts
         self.x = numpy.array(pts).flatten()
-        self.cell_node_map = expansions.compute_cell_point_map(ref_el, numpy.transpose(pts), unique=False)
+        self.cell_node_map = expansions.compute_cell_point_map(ref_el, pts, unique=False)
         self.dmats = []
         self.weights = []
         for ibfs in self.cell_node_map:

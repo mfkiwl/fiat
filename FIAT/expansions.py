@@ -312,7 +312,7 @@ class ExpansionSet(object):
         from FIAT.polynomial_set import mis
         lorder = min(order, self.recurrence_order)
         A, b = self.affine_mappings[cell]
-        ref_pts = apply_mapping(A, b, pts)
+        ref_pts = apply_mapping(A, b, numpy.transpose(pts))
         Jinv = A if direction is None else numpy.dot(A, direction)[:, None]
         sd = self.ref_el.get_spatial_dimension()
         phi = dubiner_recurrence(sd, n, lorder, ref_pts, Jinv,
@@ -346,8 +346,9 @@ class ExpansionSet(object):
 
     def _tabulate(self, n, pts, order=0):
         """A version of tabulate() that also works for a single point."""
+        pts = numpy.asarray(pts)
         cell_point_map = compute_cell_point_map(self.ref_el, pts)
-        phis = [self._tabulate_on_cell(n, pts[:, ipts], order, cell=k)
+        phis = [self._tabulate_on_cell(n, pts[ipts], order, cell=k)
                 for k, ipts in enumerate(cell_point_map)]
 
         if len(phis) == 1:
@@ -357,7 +358,7 @@ class ExpansionSet(object):
         cell_node_map = self.get_cell_node_map(n)
         result = {}
         for alpha in phis[0]:
-            result[alpha] = numpy.zeros((num_phis,) + pts.shape[1:])
+            result[alpha] = numpy.zeros((num_phis, len(pts)))
             for ibfs, ipts, phi in zip(cell_node_map, cell_point_map, phis):
                 result[alpha][numpy.ix_(ibfs, ipts)] = phi[alpha]
         return result
@@ -374,19 +375,19 @@ class ExpansionSet(object):
         """
         sd = self.ref_el.get_spatial_dimension()
         transform = self.ref_el.get_entity_transform(sd-1, facet)
-        pts = numpy.transpose(list(map(transform, ref_pts)))
+        pts = numpy.array(list(map(transform, ref_pts)))
         cell_point_map = compute_cell_point_map(self.ref_el, pts, unique=False)
         cell_node_map = self.get_cell_node_map(n)
 
         num_phis = self.get_num_members(n)
-        results = [numpy.zeros((num_phis,) + (sd,) * (r-1) + pts.shape[1:])
+        results = [numpy.zeros((num_phis,) + (sd,) * (r-1) + (len(pts),))
                    for r in range(order+1)]
 
         for k, (ibfs, ipts) in enumerate(zip(cell_node_map, cell_point_map)):
             if len(ipts) > 0:
                 normal = self.ref_el.compute_normal(facet, cell=k)
                 side = numpy.dot(normal, self.ref_el.compute_normal(facet))
-                phi = self._tabulate_on_cell(n, pts[:, ipts], order, cell=k)
+                phi = self._tabulate_on_cell(n, pts[ipts], order, cell=k)
                 v0 = phi[(0,)*sd]
                 for r in range(order+1):
                     vr = numpy.zeros((sd,)*r + v0.shape, dtype=v0.dtype)
@@ -422,7 +423,7 @@ class ExpansionSet(object):
         top = self.ref_el.get_topology()
         verts = self.ref_el.get_vertices_of_subcomplex(top[sd][cell])
         pts = reference_element.make_lattice(verts, degree, variant="gl")
-        v = self._tabulate_on_cell(degree, numpy.transpose(pts), order=1, cell=cell)
+        v = self._tabulate_on_cell(degree, pts, order=1, cell=cell)
         dv = [numpy.transpose(v[alpha]) for alpha in mis(sd, 1)]
         dmats = numpy.linalg.solve(numpy.transpose(v[(0,)*sd]), dv)
         return cache.setdefault(key, dmats)
@@ -431,11 +432,11 @@ class ExpansionSet(object):
         if len(pts) == 0:
             return numpy.array([])
         D = self.ref_el.get_spatial_dimension()
-        return self._tabulate(n, numpy.transpose(pts))[(0,) * D]
+        return self._tabulate(n, pts)[(0,) * D]
 
     def tabulate_derivatives(self, n, pts):
         from FIAT.polynomial_set import mis
-        vals = self._tabulate(n, numpy.transpose(pts), order=1)
+        vals = self._tabulate(n, pts, order=1)
         # Create the ordinary data structure.
         D = self.ref_el.get_spatial_dimension()
         v = vals[(0,) * D]
@@ -446,7 +447,7 @@ class ExpansionSet(object):
         return data
 
     def tabulate_jet(self, n, pts, order=1):
-        vals = self._tabulate(n, numpy.transpose(pts), order=order)
+        vals = self._tabulate(n, pts, order=order)
         # Create the ordinary data structure.
         D = self.ref_el.get_spatial_dimension()
         v0 = vals[(0,)*D]
@@ -486,7 +487,7 @@ class LineExpansionSet(ExpansionSet):
             return super(LineExpansionSet, self)._tabulate(n, pts, order=order)
 
         A, b = self.affine_mappings[0]
-        xs = apply_mapping(A, b, pts).T
+        xs = apply_mapping(A, b, numpy.transpose(pts)).T
         results = {}
         scale = self.scale * numpy.sqrt(2 * numpy.arange(n+1) + 1)
         for k in range(order+1):
@@ -589,7 +590,7 @@ def compute_cell_point_map(ref_el, pts, unique=True, tol=1E-12):
     """Maps cells on a simplicial complex to points.
 
     :arg ref_el: a SimplicialComplex.
-    :arg pts: a column-stacked array of physical coordinates.
+    :arg pts: an iterable of physical points on the complex.
     :kwarg unique: Are we assigning a unique cell to points on facets?
     :kwarg tol: the absolute tolerance.
     :returns: a numpy array mapping cell id to points located on that cell.
@@ -606,10 +607,10 @@ def compute_cell_point_map(ref_el, pts, unique=True, tol=1E-12):
         A, b = reference_element.make_affine_mapping(verts, ref_vertices)
         A = numpy.vstack((A, -numpy.sum(A, axis=0)))
         b = numpy.hstack((b, 1-numpy.sum(b, axis=0)))
-        x = numpy.dot(A, pts) + b[:, None]
+        x = numpy.dot(pts, A.T) + b[None, :]
 
         # Bin points based on l1 distance
-        pts_on_cell = abs(numpy.sum(abs(x) - x, axis=0)) < 2*tol
+        pts_on_cell = abs(numpy.sum(abs(x) - x, axis=1)) < 2*tol
         if unique:
             for other in cell_point_map:
                 pts_on_cell[other] = False
