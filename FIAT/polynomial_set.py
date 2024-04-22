@@ -69,7 +69,6 @@ class PolynomialSet(object):
     def tabulate(self, pts, jet_order=0):
         """Returns the values of the polynomial set."""
         base_vals = self.expansion_set._tabulate(self.embedded_degree, pts, order=jet_order)
-
         result = {alpha: numpy.dot(self.coeffs, base_vals[alpha]) for alpha in base_vals}
         return result
 

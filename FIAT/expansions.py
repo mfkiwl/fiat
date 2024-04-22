@@ -358,7 +358,7 @@ class ExpansionSet(object):
         cell_node_map = self.get_cell_node_map(n)
         result = {}
         for alpha in phis[0]:
-            result[alpha] = numpy.zeros((num_phis, len(pts)))
+            result[alpha] = numpy.zeros((num_phis,) + pts.shape[:-1])
             for ibfs, ipts, phi in zip(cell_node_map, cell_point_map, phis):
                 result[alpha][numpy.ix_(ibfs, ipts)] = phi[alpha]
         return result
@@ -380,7 +380,7 @@ class ExpansionSet(object):
         cell_node_map = self.get_cell_node_map(n)
 
         num_phis = self.get_num_members(n)
-        results = [numpy.zeros((num_phis,) + (sd,) * (r-1) + (len(pts),))
+        results = [numpy.zeros((num_phis,) + (sd,) * (r-1) + pts.shape[:-1])
                    for r in range(order+1)]
 
         for k, (ibfs, ipts) in enumerate(zip(cell_node_map, cell_point_map)):
@@ -395,6 +395,7 @@ class ExpansionSet(object):
                         vr[index] = phi[tuple(map(index.count, range(sd)))]
                     if r > 0:
                         vr = numpy.tensordot(normal, vr, axes=(0, 0))
+                    vr = vr.transpose((-2, *tuple(range(r-1)), -1))
 
                     shape_indices = tuple(range(sd) for _ in range(r-1))
                     indices = numpy.ix_(ibfs, *shape_indices, ipts)
