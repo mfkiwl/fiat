@@ -75,7 +75,7 @@ class LagrangeLineExpansionSet(expansions.LineExpansionSet):
         return self.points
 
     def get_dmats(self, degree, cell=0):
-        return self.dmats[cell].T
+        return [self.dmats[cell].T]
 
     def _tabulate(self, n, pts, order=0):
         num_members = self.get_num_members(n)
