@@ -32,6 +32,9 @@ class DualSet(object):
                 ids.sort()
                 self.entity_closure_ids[d][e] = ids
 
+    def __iter__(self):
+        return iter(self.nodes)
+
     def get_nodes(self):
         return self.nodes
 

@@ -7,6 +7,7 @@ from FIAT.quadrature_schemes import create_quadrature
 from FIAT.reference_element import ufc_simplex
 from FIAT.expansions import polynomial_entity_ids, polynomial_cell_node_map
 from FIAT.polynomial_set import make_bubbles, PolynomialSet, ONPolynomialSet
+from FIAT.barycentric_interpolation import get_lagrange_points
 
 
 @pytest.fixture(params=("I", "T", "S"))
@@ -128,14 +129,6 @@ def test_macro_lagrange(variant, degree, split, cell):
     assert numpy.allclose(fe.V, V)
 
 
-def get_lagrange_points(fe):
-    points = []
-    for node in fe.dual_basis():
-        pt, = node.get_point_dict()
-        points.append(pt)
-    return points
-
-
 def make_mass_matrix(fe, order=0):
     sd = fe.ref_el.get_spatial_dimension()
     Q = create_quadrature(fe.ref_complex, 2*fe.degree())
@@ -154,8 +147,8 @@ def test_lagrange_alfeld_duals(cell, degree, variant):
     Pk_dofs = Pk.entity_dofs()
     alfeld_dofs = alfeld.entity_dofs()
 
-    Pk_pts = numpy.asarray(get_lagrange_points(Pk))
-    alfeld_pts = numpy.asarray(get_lagrange_points(alfeld))
+    Pk_pts = numpy.asarray(get_lagrange_points(Pk.dual_basis()))
+    alfeld_pts = numpy.asarray(get_lagrange_points(alfeld.dual_basis()))
 
     sd = cell.get_dimension()
     top = cell.get_topology()
@@ -179,7 +172,7 @@ def test_lagrange_iso_duals(cell, degree):
     P2 = Lagrange(cell, 2*degree, variant="equispaced")
     iso = Lagrange(IsoSplit(cell), degree, variant="equispaced")
 
-    assert numpy.allclose(get_lagrange_points(iso), get_lagrange_points(P2))
+    assert numpy.allclose(get_lagrange_points(iso.dual_basis()), get_lagrange_points(P2.dual_basis()))
 
     P2_ids = P2.entity_dofs()
     iso_ids = iso.entity_dofs()

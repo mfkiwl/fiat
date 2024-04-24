@@ -10,7 +10,7 @@ import numpy as np
 from FIAT import finite_element, polynomial_set, dual_set, functional, P0
 from FIAT.reference_element import LINE, make_lattice
 from FIAT.orientation_utils import make_entity_permutations_simplex
-from FIAT.barycentric_interpolation import LagrangePolynomialSet
+from FIAT.barycentric_interpolation import LagrangePolynomialSet, get_lagrange_points
 from FIAT.polynomial_set import mis
 from FIAT.check_format_variant import parse_lagrange_variant
 
@@ -232,11 +232,7 @@ class DiscontinuousLagrange(finite_element.CiarletElement):
         if ref_el.shape == LINE:
             # In 1D we can use the primal basis as the expansion set,
             # avoiding any round-off coming from a basis transformation
-            points = []
-            for node in dual.nodes:
-                # Assert singleton point for each node.
-                pt, = node.get_point_dict().keys()
-                points.append(pt)
+            points = get_lagrange_points(dual)
             poly_set = LagrangePolynomialSet(ref_el, points)
         else:
             poly_set = polynomial_set.ONPolynomialSet(ref_el, degree)

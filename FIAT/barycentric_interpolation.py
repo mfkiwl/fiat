@@ -11,6 +11,15 @@ from FIAT import reference_element, expansions, polynomial_set
 from FIAT.functional import index_iterator
 
 
+def get_lagrange_points(nodes):
+    """Extract singleton point for each node."""
+    points = []
+    for node in nodes:
+        pt, = node.get_point_dict()
+        points.append(pt)
+    return points
+
+
 def barycentric_interpolation(nodes, wts, dmat, pts, order=0):
     """Evaluates a Lagrange basis on a line reference element
     via the second barycentric interpolation formula. See Berrut and Trefethen (2004)
