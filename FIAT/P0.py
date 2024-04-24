@@ -30,12 +30,12 @@ class P0Dual(dual_set.DualSet):
             entity_ids[dim] = {}
             entity_permutations[dim] = {}
             sym_size = ref_el.symmetry_group_size(dim)
-            perm = [0] if dim == sd else []
+            num_points = 1 if dim == sd else 0
             if isinstance(dim, tuple):
                 assert isinstance(sym_size, tuple)
-                perms = {o: perm for o in numpy.ndindex(sym_size)}
+                perms = {o: list(range(num_points)) for o in numpy.ndindex(sym_size)}
             else:
-                perms = {o: perm for o in range(sym_size)}
+                perms = {o: list(range(num_points)) for o in range(sym_size)}
             for entity in sorted(top[dim]):
                 entity_ids[dim][entity] = [entity] if dim == sd else []
                 entity_permutations[dim][entity] = perms
