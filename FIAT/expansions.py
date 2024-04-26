@@ -481,23 +481,24 @@ class LineExpansionSet(ExpansionSet):
             raise Exception("Must have a line")
         super(LineExpansionSet, self).__init__(ref_el, **kwargs)
 
-    def _tabulate(self, n, pts, order=0):
+    def _tabulate_on_cell(self, n, pts, order=0, cell=0, direction=None):
         """Returns a tuple of (vals, derivs) such that
         vals[i,j] = phi_i(pts[j]), derivs[i,j] = D vals[i,j]."""
-        if self.variant is not None or len(self.affine_mappings) > 1:
-            return super(LineExpansionSet, self)._tabulate(n, pts, order=order)
+        if self.variant is not None:
+            return super(LineExpansionSet, self)._tabulate_on_cell(n, pts, order=order, cell=cell, direction=direction)
 
-        A, b = self.affine_mappings[0]
+        A, b = self.affine_mappings[cell]
+        Jinv = A[0, 0] if direction is None else numpy.dot(A, direction)
         xs = apply_mapping(A, b, numpy.transpose(pts)).T
         results = {}
         scale = self.scale * numpy.sqrt(2 * numpy.arange(n+1) + 1)
         for k in range(order+1):
-            v = numpy.zeros((n + 1, len(xs)), xs.dtype)
+            v = numpy.zeros((n + 1, len(xs)), "d")
             if n >= k:
                 v[k:] = jacobi.eval_jacobi_batch(k, k, n-k, xs)
             for p in range(n + 1):
                 v[p] *= scale[p]
-                scale[p] *= 0.5 * (p + k + 1) * A[0, 0]
+                scale[p] *= 0.5 * (p + k + 1) * Jinv
             results[(k,)] = v
         return results
 

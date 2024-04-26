@@ -30,7 +30,7 @@ def barycentric_interpolation(nodes, wts, dmat, pts, order=0):
         sp_simplify = numpy.vectorize(simplify)
     else:
         sp_simplify = lambda x: x
-    phi = numpy.add.outer(-nodes, pts)
+    phi = numpy.add.outer(-nodes, pts.flatten())
     with numpy.errstate(divide='ignore', invalid='ignore'):
         numpy.reciprocal(phi, out=phi)
         numpy.multiply(phi, wts[:, None], out=phi)
@@ -38,10 +38,10 @@ def barycentric_interpolation(nodes, wts, dmat, pts, order=0):
     phi[phi != phi] = 1.0
 
     phi = sp_simplify(phi)
-    results = [phi]
-    for r in range(order):
+    results = {(0,): phi}
+    for r in range(1, order+1):
         phi = sp_simplify(numpy.dot(dmat, phi))
-        results.append(phi)
+        results[(r,)] = phi
     return results
 
 
@@ -61,14 +61,17 @@ class LagrangeLineExpansionSet(expansions.LineExpansionSet):
     """Lagrange polynomial expansion set for given points the line."""
     def __init__(self, ref_el, pts):
         self.points = pts
-        self.x = numpy.array(pts).flatten()
+        self.x = numpy.array(pts, dtype="d").flatten()
         self.cell_node_map = expansions.compute_cell_point_map(ref_el, pts, unique=False)
         self.dmats = []
         self.weights = []
+        self.nodes = []
         for ibfs in self.cell_node_map:
-            dmat, wts = make_dmat(self.x[ibfs])
+            nodes = self.x[ibfs]
+            dmat, wts = make_dmat(nodes)
             self.dmats.append(dmat)
             self.weights.append(wts)
+            self.nodes.append(nodes)
 
         self.degree = max(len(wts) for wts in self.weights)-1
         self.recurrence_order = self.degree + 1
@@ -86,24 +89,8 @@ class LagrangeLineExpansionSet(expansions.LineExpansionSet):
     def get_dmats(self, degree, cell=0):
         return [self.dmats[cell].T]
 
-    def _tabulate(self, n, pts, order=0):
-        num_members = self.get_num_members(n)
-        cell_node_map = self.get_cell_node_map(n)
-        cell_point_map = expansions.compute_cell_point_map(self.ref_el, pts)
-        pts = numpy.asarray(pts).flatten()
-        results = None
-        for ibfs, ipts, wts, dmat in zip(cell_node_map, cell_point_map, self.weights, self.dmats):
-            vals = barycentric_interpolation(self.x[ibfs], wts, dmat, pts[ipts], order=order)
-            if len(cell_node_map) == 1:
-                results = vals
-            else:
-                if results is None:
-                    results = [numpy.zeros((num_members, len(pts)), dtype=vals[0].dtype) for r in range(order+1)]
-                indices = numpy.ix_(ibfs, ipts)
-                for result, val in zip(results, vals):
-                    result[indices] = val
-        tabulations = {(r,): results[r] for r in range(order+1)}
-        return tabulations
+    def _tabulate_on_cell(self, n, pts, order=0, cell=0, direction=None):
+        return barycentric_interpolation(self.nodes[cell], self.weights[cell], self.dmats[cell], pts, order=order)
 
 
 class LagrangePolynomialSet(polynomial_set.PolynomialSet):
@@ -125,7 +112,7 @@ class LagrangePolynomialSet(polynomial_set.PolynomialSet):
 
         # set up coefficients
         if shape == tuple():
-            coeffs = numpy.eye(num_members)
+            coeffs = numpy.eye(num_members, dtype="d")
         else:
             coeffs_shape = (num_members, *shape, num_exp_functions)
             coeffs = numpy.zeros(coeffs_shape, "d")
