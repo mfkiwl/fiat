@@ -320,7 +320,7 @@ class CkPolynomialSet(polynomial_set.PolynomialSet):
 
     :arg ref_el: The simplicial complex.
     :arg degree: The polynomial degree.
-    :kwarg order: The differentiation order of continuity across subcells.
+    :kwarg order: The order of continuity across subcells.
     :kwarg shape: The value shape.
     :kwarg variant: The variant for the underlying ExpansionSet.
     :kwarg scale: The scale for the underlying ExpansionSet.
@@ -328,7 +328,6 @@ class CkPolynomialSet(polynomial_set.PolynomialSet):
     def __init__(self, ref_el, degree, order=1, shape=(), **kwargs):
         from FIAT.quadrature_schemes import create_quadrature
         expansion_set = expansions.ExpansionSet(ref_el, **kwargs)
-        num_members = expansion_set.get_num_members(degree)
         k = 1 if expansion_set.continuity == "C0" else 0
 
         sd = ref_el.get_spatial_dimension()
@@ -345,17 +344,16 @@ class CkPolynomialSet(polynomial_set.PolynomialSet):
         for facet in ref_el.get_interior_facets(sd-1):
             jumps = expansion_set.tabulate_normal_jumps(degree, qpts, facet, order=order)
             for r in range(k, order+1):
-                dimPk = 1 if sd == 1 else expansions.polynomial_dimension(facet_el, degree - r)
-                rows.append(numpy.tensordot(weights[:dimPk], jumps[r].T,
-                                            axes=(-1, 0)).reshape((-1, num_members)))
+                num_wt = 1 if sd == 1 else expansions.polynomial_dimension(facet_el, degree-r)
+                rows.append(numpy.tensordot(weights[:num_wt], jumps[r], axes=(-1, -1)).reshape(-1, jumps[r].shape[0]))
 
-        if len(rows) == 0:
-            coeffs = numpy.eye(num_members)
-        else:
+        if len(rows) > 0:
             dual_mat = numpy.row_stack(rows)
             _, sig, vt = numpy.linalg.svd(dual_mat, full_matrices=True)
             num_sv = len([s for s in sig if abs(s) > 1.e-10])
             coeffs = vt[num_sv:]
+        else:
+            coeffs = numpy.eye(expansion_set.get_num_members(degree))
 
         if shape != tuple():
             m, n = coeffs.shape
@@ -363,3 +361,50 @@ class CkPolynomialSet(polynomial_set.PolynomialSet):
             coeffs = numpy.tile(coeffs, (1,) + shape + (1,))
 
         super(CkPolynomialSet, self).__init__(ref_el, degree, degree, expansion_set, coeffs)
+
+
+class HDivSymPolynomialSet(polynomial_set.PolynomialSet):
+    """Constructs a symmetric tensor-valued PolynomialSet with continuous
+       normal components on a simplicial complex.
+
+    :arg ref_el: The simplicial complex.
+    :arg degree: The polynomial degree.
+    :kwarg order: The order of continuity across subcells.
+    :kwarg variant: The variant for the underlying ExpansionSet.
+    :kwarg scale: The scale for the underlying ExpansionSet.
+    """
+    def __init__(self, ref_el, degree, order=0, **kwargs):
+        from FIAT.quadrature_schemes import create_quadrature
+        U = polynomial_set.ONSymTensorPolynomialSet(ref_el, degree, **kwargs)
+        coeffs = U.get_coeffs()
+        expansion_set = U.get_expansion_set()
+        k = 1 if expansion_set.continuity == "C0" else 0
+
+        sd = ref_el.get_spatial_dimension()
+        facet_el = ref_el.construct_subelement(sd-1)
+
+        phi_deg = 0 if sd == 1 else degree - k
+        phi = polynomial_set.ONPolynomialSet(facet_el, phi_deg, shape=(sd,))
+        Q = create_quadrature(facet_el, 2 * phi_deg)
+        qpts, qwts = Q.get_points(), Q.get_weights()
+        phi_at_qpts = phi.tabulate(qpts)[(0,) * (sd-1)]
+        weights = numpy.multiply(phi_at_qpts, qwts)
+
+        rows = []
+        for facet in ref_el.get_interior_facets(sd-1):
+            normal = ref_el.compute_normal(facet)
+            jumps = expansion_set.tabulate_normal_jumps(degree, qpts, facet, order=order)
+            for r in range(k, order+1):
+                jump = numpy.dot(coeffs, jumps[r])
+                # num_wt = 1 if sd == 1 else expansions.polynomial_dimension(facet_el, degree-r)
+                wn = weights[:, :, None, :] * normal[None, None, :, None]
+                ax = tuple(range(1, len(wn.shape)))
+                rows.append(numpy.tensordot(wn, jump, axes=(ax, ax)))
+
+        if len(rows) > 0:
+            dual_mat = numpy.row_stack(rows)
+            _, sig, vt = numpy.linalg.svd(dual_mat, full_matrices=True)
+            num_sv = len([s for s in sig if abs(s) > 1.e-10])
+            coeffs = numpy.tensordot(vt[num_sv:], coeffs, axes=(1, 0))
+
+        super(HDivSymPolynomialSet, self).__init__(ref_el, degree, degree, expansion_set, coeffs)
