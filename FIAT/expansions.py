@@ -420,28 +420,28 @@ class ExpansionSet(object):
         if degree == 0:
             return cache.setdefault(key, numpy.zeros((self.ref_el.get_spatial_dimension(), 1, 1), "d"))
 
-        sd = self.ref_el.get_spatial_dimension()
+        D = self.ref_el.get_dimension()
         top = self.ref_el.get_topology()
-        verts = self.ref_el.get_vertices_of_subcomplex(top[sd][cell])
+        verts = self.ref_el.get_vertices_of_subcomplex(top[D][cell])
         pts = reference_element.make_lattice(verts, degree, variant="gl")
         v = self._tabulate_on_cell(degree, pts, order=1, cell=cell)
-        dv = [numpy.transpose(v[alpha]) for alpha in mis(sd, 1)]
-        dmats = numpy.linalg.solve(numpy.transpose(v[(0,)*sd]), dv)
+        dv = [numpy.transpose(v[alpha]) for alpha in mis(D, 1)]
+        dmats = numpy.linalg.solve(numpy.transpose(v[(0,) * D]), dv)
         return cache.setdefault(key, dmats)
 
     def tabulate(self, n, pts):
         if len(pts) == 0:
             return numpy.array([])
-        D = self.ref_el.get_spatial_dimension()
-        return self._tabulate(n, pts)[(0,) * D]
+        sd = self.ref_el.get_spatial_dimension()
+        return self._tabulate(n, pts)[(0,) * sd]
 
     def tabulate_derivatives(self, n, pts):
         from FIAT.polynomial_set import mis
         vals = self._tabulate(n, pts, order=1)
         # Create the ordinary data structure.
-        D = self.ref_el.get_spatial_dimension()
-        v = vals[(0,) * D]
-        dv = [vals[alpha] for alpha in mis(D, 1)]
+        sd = self.ref_el.get_spatial_dimension()
+        v = vals[(0,) * sd]
+        dv = [vals[alpha] for alpha in mis(sd, 1)]
         data = [[(v[i, j], [vi[i, j] for vi in dv])
                  for j in range(v.shape[1])]
                 for i in range(v.shape[0])]
@@ -450,13 +450,13 @@ class ExpansionSet(object):
     def tabulate_jet(self, n, pts, order=1):
         vals = self._tabulate(n, pts, order=order)
         # Create the ordinary data structure.
-        D = self.ref_el.get_spatial_dimension()
-        v0 = vals[(0,)*D]
+        sd = self.ref_el.get_spatial_dimension()
+        v0 = vals[(0,) * sd]
         data = [v0]
         for r in range(1, order+1):
-            vr = numpy.zeros((D,)*r + v0.shape, dtype=v0.dtype)
+            vr = numpy.zeros((sd,) * r + v0.shape, dtype=v0.dtype)
             for index in numpy.ndindex(vr.shape[:r]):
-                vr[index] = vals[tuple(map(index.count, range(D)))]
+                vr[index] = vals[tuple(map(index.count, range(sd)))]
             data.append(vr.transpose((r, r+1) + tuple(range(r))))
         return data
 
