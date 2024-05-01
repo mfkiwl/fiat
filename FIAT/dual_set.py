@@ -13,6 +13,7 @@ from FIAT import polynomial_set, functional
 
 class DualSet(object):
     def __init__(self, nodes, ref_el, entity_ids, entity_permutations=None):
+        nodes, ref_el, entity_ids, entity_permutations = merge_entities(nodes, ref_el, entity_ids, entity_permutations)
         self.nodes = nodes
         self.ref_el = ref_el
         self.entity_ids = entity_ids
@@ -30,6 +31,9 @@ class DualSet(object):
                     ids += self.entity_ids[d][se]
                 ids.sort()
                 self.entity_closure_ids[d][e] = ids
+
+    def __iter__(self):
+        return iter(self.nodes)
 
     def get_nodes(self):
         return self.nodes
@@ -193,3 +197,23 @@ def make_entity_closure_ids(ref_el, entity_ids):
             entity_closure_ids[d][e] = ids
 
     return entity_closure_ids
+
+
+def merge_entities(nodes, ref_el, entity_ids, entity_permutations):
+    """Collect DOFs from simplicial complex onto facets of parent cell"""
+    parent_cell = ref_el.get_parent()
+    if parent_cell is None:
+        return nodes, ref_el, entity_ids, entity_permutations
+    parent_nodes = []
+    parent_ids = {}
+    parent_permutations = None
+
+    parent_to_children = ref_el.get_parent_to_children()
+    for dim in sorted(parent_to_children):
+        parent_ids[dim] = {}
+        for entity in sorted(parent_to_children[dim]):
+            cur = len(parent_nodes)
+            for child_dim, child_entity in parent_to_children[dim][entity]:
+                parent_nodes.extend(nodes[i] for i in entity_ids[child_dim][child_entity])
+            parent_ids[dim][entity] = list(range(cur, len(parent_nodes)))
+    return parent_nodes, parent_cell, parent_ids, parent_permutations

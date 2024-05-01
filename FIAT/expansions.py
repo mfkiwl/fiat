@@ -67,22 +67,22 @@ def dubiner_recurrence(dim, n, order, ref_pts, Jinv, scale, variant=None):
 
     :arg dim: The spatial dimension of the simplex.
     :arg n: The polynomial degree.
-    :arg order: The maximum order of differenation.
+    :arg order: The maximum order of differentiation.
     :arg ref_pts: An ``ndarray`` with the coordinates on the default (-1, 1)^d simplex.
     :arg Jinv: The inverse of the Jacobian of the coordinate mapping from the default simplex.
     :arg scale: A scale factor that sets the first member of expansion set.
     :arg variant: Choose between the default (None) orthogonal basis,
-                  'integral' for integrated Jacobi polynomials,
+                  'bubble' for integrated Jacobi polynomials,
                   or 'dual' for the L2-duals of the integrated Jacobi polynomials.
 
     :returns: A tuple with tabulations of the expansion set and its derivatives.
     """
     if order > 2:
         raise ValueError("Higher order derivatives not supported")
-    if variant not in [None, "integral", "dual"]:
+    if variant not in [None, "bubble", "dual"]:
         raise ValueError(f"Invalid variant {variant}")
 
-    if variant == "integral":
+    if variant == "bubble":
         scale = -scale
     if n == 0:
         # Always return 1 for n=0 to make regression tests pass
@@ -108,7 +108,7 @@ def dubiner_recurrence(dim, n, order, ref_pts, Jinv, scale, variant=None):
         raise ValueError("Invalid number of spatial dimensions")
 
     beta = 1 if variant == "dual" else 0
-    coefficients = integrated_jrc if variant == "integral" else jrc
+    coefficients = integrated_jrc if variant == "bubble" else jrc
     X = pad_coordinates(ref_pts, pad_dim)
     idx = (lambda p: p, morton_index2, morton_index3)[dim-1]
     for codim in range(dim):
@@ -120,7 +120,7 @@ def dubiner_recurrence(dim, n, order, ref_pts, Jinv, scale, variant=None):
             icur = idx(*sub_index, 0)
             inext = idx(*sub_index, 1)
 
-            if variant == "integral":
+            if variant == "bubble":
                 alpha = 2 * sum(sub_index)
                 a = b = -0.5
             else:
@@ -162,48 +162,70 @@ def dubiner_recurrence(dim, n, order, ref_pts, Jinv, scale, variant=None):
             if variant is not None:
                 p = index[-1] + shift
                 alpha = 2 * (sum(index[:-1]) + d * shift) - 1
-                norm2 = 1.0
+                norm2 = (0.5 + d) / d
                 if p > 0 and p + alpha > 0:
-                    norm2 = (p + alpha) * (2*p + alpha) / p
-                    norm2 *= (2*d+1) / (2*d)
+                    norm2 *= (p + alpha) * (2*p + alpha) / p
             else:
                 norm2 = (2*sum(index) + d) / d
             scale = math.sqrt(norm2)
             for result in results:
                 result[icur] *= scale
+    return results
 
-    # recover facet bubbles
-    if variant == "integral":
+
+def C0_basis(dim, n, tabulations):
+    """Modify a tabulation of a hierarchical basis to enforce C0-continuity.
+
+    :arg dim: The spatial dimension of the simplex.
+    :arg n: The polynomial degree.
+    :arg tabulations: An iterable tabulations of the hierarchical basis.
+
+    :returns: A tuple of tabulations of the C0 basis.
+    """
+    idx = (lambda p: p, morton_index2, morton_index3)[dim-1]
+    # Recover facet bubbles
+    for phi in tabulations:
         icur = 0
-        for result in results:
-            result[icur] *= -1
+        phi[icur] *= -1
         for inext in range(1, dim+1):
-            for result in results:
-                result[icur] -= result[inext]
-
+            phi[icur] -= phi[inext]
         if dim == 2:
             for i in range(2, n+1):
-                icur = idx(0, i)
-                iprev = idx(1, i-1)
-                for result in results:
-                    result[icur] -= result[iprev]
-
+                phi[idx(0, i)] -= phi[idx(1, i-1)]
         elif dim == 3:
             for i in range(2, n+1):
                 for j in range(0, n+1-i):
-                    icur = idx(0, i, j)
-                    iprev = idx(1, i-1, j)
-                    for result in results:
-                        result[icur] -= result[iprev]
-
+                    phi[idx(0, i, j)] -= phi[idx(1, i-1, j)]
                 icur = idx(0, 0, i)
-                iprev0 = idx(1, 0, i-1)
-                iprev1 = idx(0, 1, i-1)
-                for result in results:
-                    result[icur] -= result[iprev0]
-                    result[icur] -= result[iprev1]
+                phi[icur] -= phi[idx(0, 1, i-1)]
+                phi[icur] -= phi[idx(1, 0, i-1)]
 
-    return results
+    # Reorder by dimension and entity on the reference simplex
+    dofs = list(range(dim+1))
+    if dim == 1:
+        dofs.extend(range(2, n+1))
+    elif dim == 2:
+        dofs.extend(idx(1, i-1) for i in range(2, n+1))
+        dofs.extend(idx(0, i) for i in range(2, n+1))
+        dofs.extend(idx(i, 0) for i in range(2, n+1))
+
+        dofs.extend(idx(i, j) for j in range(1, n+1) for i in range(2, n-j+1))
+    else:
+        dofs.extend(idx(0, 1, i-1) for i in range(2, n+1))
+        dofs.extend(idx(1, 0, i-1) for i in range(2, n+1))
+        dofs.extend(idx(1, i-1, 0) for i in range(2, n+1))
+        dofs.extend(idx(0, 0, i) for i in range(2, n+1))
+        dofs.extend(idx(0, i, 0) for i in range(2, n+1))
+        dofs.extend(idx(i, 0, 0) for i in range(2, n+1))
+
+        dofs.extend(idx(1, i-1, j) for j in range(1, n+1) for i in range(2, n-j+1))
+        dofs.extend(idx(0, i, j) for j in range(1, n+1) for i in range(2, n-j+1))
+        dofs.extend(idx(i, 0, j) for j in range(1, n+1) for i in range(2, n-j+1))
+        dofs.extend(idx(i, j, 0) for j in range(1, n+1) for i in range(2, n-j+1))
+
+        dofs.extend(idx(i, j, k) for k in range(1, n+1) for j in range(1, n-k+1) for i in range(2, n-j-k+1))
+
+    return tuple([phi[i] for i in dofs] for phi in tabulations)
 
 
 def xi_triangle(eta):
@@ -223,9 +245,19 @@ def xi_tetrahedron(eta):
     return xi1, xi2, xi3
 
 
+def apply_mapping(A, b, pts):
+    """Apply an affine mapping to a column-stacked array of points."""
+    if isinstance(pts, numpy.ndarray) and len(pts.shape) == 2:
+        return numpy.dot(A, pts) + b[:, None]
+    else:
+        m1, m2 = A.shape
+        return [sum((A[i, j] * pts[j] for j in range(m2)), b[i])
+                for i in range(m1)]
+
+
 class ExpansionSet(object):
     def __new__(cls, *args, **kwargs):
-        """Returns an ExpansionSet instance appopriate for the given
+        """Returns an ExpansionSet instance appropriate for the given
         reference element."""
         if cls is not ExpansionSet:
             return super(ExpansionSet, cls).__new__(cls)
@@ -244,13 +276,14 @@ class ExpansionSet(object):
     def __init__(self, ref_el, scale=None, variant=None):
         self.ref_el = ref_el
         self.variant = variant
-        dim = ref_el.get_spatial_dimension()
-        self.base_ref_el = reference_element.default_simplex(dim)
-        v1 = ref_el.get_vertices()
-        v2 = self.base_ref_el.get_vertices()
-        self.A, self.b = reference_element.make_affine_mapping(v1, v2)
-        self.mapping = lambda x: numpy.dot(self.A, x) + self.b
-        self._dmats_cache = {}
+        sd = ref_el.get_spatial_dimension()
+        top = ref_el.get_topology()
+        self.base_ref_el = reference_element.default_simplex(sd)
+        base_verts = self.base_ref_el.get_vertices()
+
+        self.affine_mappings = [reference_element.make_affine_mapping(
+                                ref_el.get_vertices_of_subcomplex(top[sd][cell]),
+                                base_verts) for cell in top[sd]]
         if scale is None:
             scale = math.sqrt(1.0 / self.base_ref_el.volume())
         elif isinstance(scale, str):
@@ -260,66 +293,49 @@ class ExpansionSet(object):
             elif scale == "l2 piola":
                 scale = 1.0 / ref_el.volume()
         self.scale = scale
+        self.continuity = "C0" if variant == "bubble" else None
+        self.recurrence_order = 2
+        self._dmats_cache = {}
+        self._cell_node_map_cache = {}
 
     def get_num_members(self, n):
-        D = self.ref_el.get_spatial_dimension()
-        return math.comb(n + D, D)
+        return polynomial_dimension(self.ref_el, n, self.continuity)
 
-    def _mapping(self, pts):
-        if isinstance(pts, numpy.ndarray) and len(pts.shape) == 2:
-            return numpy.dot(self.A, pts) + self.b[:, None]
-        else:
-            m1, m2 = self.A.shape
-            return [sum((self.A[i, j] * pts[j] for j in range(m2)), self.b[i])
-                    for i in range(m1)]
-
-    def _tabulate(self, n, pts, order=0):
-        """A version of tabulate() that also works for a single point.
-        """
-        D = self.ref_el.get_spatial_dimension()
-        return dubiner_recurrence(D, n, order, self._mapping(pts), self.A, self.scale, variant=self.variant)
-
-    def get_dmats(self, degree):
-        """Returns a numpy array with the expansion coefficients dmat[k, j, i]
-        of the gradient of each member of the expansion set:
-            d/dx_k phi_j = sum_i dmat[k, j, i] phi_i.
-        """
-        cache = self._dmats_cache
-        key = degree
+    def get_cell_node_map(self, n):
         try:
-            return cache[key]
+            return self._cell_node_map_cache[n]
         except KeyError:
-            pass
-        if degree == 0:
-            return cache.setdefault(key, numpy.zeros((self.ref_el.get_spatial_dimension(), 1, 1), "d"))
+            cell_node_map = polynomial_cell_node_map(self.ref_el, n, self.continuity)
+            return self._cell_node_map_cache.setdefault(n, cell_node_map)
 
-        pts = reference_element.make_lattice(self.ref_el.get_vertices(), degree, variant="gl")
-        v, dv = self._tabulate(degree, numpy.transpose(pts), order=1)
-        dv = numpy.transpose(dv, (1, 2, 0))
-        dmats = numpy.linalg.solve(numpy.transpose(v), dv)
-        return cache.setdefault(key, dmats)
-
-    def _tabulate_jet(self, degree, pts, order=0):
+    def _tabulate_on_cell(self, n, pts, order=0, cell=0, direction=None):
         from FIAT.polynomial_set import mis
-        D = self.ref_el.get_spatial_dimension()
-        lorder = min(2, order)
-        vals = self._tabulate(degree, numpy.transpose(pts), order=lorder)
-        result = {(0,) * D: numpy.array(vals[0])}
-        for r in range(1, 1+lorder):
-            vr = numpy.transpose(vals[r], tuple(range(1, r+1)) + (0, r+1))
+        lorder = min(order, self.recurrence_order)
+        A, b = self.affine_mappings[cell]
+        ref_pts = apply_mapping(A, b, numpy.transpose(pts))
+        Jinv = A if direction is None else numpy.dot(A, direction)[:, None]
+        sd = self.ref_el.get_spatial_dimension()
+        phi = dubiner_recurrence(sd, n, lorder, ref_pts, Jinv,
+                                 self.scale, variant=self.variant)
+        if self.continuity == "C0":
+            phi = C0_basis(sd, n, phi)
+
+        # Pack linearly independent components into a dictionary
+        result = {(0,) * sd: numpy.asarray(phi[0])}
+        for r in range(1, len(phi)):
+            vr = numpy.transpose(phi[r], tuple(range(1, r+1)) + (0, r+1))
             for indices in numpy.ndindex(vr.shape[:r]):
-                alpha = tuple(map(indices.count, range(D)))
+                alpha = tuple(map(indices.count, range(sd)))
                 if alpha not in result:
                     result[alpha] = vr[indices]
 
         def distance(alpha, beta):
             return sum(ai != bi for ai, bi in zip(alpha, beta))
 
-        # Only use dmats if order > lorder
-        for i in range(lorder + 1, order + 1):
-            dmats = self.get_dmats(degree)
-            alphas = mis(D, i)
-            for alpha in alphas:
+        # Only use dmats if tabulate failed
+        for i in range(len(phi), order + 1):
+            dmats = self.get_dmats(n, cell=cell)
+            for alpha in mis(sd, i):
                 base_alpha = next(a for a in result if sum(a) == i-1 and distance(alpha, a) == 1)
                 vals = result[base_alpha]
                 for dmat, start, end in zip(dmats, base_alpha, alpha):
@@ -328,31 +344,119 @@ class ExpansionSet(object):
                 result[alpha] = vals
         return result
 
+    def _tabulate(self, n, pts, order=0):
+        """A version of tabulate() that also works for a single point."""
+        pts = numpy.asarray(pts)
+        cell_point_map = compute_cell_point_map(self.ref_el, pts)
+        phis = [self._tabulate_on_cell(n, pts[ipts], order, cell=k)
+                for k, ipts in enumerate(cell_point_map)]
+
+        if len(phis) == 1:
+            return phis[0]
+
+        num_phis = self.get_num_members(n)
+        cell_node_map = self.get_cell_node_map(n)
+        result = {}
+        for alpha in phis[0]:
+            result[alpha] = numpy.zeros((num_phis,) + pts.shape[:-1])
+            for ibfs, ipts, phi in zip(cell_node_map, cell_point_map, phis):
+                result[alpha][numpy.ix_(ibfs, ipts)] = phi[alpha]
+        return result
+
+    def tabulate_normal_jumps(self, n, ref_pts, facet, order=0):
+        """Tabulates the normal derivative jumps on reference points on a facet.
+
+        :arg n: the polynomial degree.
+        :arg ref_pts: an iterable of points on the reference facet.
+        :arg facet: the facet id.
+        :kwarg order: the order of differentiation.
+
+        :returns: a numpy array of tabulations of normal derivative jumps.
+        """
+        sd = self.ref_el.get_spatial_dimension()
+        transform = self.ref_el.get_entity_transform(sd-1, facet)
+        pts = numpy.array(list(map(transform, ref_pts)))
+        cell_point_map = compute_cell_point_map(self.ref_el, pts, unique=False)
+        cell_node_map = self.get_cell_node_map(n)
+
+        num_phis = self.get_num_members(n)
+        results = [numpy.zeros((num_phis,) + (sd,) * (r-1) + pts.shape[:-1])
+                   for r in range(order+1)]
+
+        for k, (ibfs, ipts) in enumerate(zip(cell_node_map, cell_point_map)):
+            if len(ipts) > 0:
+                normal = self.ref_el.compute_normal(facet, cell=k)
+                side = numpy.dot(normal, self.ref_el.compute_normal(facet))
+                phi = self._tabulate_on_cell(n, pts[ipts], order, cell=k)
+                v0 = phi[(0,)*sd]
+                for r in range(order+1):
+                    vr = numpy.zeros((sd,)*r + v0.shape, dtype=v0.dtype)
+                    for index in numpy.ndindex(vr.shape[:r]):
+                        vr[index] = phi[tuple(map(index.count, range(sd)))]
+                    if r > 0:
+                        vr = numpy.tensordot(normal, vr, axes=(0, 0))
+                    vr = vr.transpose((-2, *tuple(range(r-1)), -1))
+
+                    shape_indices = tuple(range(sd) for _ in range(r-1))
+                    indices = numpy.ix_(ibfs, *shape_indices, ipts)
+                    if r == 0 and side < 0:
+                        results[r][indices] -= vr
+                    else:
+                        results[r][indices] += vr
+        return results
+
+    def get_dmats(self, degree, cell=0):
+        """Returns a numpy array with the expansion coefficients dmat[k, j, i]
+        of the gradient of each member of the expansion set:
+            d/dx_k phi_j = sum_i dmat[k, j, i] phi_i.
+        """
+        from FIAT.polynomial_set import mis
+        key = (degree, cell)
+        cache = self._dmats_cache
+        try:
+            return cache[key]
+        except KeyError:
+            pass
+        if degree == 0:
+            return cache.setdefault(key, numpy.zeros((self.ref_el.get_spatial_dimension(), 1, 1), "d"))
+
+        D = self.ref_el.get_dimension()
+        top = self.ref_el.get_topology()
+        verts = self.ref_el.get_vertices_of_subcomplex(top[D][cell])
+        pts = reference_element.make_lattice(verts, degree, variant="gl")
+        v = self._tabulate_on_cell(degree, pts, order=1, cell=cell)
+        dv = [numpy.transpose(v[alpha]) for alpha in mis(D, 1)]
+        dmats = numpy.linalg.solve(numpy.transpose(v[(0,) * D]), dv)
+        return cache.setdefault(key, dmats)
+
     def tabulate(self, n, pts):
         if len(pts) == 0:
             return numpy.array([])
-        results, = self._tabulate(n, numpy.transpose(pts))
-        return numpy.array(results)
+        sd = self.ref_el.get_spatial_dimension()
+        return self._tabulate(n, pts)[(0,) * sd]
 
     def tabulate_derivatives(self, n, pts):
-        vals, deriv_vals = self._tabulate(n, numpy.transpose(pts), order=1)
+        from FIAT.polynomial_set import mis
+        vals = self._tabulate(n, pts, order=1)
         # Create the ordinary data structure.
-        D = self.ref_el.get_spatial_dimension()
-        data = [[(vals[i][j], [deriv_vals[i][r][j] for r in range(D)])
-                 for j in range(len(vals[0]))]
-                for i in range(len(vals))]
+        sd = self.ref_el.get_spatial_dimension()
+        v = vals[(0,) * sd]
+        dv = [vals[alpha] for alpha in mis(sd, 1)]
+        data = [[(v[i, j], [vi[i, j] for vi in dv])
+                 for j in range(v.shape[1])]
+                for i in range(v.shape[0])]
         return data
 
     def tabulate_jet(self, n, pts, order=1):
-        vals = self._tabulate_jet(n, pts, order=order)
+        vals = self._tabulate(n, pts, order=order)
         # Create the ordinary data structure.
-        D = self.ref_el.get_spatial_dimension()
-        v0 = vals[(0,)*D]
+        sd = self.ref_el.get_spatial_dimension()
+        v0 = vals[(0,) * sd]
         data = [v0]
         for r in range(1, order+1):
-            vr = numpy.zeros((D,)*r + v0.shape, dtype=v0.dtype)
+            vr = numpy.zeros((sd,) * r + v0.shape, dtype=v0.dtype)
             for index in numpy.ndindex(vr.shape[:r]):
-                vr[index] = vals[tuple(map(index.count, range(D)))]
+                vr[index] = vals[tuple(map(index.count, range(sd)))]
             data.append(vr.transpose((r, r+1) + tuple(range(r))))
         return data
 
@@ -377,26 +481,26 @@ class LineExpansionSet(ExpansionSet):
             raise Exception("Must have a line")
         super(LineExpansionSet, self).__init__(ref_el, **kwargs)
 
-    def _tabulate(self, n, pts, order=0):
+    def _tabulate_on_cell(self, n, pts, order=0, cell=0, direction=None):
         """Returns a tuple of (vals, derivs) such that
         vals[i,j] = phi_i(pts[j]), derivs[i,j] = D vals[i,j]."""
         if self.variant is not None:
-            return super(LineExpansionSet, self)._tabulate(n, pts, order=order)
+            return super(LineExpansionSet, self)._tabulate_on_cell(n, pts, order=order, cell=cell, direction=direction)
 
-        xs = self._mapping(pts).T
-        results = []
+        A, b = self.affine_mappings[cell]
+        Jinv = A[0, 0] if direction is None else numpy.dot(A, direction)
+        xs = apply_mapping(A, b, numpy.transpose(pts)).T
+        results = {}
         scale = self.scale * numpy.sqrt(2 * numpy.arange(n+1) + 1)
         for k in range(order+1):
-            v = numpy.zeros((n + 1, len(xs)), xs.dtype)
+            v = numpy.zeros((n + 1, len(xs)), "d")
             if n >= k:
                 v[k:] = jacobi.eval_jacobi_batch(k, k, n-k, xs)
             for p in range(n + 1):
                 v[p] *= scale[p]
-                scale[p] *= 0.5 * (p + k + 1) * self.A[0, 0]
-            shape = v.shape
-            shape = shape[:1] + (1,) * k + shape[1:]
-            results.append(v.reshape(shape))
-        return tuple(results)
+                scale[p] *= 0.5 * (p + k + 1) * Jinv
+            results[(k,)] = v
+        return results
 
 
 class TriangleExpansionSet(ExpansionSet):
@@ -416,18 +520,102 @@ class TetrahedronExpansionSet(ExpansionSet):
         super(TetrahedronExpansionSet, self).__init__(ref_el, **kwargs)
 
 
-def polynomial_dimension(ref_el, degree):
+def polynomial_dimension(ref_el, n, continuity=None):
     """Returns the dimension of the space of polynomials of degree no
-    greater than degree on the reference element."""
+    greater than n on the reference complex."""
     if ref_el.get_shape() == reference_element.POINT:
-        if degree > 0:
+        if n > 0:
             raise ValueError("Only degree zero polynomials supported on point elements.")
         return 1
-    elif ref_el.get_shape() == reference_element.LINE:
-        return max(0, degree + 1)
-    elif ref_el.get_shape() == reference_element.TRIANGLE:
-        return max((degree + 1) * (degree + 2) // 2, 0)
-    elif ref_el.get_shape() == reference_element.TETRAHEDRON:
-        return max(0, (degree + 1) * (degree + 2) * (degree + 3) // 6)
+    top = ref_el.get_topology()
+    if continuity == "C0":
+        space_dimension = sum(math.comb(n - 1, dim) * len(top[dim]) for dim in top)
     else:
-        raise ValueError("Unknown reference element type.")
+        dim = ref_el.get_spatial_dimension()
+        space_dimension = math.comb(n + dim, dim) * len(top[dim])
+    return space_dimension
+
+
+def polynomial_entity_ids(ref_el, n, continuity=None):
+    """Maps entites of a cell complex to members of a polynomial basis.
+
+    :arg ref_el: a SimplicialComplex.
+    :arg n: the polynomial degree of the expansion set.
+    :arg continuity: the continuity of the expansion set.
+    :returns: a dict of dicts mapping dimension and entity id to basis functions.
+    """
+    top = ref_el.get_topology()
+    sd = ref_el.get_spatial_dimension()
+    entity_ids = {}
+    cur = 0
+    for dim in sorted(top):
+        if continuity == "C0":
+            dofs = math.comb(n - 1, dim)
+        else:
+            # DG numbering
+            dofs = math.comb(n + dim, dim) if dim == sd else 0
+        entity_ids[dim] = {}
+        for entity in sorted(top[dim]):
+            entity_ids[dim][entity] = list(range(cur, cur + dofs))
+            cur += dofs
+    return entity_ids
+
+
+def polynomial_cell_node_map(ref_el, n, continuity=None):
+    """Maps cells on a simplicial complex to members of a polynomial basis.
+
+    :arg ref_el: a SimplicialComplex.
+    :arg n: the polynomial degree of the expansion set.
+    :arg continuity: the continuity of the expansion set.
+    :returns: a numpy array mapping cell id to basis functions supported on that cell.
+    """
+    top = ref_el.get_topology()
+    sd = ref_el.get_spatial_dimension()
+
+    entity_ids = polynomial_entity_ids(ref_el, n, continuity)
+    ref_entity_ids = polynomial_entity_ids(ref_el.construct_subelement(sd), n, continuity)
+
+    num_cells = len(top[sd])
+    dofs_per_cell = sum(len(ref_entity_ids[dim][entity])
+                        for dim in ref_entity_ids for entity in ref_entity_ids[dim])
+    cell_node_map = numpy.zeros((num_cells, dofs_per_cell), dtype=int)
+    conn = ref_el.get_cell_connectivity()
+    for cell in top[sd]:
+        for dim in top:
+            for ref_entity, entity in enumerate(conn[cell][dim]):
+                ref_dofs = ref_entity_ids[dim][ref_entity]
+                cell_node_map[cell, ref_dofs] = entity_ids[dim][entity]
+    return cell_node_map
+
+
+def compute_cell_point_map(ref_el, pts, unique=True, tol=1E-12):
+    """Maps cells on a simplicial complex to points.
+
+    :arg ref_el: a SimplicialComplex.
+    :arg pts: an iterable of physical points on the complex.
+    :kwarg unique: Are we assigning a unique cell to points on facets?
+    :kwarg tol: the absolute tolerance.
+    :returns: a numpy array mapping cell id to points located on that cell.
+    """
+    top = ref_el.get_topology()
+    sd = ref_el.get_spatial_dimension()
+    if len(top[sd]) == 1:
+        return (Ellipsis,)
+
+    cell_point_map = []
+    ref_vertices = reference_element.ufc_simplex(sd).get_vertices()
+    for cell in top[sd]:
+        verts = ref_el.get_vertices_of_subcomplex(top[sd][cell])
+        A, b = reference_element.make_affine_mapping(verts, ref_vertices)
+        A = numpy.vstack((A, -numpy.sum(A, axis=0)))
+        b = numpy.hstack((b, 1-numpy.sum(b, axis=0)))
+        x = numpy.dot(pts, A.T) + b[None, :]
+
+        # Bin points based on l1 distance
+        pts_on_cell = abs(numpy.sum(abs(x) - x, axis=1)) < 2*tol
+        if unique:
+            for other in cell_point_map:
+                pts_on_cell[other] = False
+        ipts = numpy.where(pts_on_cell)[0]
+        cell_point_map.append(ipts)
+    return cell_point_map

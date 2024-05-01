@@ -7,6 +7,7 @@ import pkg_resources
 # Import finite element classes
 from FIAT.finite_element import FiniteElement, CiarletElement  # noqa: F401
 from FIAT.argyris import Argyris
+from FIAT.hct import HsiehCloughTocher
 from FIAT.bernstein import Bernstein
 from FIAT.bell import Bell
 from FIAT.argyris import QuinticArgyris
@@ -30,6 +31,7 @@ from FIAT.gauss_radau import GaussRadau
 from FIAT.morley import Morley
 from FIAT.nedelec import Nedelec
 from FIAT.nedelec_second_kind import NedelecSecondKind
+from FIAT.hierarchical import Legendre, IntegratedLegendre
 from FIAT.P0 import P0
 from FIAT.raviart_thomas import RaviartThomas
 from FIAT.crouzeix_raviart import CrouzeixRaviart
@@ -48,7 +50,6 @@ from FIAT.mixed import MixedElement                       # noqa: F401
 from FIAT.restricted import RestrictedElement             # noqa: F401
 from FIAT.quadrature_element import QuadratureElement     # noqa: F401
 from FIAT.kong_mulder_veldhuizen import KongMulderVeldhuizen  # noqa: F401
-from FIAT.hierarchical import Legendre, IntegratedLegendre  # noqa: F401
 from FIAT.fdm_element import FDMLagrange, FDMDiscontinuousLagrange, FDMQuadrature, FDMBrokenH1, FDMBrokenL2, FDMHermite  # noqa: F401
 
 # Important functionality
@@ -61,6 +62,7 @@ __version__ = pkg_resources.get_distribution("fenics-fiat").version
 
 # List of supported elements and mapping to element classes
 supported_elements = {"Argyris": Argyris,
+                      "HsiehCloughTocher": HsiehCloughTocher,
                       "Bell": Bell,
                       "Bernstein": Bernstein,
                       "Brezzi-Douglas-Marini": BrezziDouglasMarini,
@@ -81,6 +83,8 @@ supported_elements = {"Argyris": Argyris,
                       "Gauss-Lobatto-Legendre": GaussLobattoLegendre,
                       "Gauss-Legendre": GaussLegendre,
                       "Gauss-Radau": GaussRadau,
+                      "Legendre": Legendre,
+                      "Integrated Legendre": IntegratedLegendre,
                       "Morley": Morley,
                       "Nedelec 1st kind H(curl)": Nedelec,
                       "Nedelec 2nd kind H(curl)": NedelecSecondKind,
