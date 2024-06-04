@@ -737,7 +737,7 @@ class UFCSimplex(Simplex):
         # sum(bary-abs(bary)) = -4.
         # - 0.5 * sum(bary-abs(bary)) = 2.0
         # which is the correct L1 distance from the cell to the point.
-        l1_dist = - 0.5 * sum([b - abs(b) for b in bary])
+        l1_dist = - 0.5 * sum(b - abs(b) for b in bary)
         # Take abs at the end to avoid negative zero.
         return abs(l1_dist)
 

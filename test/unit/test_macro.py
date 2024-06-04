@@ -347,3 +347,26 @@ def test_Ck_basis(cell, order, degree, variant):
         Uvals = U._tabulate_on_cell(degree, verts, 0, cell=cell)[(0,)*sd]
         local_phis = numpy.dot(coeffs[:, cell_node_map[cell]], Uvals)
         assert numpy.allclose(local_phis, phis[:, ipts])
+
+
+@pytest.mark.parametrize("variant", (None, "bubble"))
+def test_macro_sympy(cell, variant):
+    import sympy
+    from FIAT.expansions import ExpansionSet
+    dim = cell.get_spatial_dimension()
+    A = AlfeldSplit(cell)
+    phi = ExpansionSet(A, variant=variant)
+    pt = tuple(sympy.Symbol("X[%d]" % i) for i in range(dim))
+    X = A.get_vertices()
+    num_pts = len(X)
+
+    min_deg = 1 if variant == "bubble" else 0
+    for degree in range(min_deg, 3):
+        tab_sympy = phi.tabulate(degree, pt)
+        results = numpy.zeros((len(tab_sympy), num_pts))
+        for k in range(num_pts):
+            rule = {pt[j]: X[k][j] for j in range(dim)}
+            results[:, k] = [float(phi.subs(rule)) for phi in tab_sympy]
+
+        tab_numpy = phi.tabulate(degree, X)
+        assert numpy.allclose(results, tab_numpy)
