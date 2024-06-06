@@ -356,17 +356,18 @@ def test_macro_sympy(cell, element):
     A = AlfeldSplit(cell)
 
     X = tuple(sympy.Symbol("X[%d]" % i) for i in range(dim))
-    pts = A.get_vertices()
-    num_pts = len(pts)
+    pts = []
+    top = A.get_topology()
+    for edim in range(2):
+        for e in top[edim]:
+            pts.extend(A.make_points(edim, e, 2))
 
-    min_deg = 1
-    for degree in range(min_deg, 3):
+    degrees = range(1, 3) if element is Lagrange else range(3)
+    for degree in degrees:
         fe = element(A, degree, variant="spectral")
         tab_numpy = fe.tabulate(0, pts)[(0,) * dim]
         tab_sympy = fe.tabulate(0, X)[(0,) * dim]
 
-        results = numpy.zeros(tab_numpy.shape)
-        for k in range(num_pts):
-            rule = {X[j]: pts[k][j] for j in range(dim)}
-            results[:, k] = [float(phi.subs(rule)) for phi in tab_sympy]
+        phis = sympy.lambdify(X, tab_sympy)
+        results = phis(*numpy.transpose(pts))
         assert numpy.allclose(results, tab_numpy)

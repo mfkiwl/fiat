@@ -377,7 +377,8 @@ class ExpansionSet(object):
             dtype = phis[0][alpha].dtype
             result[alpha] = numpy.zeros((num_phis,) + pts.shape[:-1], dtype=dtype)
             for ibfs, ipts, phi in zip(cell_node_map, cell_point_map, phis):
-                result[alpha][idx(ibfs, ipts)] = phi[alpha]
+                # Add non-overlapping contributions, as points are uniquely binned
+                result[alpha][idx(ibfs, ipts)] += phi[alpha]
         return result
 
     def tabulate_normal_jumps(self, n, ref_pts, facet, order=0):
