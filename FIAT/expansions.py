@@ -359,7 +359,7 @@ class ExpansionSet(object):
         if len(phis) == 1:
             return phis[0]
 
-        # If binning is not defined, scale by the characteristic function of each subcell
+        # If binning is undefined, scale by the characteristic function of each subcell
         if pts.dtype == object:
             # assert singleton point
             pt, = pts[cell_point_map[0]]
@@ -660,7 +660,6 @@ def compute_cell_point_map(ref_el, pts, unique=True, tol=1E-12):
 
 def compute_subcell_masks(ref_el, pt, tol=1E-12, unique=True, continuity=None):
     from sympy import Piecewise
-    T = 1.0
     sd = ref_el.get_spatial_dimension()
     top = ref_el.get_topology()
     masks = [None for cell in top[sd]]
@@ -668,10 +667,11 @@ def compute_subcell_masks(ref_el, pt, tol=1E-12, unique=True, continuity=None):
     cells = top[sd]
     if continuity is not None:
         cells = reversed(cells)
+
+    otherwise = []
     for cell in cells:
         inside = compute_l1_distance(ref_el, sd, cell, pt) < tol
-        Xi = Piecewise((1.0, inside), (0.0, True))
-        masks[cell] = T * Xi
+        masks[cell] = Piecewise(*otherwise, (1.0, inside), (0.0, True))
         if unique:
-            T = T * (1.0 - Xi)
+            otherwise.append((0.0, inside))
     return masks

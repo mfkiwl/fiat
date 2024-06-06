@@ -349,24 +349,24 @@ def test_Ck_basis(cell, order, degree, variant):
         assert numpy.allclose(local_phis, phis[:, ipts])
 
 
-@pytest.mark.parametrize("variant", (None, "bubble"))
-def test_macro_sympy(cell, variant):
+@pytest.mark.parametrize("element", (DiscontinuousLagrange, Lagrange))
+def test_macro_sympy(cell, element):
     import sympy
-    from FIAT.expansions import ExpansionSet
     dim = cell.get_spatial_dimension()
     A = AlfeldSplit(cell)
-    phi = ExpansionSet(A, variant=variant)
-    pt = tuple(sympy.Symbol("X[%d]" % i) for i in range(dim))
-    X = A.get_vertices()
-    num_pts = len(X)
 
-    min_deg = 1 if variant == "bubble" else 0
+    X = tuple(sympy.Symbol("X[%d]" % i) for i in range(dim))
+    pts = A.get_vertices()
+    num_pts = len(pts)
+
+    min_deg = 1
     for degree in range(min_deg, 3):
-        tab_sympy = phi.tabulate(degree, pt)
-        results = numpy.zeros((len(tab_sympy), num_pts))
-        for k in range(num_pts):
-            rule = {pt[j]: X[k][j] for j in range(dim)}
-            results[:, k] = [float(phi.subs(rule)) for phi in tab_sympy]
+        fe = element(A, degree, variant="spectral")
+        tab_numpy = fe.tabulate(0, pts)[(0,) * dim]
+        tab_sympy = fe.tabulate(0, X)[(0,) * dim]
 
-        tab_numpy = phi.tabulate(degree, X)
+        results = numpy.zeros(tab_numpy.shape)
+        for k in range(num_pts):
+            rule = {X[j]: pts[k][j] for j in range(dim)}
+            results[:, k] = [float(phi.subs(rule)) for phi in tab_sympy]
         assert numpy.allclose(results, tab_numpy)
