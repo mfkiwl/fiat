@@ -352,22 +352,20 @@ def test_Ck_basis(cell, order, degree, variant):
 @pytest.mark.parametrize("element", (DiscontinuousLagrange, Lagrange))
 def test_macro_sympy(cell, element):
     import sympy
+    variant = "spectral,alfeld"
+    K = IsoSplit(cell)
+    ebig = element(K, 2, variant=variant)
+    pts = get_lagrange_points(ebig.dual_basis())
+    pts = pts[0]
+
     dim = cell.get_spatial_dimension()
-    A = AlfeldSplit(cell)
-
     X = tuple(sympy.Symbol("X[%d]" % i) for i in range(dim))
-    pts = []
-    top = A.get_topology()
-    for edim in range(2):
-        for e in top[edim]:
-            pts.extend(A.make_points(edim, e, 2))
-
     degrees = range(1, 3) if element is Lagrange else range(3)
     for degree in degrees:
-        fe = element(A, degree, variant="spectral")
-        tab_numpy = fe.tabulate(0, pts)[(0,) * dim]
+        fe = element(cell, degree, variant=variant)
         tab_sympy = fe.tabulate(0, X)[(0,) * dim]
 
         phis = sympy.lambdify(X, tab_sympy)
         results = phis(*numpy.transpose(pts))
+        tab_numpy = fe.tabulate(0, pts)[(0,) * dim]
         assert numpy.allclose(results, tab_numpy)

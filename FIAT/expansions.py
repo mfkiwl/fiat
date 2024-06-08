@@ -353,32 +353,33 @@ class ExpansionSet(object):
         """A version of tabulate() that also works for a single point."""
         pts = numpy.asarray(pts)
         cell_point_map = compute_cell_point_map(self.ref_el, pts)
-        phis = [self._tabulate_on_cell(n, pts[ipts], order, cell=k)
-                for k, ipts in enumerate(cell_point_map)]
+        phis = {cell: self._tabulate_on_cell(n, pts[ibfs], order, cell=cell)
+                for cell, ibfs in cell_point_map.items()}
 
-        if len(phis) == 1:
+        if not self.ref_el.is_macrocell():
             return phis[0]
 
         # If binning is undefined, scale by the characteristic function of each subcell
         if pts.dtype == object:
-            # assert singleton point
-            pt, = pts[cell_point_map[0]]
-            masks = compute_subcell_masks(self.ref_el, pt, continuity=self.continuity)
-            for phi, mask in zip(phis, masks):
+            masks = compute_subcell_masks(self.ref_el, pts, continuity=self.continuity)
+            for cell, phi in phis.items():
                 for alpha in phi:
-                    phi[alpha] *= mask
+                    phi[alpha] *= masks[cell]
 
         # Insert subcell tabulations into the corresponding submatrices
-        idx = lambda *args: args if args[1] is None else numpy.ix_(*args)
+        idx = lambda *args: args if args[1] is Ellipsis else numpy.ix_(*args)
         num_phis = self.get_num_members(n)
         cell_node_map = self.get_cell_node_map(n)
         result = {}
-        for alpha in phis[0]:
-            dtype = phis[0][alpha].dtype
-            result[alpha] = numpy.zeros((num_phis,) + pts.shape[:-1], dtype=dtype)
-            for ibfs, ipts, phi in zip(cell_node_map, cell_point_map, phis):
+        base_phi = tuple(phis.values())[0]
+        for alpha in base_phi:
+            dtype = base_phi[alpha].dtype
+            result[alpha] = numpy.zeros((num_phis, *pts.shape[:-1]), dtype=dtype)
+            for cell in cell_point_map:
+                ibfs = cell_node_map[cell]
+                ipts = cell_point_map[cell]
                 # Add non-overlapping contributions, as points are uniquely binned
-                result[alpha][idx(ibfs, ipts)] += phi[alpha]
+                result[alpha][idx(ibfs, ipts)] += phis[cell][alpha]
         return result
 
     def tabulate_normal_jumps(self, n, ref_pts, facet, order=0):
@@ -401,26 +402,27 @@ class ExpansionSet(object):
         results = [numpy.zeros((num_phis,) + (sd,) * (r-1) + pts.shape[:-1])
                    for r in range(order+1)]
 
-        for k, (ibfs, ipts) in enumerate(zip(cell_node_map, cell_point_map)):
-            if len(ipts) > 0:
-                normal = self.ref_el.compute_normal(facet, cell=k)
-                side = numpy.dot(normal, self.ref_el.compute_normal(facet))
-                phi = self._tabulate_on_cell(n, pts[ipts], order, cell=k)
-                v0 = phi[(0,)*sd]
-                for r in range(order+1):
-                    vr = numpy.zeros((sd,)*r + v0.shape, dtype=v0.dtype)
-                    for index in numpy.ndindex(vr.shape[:r]):
-                        vr[index] = phi[tuple(map(index.count, range(sd)))]
-                    if r > 0:
-                        vr = numpy.tensordot(normal, vr, axes=(0, 0))
-                    vr = vr.transpose((-2, *tuple(range(r-1)), -1))
+        for cell in cell_point_map:
+            ipts = cell_point_map[cell]
+            ibfs = cell_node_map[cell]
+            normal = self.ref_el.compute_normal(facet, cell=cell)
+            side = numpy.dot(normal, self.ref_el.compute_normal(facet))
+            phi = self._tabulate_on_cell(n, pts[ipts], order, cell=cell)
+            v0 = phi[(0,)*sd]
+            for r in range(order+1):
+                vr = numpy.zeros((sd,)*r + v0.shape, dtype=v0.dtype)
+                for index in numpy.ndindex(vr.shape[:r]):
+                    vr[index] = phi[tuple(map(index.count, range(sd)))]
+                if r > 0:
+                    vr = numpy.tensordot(normal, vr, axes=(0, 0))
+                vr = vr.transpose((-2, *tuple(range(r-1)), -1))
 
-                    shape_indices = tuple(range(sd) for _ in range(r-1))
-                    indices = numpy.ix_(ibfs, *shape_indices, ipts)
-                    if r == 0 and side < 0:
-                        results[r][indices] -= vr
-                    else:
-                        results[r][indices] += vr
+                shape_indices = tuple(range(sd) for _ in range(r-1))
+                indices = numpy.ix_(ibfs, *shape_indices, ipts)
+                if r == 0 and side < 0:
+                    results[r][indices] -= vr
+                else:
+                    results[r][indices] += vr
         return results
 
     def get_dmats(self, degree, cell=0):
@@ -627,49 +629,50 @@ def compute_cell_point_map(ref_el, pts, unique=True, tol=1E-12):
     :arg pts: an iterable of physical points on the complex.
     :kwarg unique: Are we assigning a unique cell to points on facets?
     :kwarg tol: the absolute tolerance.
-    :returns: a numpy array mapping cell id to points located on that cell.
+    :returns: a dict mapping cell id to points located on that cell.
     """
     top = ref_el.get_topology()
     sd = ref_el.get_spatial_dimension()
     if len(top[sd]) == 1:
-        return (Ellipsis,)
+        return {0: Ellipsis}
 
     pts = numpy.asarray(pts)
     if pts.dtype == object:
-        ipts = None if len(pts.shape) == 1 else numpy.arange(len(pts))
-        return [ipts] * len(top[sd])
+        return {cell: Ellipsis for cell in sorted(top[sd])}
 
     binned = False
-    cell_point_map = []
-    for cell in top[sd]:
-        ipts = []
+    cell_point_map = {}
+    for cell in sorted(top[sd]):
         # Bin points based on l1 distance
         pts_on_cell = compute_l1_distance(ref_el, sd, cell, pts) < tol
-        if len(pts_on_cell.shape) == 0 and pts_on_cell:
+        if len(pts_on_cell.shape) == 0:
             # singleton case
-            if not binned:
-                ipts = None
+            if pts_on_cell and not binned:
+                cell_point_map[cell] = Ellipsis
                 binned = unique
         else:
             if unique:
-                for other in cell_point_map:
+                for other in cell_point_map.values():
                     pts_on_cell[other] = False
             ipts = numpy.where(pts_on_cell)[0]
-        cell_point_map.append(ipts)
+            if len(ipts) > 0:
+                cell_point_map[cell] = ipts
     return cell_point_map
 
 
-def compute_subcell_masks(ref_el, pt, tol=1E-12, unique=True, continuity=None):
+def compute_subcell_masks(ref_el, pt, unique=True, tol=1E-12, continuity=None):
     from sympy import Piecewise
     sd = ref_el.get_spatial_dimension()
     top = ref_el.get_topology()
-    masks = [None for cell in top[sd]]
-
     cells = top[sd]
     if continuity is not None:
         cells = reversed(cells)
 
     otherwise = []
+    masks = [None for cell in top[sd]]
+
+    # assert singleton point
+    pt = pt.reshape((sd,))
     for cell in cells:
         inside = compute_l1_distance(ref_el, sd, cell, pt) < tol
         masks[cell] = Piecewise(*otherwise, (1.0, inside), (0.0, True))
