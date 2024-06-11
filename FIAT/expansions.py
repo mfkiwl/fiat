@@ -283,14 +283,14 @@ class ExpansionSet(object):
         self.variant = variant
         sd = ref_el.get_spatial_dimension()
         top = ref_el.get_topology()
-        self.base_ref_el = reference_element.default_simplex(sd)
-        base_verts = self.base_ref_el.get_vertices()
+        base_ref_el = reference_element.default_simplex(sd)
+        base_verts = base_ref_el.get_vertices()
 
         self.affine_mappings = [reference_element.make_affine_mapping(
                                 ref_el.get_vertices_of_subcomplex(top[sd][cell]),
                                 base_verts) for cell in top[sd]]
         if scale is None:
-            scale = math.sqrt(1.0 / self.base_ref_el.volume())
+            scale = math.sqrt(1.0 / base_ref_el.volume())
         elif isinstance(scale, str):
             scale = scale.lower()
             if scale == "orthonormal":
@@ -315,11 +315,11 @@ class ExpansionSet(object):
 
     def _tabulate_on_cell(self, n, pts, order=0, cell=0, direction=None):
         from FIAT.polynomial_set import mis
-        sd = self.ref_el.get_spatial_dimension()
         lorder = min(order, self.recurrence_order)
         A, b = self.affine_mappings[cell]
         ref_pts = apply_mapping(A, b, numpy.transpose(pts))
         Jinv = A if direction is None else numpy.dot(A, direction)[:, None]
+        sd = self.ref_el.get_spatial_dimension()
         phi = dubiner_recurrence(sd, n, lorder, ref_pts, Jinv,
                                  self.scale, variant=self.variant)
         if self.continuity == "C0":
@@ -353,8 +353,8 @@ class ExpansionSet(object):
         """A version of tabulate() that also works for a single point."""
         pts = numpy.asarray(pts)
         cell_point_map = compute_cell_point_map(self.ref_el, pts)
-        phis = {cell: self._tabulate_on_cell(n, pts[ibfs], order, cell=cell)
-                for cell, ibfs in cell_point_map.items()}
+        phis = {cell: self._tabulate_on_cell(n, pts[ipts], order, cell=cell)
+                for cell, ipts in cell_point_map.items()}
 
         if not self.ref_el.is_macrocell():
             return phis[0]
@@ -640,16 +640,16 @@ def compute_cell_point_map(ref_el, pts, unique=True, tol=1E-12):
     if pts.dtype == object:
         return {cell: Ellipsis for cell in sorted(top[sd])}
 
-    binned = False
     cell_point_map = {}
     for cell in sorted(top[sd]):
         # Bin points based on l1 distance
         pts_on_cell = compute_l1_distance(ref_el, sd, cell, pts) < tol
         if len(pts_on_cell.shape) == 0:
             # singleton case
-            if pts_on_cell and not binned:
+            if pts_on_cell:
                 cell_point_map[cell] = Ellipsis
-                binned = unique
+                if unique:
+                    break
         else:
             if unique:
                 for other in cell_point_map.values():
