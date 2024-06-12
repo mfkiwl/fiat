@@ -329,7 +329,7 @@ def test_macro_expansion(cell, split, variant, degree):
 @pytest.mark.parametrize("degree", (1, 4))
 def test_Ck_basis(cell, order, degree, variant):
     # Test that we can correctly tabulate on points on facets.
-    # This breaks if we were binning points into more than one cell.
+    # This breaks if we were binning points into more than one cell without a partition of unity.
     # It suffices to tabulate on the vertices of the simplicial complex.
     A = AlfeldSplit(cell)
     Ck = CkPolynomialSet(A, degree, order=order, variant=variant)
@@ -354,9 +354,8 @@ def test_macro_sympy(cell, element):
     import sympy
     variant = "spectral,alfeld"
     K = IsoSplit(cell)
-    ebig = element(K, 2, variant=variant)
+    ebig = element(K, 3, variant=variant)
     pts = get_lagrange_points(ebig.dual_basis())
-    pts = pts[0]
 
     dim = cell.get_spatial_dimension()
     X = tuple(sympy.Symbol("X[%d]" % i) for i in range(dim))

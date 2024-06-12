@@ -352,19 +352,29 @@ class ExpansionSet(object):
     def _tabulate(self, n, pts, order=0):
         """A version of tabulate() that also works for a single point."""
         pts = numpy.asarray(pts)
-        cell_point_map = compute_cell_point_map(self.ref_el, pts)
+        unique = self.continuity is not None
+        cell_point_map = compute_cell_point_map(self.ref_el, pts, unique=unique)
         phis = {cell: self._tabulate_on_cell(n, pts[ipts], order, cell=cell)
                 for cell, ipts in cell_point_map.items()}
 
         if not self.ref_el.is_macrocell():
             return phis[0]
 
-        # If binning is undefined, scale by the characteristic function of each subcell
         if pts.dtype == object:
-            masks = compute_subcell_masks(self.ref_el, pts, continuity=self.continuity)
+            # If binning is undefined, scale by the characteristic function of each subcell
+            Xi = compute_partition_of_unity(self.ref_el, pts, unique=unique)
             for cell, phi in phis.items():
                 for alpha in phi:
-                    phi[alpha] *= masks[cell]
+                    phi[alpha] *= Xi[cell]
+        elif not unique:
+            # If binning is not unique, divide by the multiplicity of each point
+            mult = numpy.zeros(pts.shape[:-1])
+            for cell, ipts in cell_point_map.items():
+                mult[ipts] += 1
+            for cell, ipts in cell_point_map.items():
+                phi = phis[cell]
+                for alpha in phi:
+                    phi[alpha] /= mult[None, ipts]
 
         # Insert subcell tabulations into the corresponding submatrices
         idx = lambda *args: args if args[1] is Ellipsis else numpy.ix_(*args)
@@ -378,7 +388,6 @@ class ExpansionSet(object):
             for cell in cell_point_map:
                 ibfs = cell_node_map[cell]
                 ipts = cell_point_map[cell]
-                # Add non-overlapping contributions, as points are uniquely binned
                 result[alpha][idx(ibfs, ipts)] += phis[cell][alpha]
         return result
 
@@ -609,6 +618,14 @@ def polynomial_cell_node_map(ref_el, n, continuity=None):
 
 
 def compute_l1_distance(ref_el, dim, entity, pts):
+    """Computes the l1 distances from a simplex entity to a set of points.
+
+    :arg ref_el: a SimplicialComplex.
+    :arg dim: the entity dimension.
+    :arg entity: the entity id.
+    :arg pts: an iterable of points.
+    :returns: a numpy array with the l1 distance from the entity to each point.
+    """
     top = ref_el.get_topology()
     verts = ref_el.get_vertices_of_subcomplex(top[dim][entity])
     ref_verts = numpy.zeros((dim + 1, dim))
@@ -660,22 +677,31 @@ def compute_cell_point_map(ref_el, pts, unique=True, tol=1E-12):
     return cell_point_map
 
 
-def compute_subcell_masks(ref_el, pt, unique=True, tol=1E-12, continuity=None):
+def compute_partition_of_unity(ref_el, pt, unique=True, tol=1E-12):
+    """Computes the partition of unity functions for each subcell.
+
+    :arg ref_el: a SimplicialComplex.
+    :arg pt: a physical point on the complex.
+    :kwarg unique: Are we assigning a unique cell to points on facets?
+    :kwarg tol: the absolute tolerance.
+    :returns: a list of (weighted) characteristic functions for each subcell.
+    """
     from sympy import Piecewise
     sd = ref_el.get_spatial_dimension()
     top = ref_el.get_topology()
-    cells = top[sd]
-    if continuity is not None:
-        cells = reversed(cells)
-
-    otherwise = []
-    masks = [None for cell in top[sd]]
-
     # assert singleton point
     pt = pt.reshape((sd,))
-    for cell in cells:
+
+    # compute characteristic function of each cell
+    otherwise = []
+    masks = []
+    for cell in sorted(top[sd]):
         inside = compute_l1_distance(ref_el, sd, cell, pt) < tol
-        masks[cell] = Piecewise(*otherwise, (1.0, inside), (0.0, True))
+        masks.append(Piecewise(*otherwise, (1.0, inside), (0.0, True)))
         if unique:
             otherwise.append((0.0, inside))
+    # if the point is in a facet, divide the characteristic function by the facet multiplicity
+    if not unique:
+        mult = sum(masks)
+        masks = [m / mult for m in masks]
     return masks
