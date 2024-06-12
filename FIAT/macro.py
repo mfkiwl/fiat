@@ -1,5 +1,5 @@
 import copy
-from itertools import chain
+from itertools import chain, combinations
 
 import numpy
 
@@ -54,6 +54,28 @@ def facet_support(facet_coords, tol=1.e-12):
 def invert_cell_topology(T):
     """Returns a dict of dicts mapping dimension x vertices to entity id."""
     return {dim: {T[dim][entity]: entity for entity in T[dim]} for dim in T}
+
+
+def make_topology(sd, num_verts, edges):
+    topology = {}
+    topology[0] = {i: (i,) for i in range(num_verts)}
+    topology[1] = dict(enumerate(edges))
+
+    # Get an adjacency list for each vertex
+    adjacency = {v: set(chain.from_iterable(verts for verts in edges if v in verts))
+                 for v in topology[0]}
+
+    # Complete the higher dimensional facets by appending a vertex
+    # adjacent to the vertices of codimension 1 facets
+    for dim in range(2, sd+1):
+        entities = []
+        for entity in topology[dim-1]:
+            facet = topology[dim-1][entity]
+            for v in range(min(facet)):
+                if set(facet) < adjacency[v]:
+                    entities.append((v,) + facet)
+        topology[dim] = dict(enumerate(entities))
+    return topology
 
 
 class SplitSimplicialComplex(SimplicialComplex):
@@ -226,8 +248,6 @@ class IsoSplit(SplitSimplicialComplex):
         new_verts = make_lattice(ref_el.vertices, degree, variant=variant)
         flat_index = {tuple(alpha): i for i, alpha in enumerate(lattice_iter(0, degree+1, sd))}
 
-        new_topology = {}
-        new_topology[0] = {i: (i,) for i in range(len(new_verts))}
         # Loop through degree-1 vertices
         # Construct a P1 simplex by connecting edges between a vertex and
         # its neighbors obtained by shifting each coordinate up by 1
@@ -247,23 +267,7 @@ class IsoSplit(SplitSimplicialComplex):
             v0, v1 = flat_index[(1, 0, 0)], flat_index[(0, 1, 1)]
             edges.append(tuple(sorted((v0, v1))))
 
-        new_topology[1] = dict(enumerate(edges))
-
-        # Get an adjacency list for each vertex
-        adjacency = {v: set(chain.from_iterable(verts for verts in edges if v in verts))
-                     for v in new_topology[0]}
-
-        # Complete the higher dimensional facets by appending a vertex
-        # adjacent to the vertices of codimension 1 facets
-        for dim in range(2, sd+1):
-            entities = []
-            for entity in new_topology[dim-1]:
-                facet = new_topology[dim-1][entity]
-                for v in range(min(facet)):
-                    if set(facet) < adjacency[v]:
-                        entities.append((v,) + facet)
-            new_topology[dim] = dict(enumerate(entities))
-
+        new_topology = make_topology(sd, len(new_verts), edges)
         parent = ref_el.get_parent() or ref_el
         super(IsoSplit, self).__init__(parent, new_verts, new_topology)
 
@@ -279,6 +283,49 @@ class IsoSplit(SplitSimplicialComplex):
         else:
             # Iso on facets is Iso
             return IsoSplit(ref_el, self.degree, self.variant)
+
+
+class PowellSabinSplit(SplitSimplicialComplex):
+    """Splits a simplicial complex by connecting barycenters of subentities to
+    the barycenter of the superentity.
+    """
+    def __init__(self, ref_el):
+        sd = ref_el.get_spatial_dimension()
+        top = ref_el.get_topology()
+        inv_top = invert_cell_topology(top)
+        verts = list(ref_el.get_vertices())
+        edges = []
+        offset = {0: 0}
+        for dim in range(1, sd+1):
+            offset[dim] = len(verts)
+            for entity in top[dim]:
+                bary_id = entity + offset[dim]
+                verts.extend(ref_el.make_points(dim, entity, dim+1))
+
+                # Connect subentity barycenter to the entity barycenter
+                for subdim in range(dim):
+                    for subverts in combinations(top[dim][entity], subdim+1):
+                        subentity = inv_top[subdim][subverts]
+                        sub_id = subentity + offset[subdim]
+                        edges.append((sub_id, bary_id))
+
+        new_verts = tuple(verts)
+        new_topology = make_topology(sd, len(new_verts), edges)
+        parent = ref_el.get_parent() or ref_el
+        super(PowellSabinSplit, self).__init__(parent, new_verts, new_topology)
+
+    def construct_subcomplex(self, dimension):
+        """Constructs the reference subcomplex of the parent cell subentity
+        specified by subcomplex dimension.
+        """
+        if dimension == self.get_dimension():
+            return self
+        ref_el = self.construct_subelement(dimension)
+        if dimension == 0:
+            return ref_el
+        else:
+            # Powell-Sabin on facets is Powell-Sabin
+            return PowellSabinSplit(ref_el)
 
 
 class MacroQuadratureRule(QuadratureRule):
