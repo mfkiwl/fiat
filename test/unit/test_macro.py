@@ -138,27 +138,19 @@ def make_mass_matrix(fe, order=0):
     return M
 
 
-@pytest.mark.parametrize("degree", (1, 2, 4,))
+@pytest.mark.parametrize("degree", (1, 2, 4))
 @pytest.mark.parametrize("variant", ("equispaced", "gll"))
 def test_lagrange_alfeld_duals(cell, degree, variant):
     Pk = Lagrange(cell, degree, variant=variant)
     alfeld = Lagrange(AlfeldSplit(cell), degree, variant=variant)
 
-    Pk_dofs = Pk.entity_dofs()
-    alfeld_dofs = alfeld.entity_dofs()
-
     Pk_pts = numpy.asarray(get_lagrange_points(Pk.dual_basis()))
     alfeld_pts = numpy.asarray(get_lagrange_points(alfeld.dual_basis()))
+    ids = alfeld.entity_dofs()
 
-    sd = cell.get_dimension()
-    top = cell.get_topology()
-    for dim in sorted(top):
-        if dim == sd:
-            continue
-        for entity in sorted(top[dim]):
-            assert alfeld_dofs[dim][entity] == Pk_dofs[dim][entity]
-            assert numpy.allclose(Pk_pts[Pk_dofs[dim][entity]],
-                                  alfeld_pts[alfeld_dofs[dim][entity]])
+    sd = cell.get_spatial_dimension()
+    facet_dim = sum(len(ids[dim][entity]) for dim in range(sd) for entity in ids[dim])
+    assert numpy.allclose(alfeld_pts[:facet_dim], Pk_pts[:facet_dim])
 
     phi = Pk.tabulate(0, alfeld_pts)[(0,) * sd]
     M_Pk = make_mass_matrix(Pk)
@@ -167,22 +159,24 @@ def test_lagrange_alfeld_duals(cell, degree, variant):
     assert numpy.allclose(M_Pk, M_galerkin)
 
 
-@pytest.mark.parametrize("degree", (1, 2,))
+@pytest.mark.parametrize("degree", (1, 2, 4))
 def test_lagrange_iso_duals(cell, degree):
-    P2 = Lagrange(cell, 2*degree, variant="equispaced")
-    iso = Lagrange(IsoSplit(cell), degree, variant="equispaced")
+    Pk = Lagrange(cell, 2*degree, variant="equispaced")
+    Piso = Lagrange(IsoSplit(cell), degree, variant="equispaced")
 
-    assert numpy.allclose(get_lagrange_points(iso.dual_basis()), get_lagrange_points(P2.dual_basis()))
+    Pk_pts = numpy.asarray(get_lagrange_points(Pk.dual_basis()))
+    Piso_pts = numpy.asarray(get_lagrange_points(Piso.dual_basis()))
+    ids = Piso.entity_dofs()
 
-    P2_ids = P2.entity_dofs()
-    iso_ids = iso.entity_dofs()
-    for dim in iso_ids:
-        for entity in iso_ids[dim]:
-            assert iso_ids[dim][entity] == P2_ids[dim][entity]
+    reorder = []
+    for dim in ids:
+        for entity in ids[dim]:
+            reorder.extend(ids[dim][entity])
+    assert numpy.allclose(Piso_pts[reorder], Pk_pts)
 
-    poly_set = iso.get_nodal_basis()
-    assert numpy.allclose(numpy.eye(iso.space_dimension()),
-                          numpy.dot(P2.get_dual_set().to_riesz(poly_set),
+    poly_set = Piso.get_nodal_basis().take(reorder)
+    assert numpy.allclose(numpy.eye(Piso.space_dimension()),
+                          numpy.dot(Pk.get_dual_set().to_riesz(poly_set),
                                     poly_set.get_coeffs().T))
 
 

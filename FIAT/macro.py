@@ -59,7 +59,7 @@ def invert_cell_topology(T):
 def make_topology(sd, num_verts, edges):
     topology = {}
     topology[0] = {i: (i,) for i in range(num_verts)}
-    topology[1] = dict(enumerate(edges))
+    topology[1] = dict(enumerate(sorted(edges)))
 
     # Get an adjacency list for each vertex
     adjacency = {v: set(chain.from_iterable(verts for verts in edges if v in verts))
@@ -67,14 +67,15 @@ def make_topology(sd, num_verts, edges):
 
     # Complete the higher dimensional facets by appending a vertex
     # adjacent to the vertices of codimension 1 facets
-    for dim in range(2, sd+1):
+    for dim in range(1, sd):
         entities = []
-        for entity in topology[dim-1]:
-            facet = topology[dim-1][entity]
+        for entity in topology[dim]:
+            facet = topology[dim][entity]
+            facet_verts = set(facet)
             for v in range(min(facet)):
-                if set(facet) < adjacency[v]:
-                    entities.append((v,) + facet)
-        topology[dim] = dict(enumerate(entities))
+                if facet_verts < adjacency[v]:
+                    entities.append((v, *facet))
+        topology[dim+1] = dict(enumerate(sorted(entities)))
     return topology
 
 
@@ -117,12 +118,12 @@ class SplitSimplicialComplex(SimplicialComplex):
                                       for cdim, centity in children]
 
                     B = numpy.transpose(children_verts)
-                    A = numpy.transpose(parent_verts[::-1])
-                    B = B - A[:, -1:]
-                    A = A[:, :-1] - A[:, -1:]
-                    coords = numpy.linalg.solve(numpy.dot(A.T, A), numpy.dot(A.T, B)).T
-                    coords = list(map(tuple, coords))
-                    children = (c for _, c in sorted(zip(coords, children)))
+                    A = numpy.transpose(parent_verts)
+                    B = B - A[:, :1]
+                    A = A[:, 1:] - A[:, :1]
+                    bary = numpy.linalg.solve(numpy.dot(A.T, A), numpy.dot(A.T, B))
+                    order = numpy.lexsort(bary)
+                    children = tuple(children[j] for j in order)
                 parent_to_children[dim][entity] = tuple(children)
 
         self._child_to_parent = child_to_parent
@@ -256,8 +257,7 @@ class IsoSplit(SplitSimplicialComplex):
             simplex = []
             for beta in lattice_iter(0, 2, sd):
                 v1 = flat_index[tuple(a+b for a, b in zip(alpha, beta))]
-                for v0 in simplex:
-                    edges.append((v0, v1))
+                edges.extend((v0, v1) for v0 in simplex)
                 simplex.append(v1)
 
         if sd == 3:
@@ -293,23 +293,20 @@ class PowellSabinSplit(SplitSimplicialComplex):
         sd = ref_el.get_spatial_dimension()
         top = ref_el.get_topology()
         inv_top = invert_cell_topology(top)
-        verts = list(ref_el.get_vertices())
+        new_verts = list(ref_el.get_vertices())
         edges = []
         offset = {0: 0}
         for dim in range(1, sd+1):
-            offset[dim] = len(verts)
+            offset[dim] = len(new_verts)
             for entity in top[dim]:
                 bary_id = entity + offset[dim]
-                verts.extend(ref_el.make_points(dim, entity, dim+1))
+                new_verts.extend(ref_el.make_points(dim, entity, dim+1))
 
                 # Connect subentity barycenter to the entity barycenter
                 for subdim in range(dim):
-                    for subverts in combinations(top[dim][entity], subdim+1):
-                        subentity = inv_top[subdim][subverts]
-                        sub_id = subentity + offset[subdim]
-                        edges.append((sub_id, bary_id))
+                    edges.extend((inv_top[subdim][subverts] + offset[subdim], bary_id)
+                                 for subverts in combinations(top[dim][entity], subdim+1))
 
-        new_verts = tuple(verts)
         new_topology = make_topology(sd, len(new_verts), edges)
         parent = ref_el.get_parent() or ref_el
         super(PowellSabinSplit, self).__init__(parent, new_verts, new_topology)

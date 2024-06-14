@@ -199,6 +199,27 @@ def make_entity_closure_ids(ref_el, entity_ids):
     return entity_closure_ids
 
 
+def lexsort_nodes(ref_el, dim, entity, nodes, offset=0):
+    """Sort PointEvaluation nodes in lexicographical ordering."""
+    if len(nodes) > 1 and all(isinstance(node, functional.PointEvaluation) for node in nodes):
+        pts = []
+        for node in nodes:
+            pt, = node.get_point_dict()
+            pts.append(pt)
+
+        top = ref_el.get_topology()
+        verts = ref_el.get_vertices_of_subcomplex(top[dim][entity])
+        B = numpy.transpose(pts)
+        A = numpy.transpose(verts)
+        B = B - A[:, :1]
+        A = A[:, 1:] - A[:, :1]
+        bary = numpy.linalg.solve(numpy.dot(A.T, A), numpy.dot(A.T, B))
+        order = list(offset + numpy.lexsort(bary))
+    else:
+        order = list(range(offset, offset + len(nodes)))
+    return order
+
+
 def merge_entities(nodes, ref_el, entity_ids, entity_permutations):
     """Collect DOFs from simplicial complex onto facets of parent cell"""
     parent_cell = ref_el.get_parent()
@@ -215,5 +236,6 @@ def merge_entities(nodes, ref_el, entity_ids, entity_permutations):
             cur = len(parent_nodes)
             for child_dim, child_entity in parent_to_children[dim][entity]:
                 parent_nodes.extend(nodes[i] for i in entity_ids[child_dim][child_entity])
-            parent_ids[dim][entity] = list(range(cur, len(parent_nodes)))
+            ids = lexsort_nodes(parent_cell, dim, entity, parent_nodes[cur:], offset=cur)
+            parent_ids[dim][entity] = ids
     return parent_nodes, parent_cell, parent_ids, parent_permutations
