@@ -521,6 +521,21 @@ class SimplicialComplex(Cell):
         spatial dimension."""
         return self.get_spatial_dimension()
 
+    def compute_barycentric_coordinates(self, dim, entity, pts):
+        """Returns the barycentric coordinates of a list of points on an
+        entity."""
+        top = self.get_topology()
+        verts = self.get_vertices_of_subcomplex(top[dim][entity])
+        A = numpy.transpose(verts)
+        B = numpy.transpose(pts)
+        B = B - A[:, :1]
+        A = A[:, 1:] - A[:, :1]
+        if A.shape[0] != A.shape[1]:
+            # Form normal equations
+            B = numpy.dot(A.T, B)
+            A = numpy.dot(A.T, A)
+        return numpy.linalg.solve(A, B).T
+
 
 class Simplex(SimplicialComplex):
     r"""Abstract class for a reference simplex.

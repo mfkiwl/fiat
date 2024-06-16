@@ -113,16 +113,10 @@ class SplitSimplicialComplex(SimplicialComplex):
                 children = parent_to_children[dim][entity]
                 if len(children) > 1:
                     # sort children lexicographically
-                    parent_verts = parent.get_vertices_of_subcomplex(parent_top[dim][entity])
-                    children_verts = [tuple(numpy.average([vertices[i] for i in topology[cdim][centity]], 0))
-                                      for cdim, centity in children]
-
-                    B = numpy.transpose(children_verts)
-                    A = numpy.transpose(parent_verts)
-                    B = B - A[:, :1]
-                    A = A[:, 1:] - A[:, :1]
-                    bary = numpy.linalg.solve(numpy.dot(A.T, A), numpy.dot(A.T, B))
-                    order = numpy.lexsort(bary)
+                    pts = [tuple(numpy.average([vertices[i] for i in topology[cdim][centity]], 0))
+                           for cdim, centity in children]
+                    bary = parent.compute_barycentric_coordinates(dim, entity, pts)
+                    order = numpy.lexsort(bary.T)
                     children = tuple(children[j] for j in order)
                 parent_to_children[dim][entity] = tuple(children)
 

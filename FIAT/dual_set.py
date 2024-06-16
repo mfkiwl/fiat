@@ -206,22 +206,15 @@ def lexsort_nodes(ref_el, dim, entity, nodes, offset=0):
         for node in nodes:
             pt, = node.get_point_dict()
             pts.append(pt)
-
-        top = ref_el.get_topology()
-        verts = ref_el.get_vertices_of_subcomplex(top[dim][entity])
-        B = numpy.transpose(pts)
-        A = numpy.transpose(verts)
-        B = B - A[:, :1]
-        A = A[:, 1:] - A[:, :1]
-        bary = numpy.linalg.solve(numpy.dot(A.T, A), numpy.dot(A.T, B))
-        order = list(offset + numpy.lexsort(bary))
+        bary = ref_el.compute_barycentric_coordinates(dim, entity, pts)
+        order = list(offset + numpy.lexsort(bary.T))
     else:
         order = list(range(offset, offset + len(nodes)))
     return order
 
 
 def merge_entities(nodes, ref_el, entity_ids, entity_permutations):
-    """Collect DOFs from simplicial complex onto facets of parent cell"""
+    """Collect DOFs from simplicial complex onto facets of parent cell."""
     parent_cell = ref_el.get_parent()
     if parent_cell is None:
         return nodes, ref_el, entity_ids, entity_permutations
