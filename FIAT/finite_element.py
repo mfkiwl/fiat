@@ -144,7 +144,7 @@ class CiarletElement(FiniteElement):
         V = numpy.dot(A, numpy.transpose(B))
         self.V = V
 
-        # new_coeffs_flat = numpy.linalg.solve(V.T, B)
+        new_coeffs_flat = numpy.linalg.solve(V.T, B)
         with warnings.catch_warnings():
             warnings.filterwarnings("error")
             try:

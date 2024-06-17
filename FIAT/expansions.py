@@ -354,7 +354,7 @@ class ExpansionSet(object):
     def _tabulate(self, n, pts, order=0):
         """A version of tabulate() that also works for a single point."""
         pts = numpy.asarray(pts)
-        unique = self.continuity is not None
+        unique = self.continuity is not None and order == 0
         cell_point_map = compute_cell_point_map(self.ref_el, pts, unique=unique)
         phis = {cell: self._tabulate_on_cell(n, pts[ipts], order, cell=cell)
                 for cell, ipts in cell_point_map.items()}
@@ -410,8 +410,7 @@ class ExpansionSet(object):
         cell_node_map = self.get_cell_node_map(n)
 
         num_phis = self.get_num_members(n)
-        results = [numpy.zeros((num_phis,) + (sd,) * (r-1) + pts.shape[:-1])
-                   for r in range(order+1)]
+        results = numpy.zeros((order+1, num_phis, *pts.shape[:-1]))
 
         for cell in cell_point_map:
             ipts = cell_point_map[cell]
@@ -424,13 +423,11 @@ class ExpansionSet(object):
                 vr = numpy.zeros((sd,)*r + v0.shape, dtype=v0.dtype)
                 for index in numpy.ndindex(vr.shape[:r]):
                     vr[index] = phi[tuple(map(index.count, range(sd)))]
-                if r > 0:
+                for _ in range(r):
                     vr = numpy.tensordot(normal, vr, axes=(0, 0))
-                vr = vr.transpose((-2, *tuple(range(r-1)), -1))
 
-                shape_indices = tuple(range(sd) for _ in range(r-1))
-                indices = numpy.ix_(ibfs, *shape_indices, ipts)
-                if r == 0 and side < 0:
+                indices = numpy.ix_(ibfs, ipts)
+                if r % 2 == 0 and side < 0:
                     results[r][indices] -= vr
                 else:
                     results[r][indices] += vr
@@ -620,24 +617,27 @@ def polynomial_cell_node_map(ref_el, n, continuity=None):
     return cell_node_map
 
 
-def compute_l1_distance(ref_el, dim, entity, pts):
+def compute_l1_distance(ref_el, points, entity=None):
     """Computes the l1 distances from a simplex entity to a set of points.
 
     :arg ref_el: a SimplicialComplex.
-    :arg dim: the entity dimension.
-    :arg entity: the entity id.
-    :arg pts: an iterable of points.
+    :arg points: an iterable of points.
+    :arg entity: a tuple of the entity dimension and id.
     :returns: a numpy array with the l1 distance from the entity to each point.
     """
-    top = ref_el.get_topology()
-    verts = ref_el.get_vertices_of_subcomplex(top[dim][entity])
+    if entity is None:
+        entity = (ref_el.get_spatial_dimension(), 0)
+    dim, entity_id = entity
     ref_verts = numpy.zeros((dim + 1, dim))
     ref_verts[range(1, dim + 1), range(dim)] = 1.0
 
+    top = ref_el.get_topology()
+    verts = ref_el.get_vertices_of_subcomplex(top[dim][entity_id])
     A, b = reference_element.make_affine_mapping(verts, ref_verts)
     A = numpy.vstack((A, -numpy.sum(A, axis=0)))
     b = numpy.hstack((b, 1-numpy.sum(b, axis=0)))
-    bary = apply_mapping(A, b, pts, transpose=True)
+    bary = apply_mapping(A, b, points, transpose=True)
+
     dist = 0.5 * abs(numpy.sum(abs(bary) - bary, axis=-1))
     return dist
 
@@ -663,7 +663,7 @@ def compute_cell_point_map(ref_el, pts, unique=True, tol=1E-12):
     cell_point_map = {}
     for cell in sorted(top[sd]):
         # Bin points based on l1 distance
-        pts_on_cell = compute_l1_distance(ref_el, sd, cell, pts) < tol
+        pts_on_cell = compute_l1_distance(ref_el, pts, entity=(sd, cell)) < tol
         if len(pts_on_cell.shape) == 0:
             # singleton case
             if pts_on_cell:
@@ -695,15 +695,15 @@ def compute_partition_of_unity(ref_el, pt, unique=True, tol=1E-12):
     # assert singleton point
     pt = pt.reshape((sd,))
 
-    # compute characteristic function of each cell
+    # Compute characteristic function of each cell
     otherwise = []
     masks = []
     for cell in sorted(top[sd]):
-        inside = compute_l1_distance(ref_el, sd, cell, pt) < tol
+        inside = compute_l1_distance(ref_el, pt, entity=(sd, cell)) < tol
         masks.append(Piecewise(*otherwise, (1.0, inside), (0.0, True)))
         if unique:
             otherwise.append((0.0, inside))
-    # if the point is in a facet, divide the characteristic function by the facet multiplicity
+    # If the point is on a facet, divide the characteristic function by the facet multiplicity
     if not unique:
         mult = sum(masks)
         masks = [m / mult for m in masks]

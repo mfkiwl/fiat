@@ -115,10 +115,12 @@ class SplitSimplicialComplex(SimplicialComplex):
                     # sort children lexicographically
                     pts = [tuple(numpy.average([vertices[i] for i in topology[cdim][centity]], 0))
                            for cdim, centity in children]
-                    bary = parent.compute_barycentric_coordinates(dim, entity, pts)
+                    bary = parent.compute_barycentric_coordinates(pts, entity=(dim, entity))
                     order = numpy.lexsort(bary.T)
                     children = tuple(children[j] for j in order)
-                parent_to_children[dim][entity] = tuple(children)
+                else:
+                    children = tuple(children)
+                parent_to_children[dim][entity] = children
 
         self._child_to_parent = child_to_parent
         self._parent_to_children = parent_to_children
@@ -197,12 +199,11 @@ class AlfeldSplit(SplitSimplicialComplex):
         new_topology = copy.deepcopy(top)
         # Discard the cell interiors
         new_topology[sd] = {}
-        new_verts = tuple(ref_el.get_vertices())
+        new_verts = list(ref_el.get_vertices())
 
         for cell in top[sd]:
             # Append the barycenter as the new vertex
-            barycenter = ref_el.make_points(sd, cell, sd+1)
-            new_verts += tuple(barycenter)
+            new_verts.extend(ref_el.make_points(sd, cell, sd+1))
             new_vert_id = len(new_topology[0])
             new_topology[0][new_vert_id] = (new_vert_id,)
 
@@ -215,7 +216,7 @@ class AlfeldSplit(SplitSimplicialComplex):
                         cur = cur + 1
 
         parent = ref_el.get_parent() or ref_el
-        super(AlfeldSplit, self).__init__(parent, new_verts, new_topology)
+        super(AlfeldSplit, self).__init__(parent, tuple(new_verts), new_topology)
 
     def construct_subcomplex(self, dimension):
         """Constructs the reference subcomplex of the parent cell subentity
@@ -263,7 +264,7 @@ class IsoSplit(SplitSimplicialComplex):
 
         new_topology = make_topology(sd, len(new_verts), edges)
         parent = ref_el.get_parent() or ref_el
-        super(IsoSplit, self).__init__(parent, new_verts, new_topology)
+        super(IsoSplit, self).__init__(parent, tuple(new_verts), new_topology)
 
     def construct_subcomplex(self, dimension):
         """Constructs the reference subcomplex of the parent cell subentity
@@ -303,7 +304,7 @@ class PowellSabinSplit(SplitSimplicialComplex):
 
         new_topology = make_topology(sd, len(new_verts), edges)
         parent = ref_el.get_parent() or ref_el
-        super(PowellSabinSplit, self).__init__(parent, new_verts, new_topology)
+        super(PowellSabinSplit, self).__init__(parent, tuple(new_verts), new_topology)
 
     def construct_subcomplex(self, dimension):
         """Constructs the reference subcomplex of the parent cell subentity
@@ -367,6 +368,7 @@ class CkPolynomialSet(polynomial_set.PolynomialSet):
         from FIAT.quadrature_schemes import create_quadrature
         expansion_set = expansions.ExpansionSet(ref_el, **kwargs)
         k = 1 if expansion_set.continuity == "C0" else 0
+        num_members = expansion_set.get_num_members(degree)
 
         sd = ref_el.get_spatial_dimension()
         facet_el = ref_el.construct_subelement(sd-1)
@@ -383,7 +385,7 @@ class CkPolynomialSet(polynomial_set.PolynomialSet):
             jumps = expansion_set.tabulate_normal_jumps(degree, qpts, facet, order=order)
             for r in range(k, order+1):
                 num_wt = 1 if sd == 1 else expansions.polynomial_dimension(facet_el, degree-r)
-                rows.append(numpy.tensordot(weights[:num_wt], jumps[r], axes=(-1, -1)).reshape(-1, jumps[r].shape[0]))
+                rows.append(numpy.tensordot(weights[:num_wt], jumps[r], axes=(-1, -1)).reshape(-1, num_members))
 
         if len(rows) > 0:
             dual_mat = numpy.row_stack(rows)

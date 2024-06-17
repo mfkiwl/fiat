@@ -199,14 +199,14 @@ def make_entity_closure_ids(ref_el, entity_ids):
     return entity_closure_ids
 
 
-def lexsort_nodes(ref_el, dim, entity, nodes, offset=0):
+def lexsort_nodes(ref_el, nodes, entity=None, offset=0):
     """Sort PointEvaluation nodes in lexicographical ordering."""
     if len(nodes) > 1 and all(isinstance(node, functional.PointEvaluation) for node in nodes):
         pts = []
         for node in nodes:
             pt, = node.get_point_dict()
             pts.append(pt)
-        bary = ref_el.compute_barycentric_coordinates(dim, entity, pts)
+        bary = ref_el.compute_barycentric_coordinates(pts, entity=entity)
         order = list(offset + numpy.lexsort(bary.T))
     else:
         order = list(range(offset, offset + len(nodes)))
@@ -229,6 +229,6 @@ def merge_entities(nodes, ref_el, entity_ids, entity_permutations):
             cur = len(parent_nodes)
             for child_dim, child_entity in parent_to_children[dim][entity]:
                 parent_nodes.extend(nodes[i] for i in entity_ids[child_dim][child_entity])
-            ids = lexsort_nodes(parent_cell, dim, entity, parent_nodes[cur:], offset=cur)
+            ids = lexsort_nodes(parent_cell, parent_nodes[cur:], entity=(dim, entity), offset=cur)
             parent_ids[dim][entity] = ids
     return parent_nodes, parent_cell, parent_ids, parent_permutations
