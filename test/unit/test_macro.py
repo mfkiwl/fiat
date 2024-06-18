@@ -352,7 +352,7 @@ def test_macro_sympy(cell, element):
     pts = get_lagrange_points(ebig.dual_basis())
 
     dim = cell.get_spatial_dimension()
-    X = tuple(sympy.Symbol("X[%d]" % i) for i in range(dim))
+    X = tuple(sympy.Symbol(f"X[{i}]") for i in range(dim))
     degrees = range(1, 3) if element is Lagrange else range(3)
     for degree in degrees:
         fe = element(cell, degree, variant=variant)

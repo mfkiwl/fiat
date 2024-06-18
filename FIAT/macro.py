@@ -388,7 +388,7 @@ class CkPolynomialSet(polynomial_set.PolynomialSet):
                 rows.append(numpy.tensordot(weights[:num_wt], jumps[r], axes=(-1, -1)).reshape(-1, num_members))
 
         if len(rows) > 0:
-            dual_mat = numpy.row_stack(rows)
+            dual_mat = numpy.vstack(rows)
             _, sig, vt = numpy.linalg.svd(dual_mat, full_matrices=True)
             num_sv = len([s for s in sig if abs(s) > 1.e-10])
             coeffs = vt[num_sv:]
