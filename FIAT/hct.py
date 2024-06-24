@@ -43,7 +43,7 @@ class HCTDualSet(dual_set.DualSet):
                 nodes.append(IntegralMomentOfNormalDerivative(ref_el, e, Q, f_at_qpts))
                 entity_ids[1][e].extend(range(cur, len(nodes)))
         else:
-            Pk = polynomial_set.ONPolynomialSet(rline, k)
+            Pk = polynomial_set.ONPolynomialSet(rline, k, scale=1)
             phis = Pk.tabulate(qpts)[(0,)]
             for e in sorted(top[1]):
                 Q_mapped = FacetQuadratureRule(ref_el, 1, e, Q)
@@ -69,17 +69,5 @@ class HsiehCloughTocher(finite_element.CiarletElement):
     def __init__(self, ref_el, degree=3, reduced=False):
         ref_complex = macro.AlfeldSplit(ref_el)
         dual = HCTDualSet(ref_complex, degree, reduced=reduced)
-
-        poly_set = macro.CkPolynomialSet(ref_complex, degree, order=1, variant="bubble")
-
-        print("entity_ids", dual.entity_ids)
-        print("num bfs", poly_set.get_num_members())
-        print("num dofs", len(dual.nodes))
-
+        poly_set = macro.CkPolynomialSet(ref_complex, degree, order=1, vorder=degree-1, variant="bubble")
         super(HsiehCloughTocher, self).__init__(poly_set, dual, degree)
-
-
-if __name__ == "__main__":
-
-    degree = 4
-    HsiehCloughTocher(ufc_simplex(2), degree)
