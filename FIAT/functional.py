@@ -215,15 +215,15 @@ class PointDerivative(Functional):
     def __call__(self, fn):
         """Evaluate the functional on the function fn. Note that this depends
         on sympy being able to differentiate fn."""
-        x = list(self.deriv_dict.keys())[0]
+        x, = self.deriv_dict
 
-        X = sympy.DeferredVector('x')
-        dX = numpy.asarray([X[i] for i in range(len(x))])
+        X = tuple(sympy.Symbol(f"X[{i}]") for i in range(len(x)))
 
-        dvars = tuple(d for d, a in zip(dX, self.alpha)
+        dvars = tuple(d for d, a in zip(X, self.alpha)
                       for count in range(a))
 
-        return sympy.diff(fn(X), *dvars).evalf(subs=dict(zip(dX, x)))
+        df = sympy.lambdify(X, sympy.diff(fn(X), *dvars))
+        return df(*x)
 
 
 class PointNormalDerivative(Functional):
