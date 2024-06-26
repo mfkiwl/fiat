@@ -5,11 +5,13 @@ from FIAT import finite_element, dual_set, macro, polynomial_set
 from FIAT.reference_element import TRIANGLE, ufc_simplex
 from FIAT.quadrature import FacetQuadratureRule
 from FIAT.quadrature_schemes import create_quadrature
-from FIAT.jacobi import eval_jacobi
+from FIAT.jacobi import eval_jacobi, eval_jacobi_batch
 
 
 class HCTDualSet(dual_set.DualSet):
     def __init__(self, ref_complex, degree, reduced=False):
+        if reduced and degree != 3:
+            raise("Reduced HCT only defined for degree = 3")
         if degree < 3:
             raise ValueError("HCT only defined for degree >= 3")
         ref_el = ref_complex.get_parent()
@@ -30,11 +32,11 @@ class HCTDualSet(dual_set.DualSet):
             nodes.extend(PointDerivative(ref_el, pt, alpha) for alpha in alphas)
             entity_ids[0][v].extend(range(cur, len(nodes)))
 
-        rline = ufc_simplex(1)
         k = 2 if reduced else degree - 3
+        rline = ufc_simplex(1)
         Q = create_quadrature(rline, degree-1+k)
         qpts = Q.get_points()
-        if degree == 3:
+        if reduced:
             # lowest order case
             x, = qpts.T
             f_at_qpts = eval_jacobi(0, 0, k, 2.0*x - 1)
@@ -43,22 +45,24 @@ class HCTDualSet(dual_set.DualSet):
                 nodes.append(IntegralMomentOfNormalDerivative(ref_el, e, Q, f_at_qpts))
                 entity_ids[1][e].extend(range(cur, len(nodes)))
         else:
-            Pk = polynomial_set.ONPolynomialSet(rline, k, scale=1)
-            phis = Pk.tabulate(qpts)[(0,)]
+            phis = eval_jacobi_batch(0, 0, k, 2.0*qpts - 1)
             for e in sorted(top[1]):
                 Q_mapped = FacetQuadratureRule(ref_el, 1, e, Q)
+                scale = Q_mapped.jacobian_determinant()
                 cur = len(nodes)
                 nodes.extend(IntegralMomentOfNormalDerivative(ref_el, e, Q, phi) for phi in phis)
-                nodes.extend(IntegralMoment(ref_el, Q_mapped, phi) for phi in phis[:-1])
+                nodes.extend(IntegralMoment(ref_el, Q_mapped, phi/scale) for phi in phis[:-1])
                 entity_ids[1][e].extend(range(cur, len(nodes)))
 
             q = degree - 4
-            Q = create_quadrature(ref_complex, degree + q)
-            Pq = polynomial_set.ONPolynomialSet(ref_el, q)
-            phis = Pq.tabulate(Q.get_points())[(0,) * sd]
-            cur = len(nodes)
-            nodes.extend(IntegralMoment(ref_el, Q, phi) for phi in phis)
-            entity_ids[sd][0] = list(range(cur, len(nodes)))
+            if q >= 0:
+                Q = create_quadrature(ref_complex, degree + q)
+                Pq = polynomial_set.ONPolynomialSet(ref_el, q, scale=1)
+                phis = Pq.tabulate(Q.get_points())[(0,) * sd]
+                scale = ref_el.volume()
+                cur = len(nodes)
+                nodes.extend(IntegralMoment(ref_el, Q, phi/scale) for phi in phis)
+                entity_ids[sd][0] = list(range(cur, len(nodes)))
 
         super(HCTDualSet, self).__init__(nodes, ref_el, entity_ids)
 
