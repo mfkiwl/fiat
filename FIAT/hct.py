@@ -11,7 +11,7 @@ from FIAT.jacobi import eval_jacobi, eval_jacobi_batch
 class HCTDualSet(dual_set.DualSet):
     def __init__(self, ref_complex, degree, reduced=False):
         if reduced and degree != 3:
-            raise("Reduced HCT only defined for degree = 3")
+            raise ValueError("Reduced HCT only defined for degree = 3")
         if degree < 3:
             raise ValueError("HCT only defined for degree >= 3")
         ref_el = ref_complex.get_parent()
