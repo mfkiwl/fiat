@@ -37,7 +37,6 @@ class HCTDualSet(dual_set.DualSet):
         Q = create_quadrature(rline, degree-1+k)
         qpts = Q.get_points()
         if reduced:
-            # lowest order case
             x, = qpts.T
             f_at_qpts = eval_jacobi(0, 0, k, 2.0*x - 1)
             for e in sorted(top[1]):
@@ -48,10 +47,10 @@ class HCTDualSet(dual_set.DualSet):
             phis = eval_jacobi_batch(0, 0, k, 2.0*qpts - 1)
             for e in sorted(top[1]):
                 Q_mapped = FacetQuadratureRule(ref_el, 1, e, Q)
-                scale = Q_mapped.jacobian_determinant()
+                scale = 2 / Q_mapped.jacobian_determinant()
                 cur = len(nodes)
                 nodes.extend(IntegralMomentOfNormalDerivative(ref_el, e, Q, phi) for phi in phis)
-                nodes.extend(IntegralMoment(ref_el, Q_mapped, phi/scale) for phi in phis[:-1])
+                nodes.extend(IntegralMoment(ref_el, Q_mapped, phi * scale) for phi in phis[:-1])
                 entity_ids[1][e].extend(range(cur, len(nodes)))
 
             q = degree - 4

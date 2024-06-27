@@ -292,6 +292,8 @@ elements = [
     "    RestrictedElement(Regge(S, 2), restriction_domain='interior')"
     ")",
     "Argyris(T, 5)",
+    "Argyris(T, 5, 'integral')",
+    "Argyris(T, 6, 'integral')",
     "QuinticArgyris(T)",
     "CubicHermite(I)",
     "CubicHermite(T)",

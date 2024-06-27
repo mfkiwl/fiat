@@ -5,7 +5,9 @@
 # SPDX-License-Identifier:    LGPL-3.0-or-later
 
 from FIAT import finite_element, polynomial_set, dual_set, functional
-from FIAT.functional import IntegralMoment, IntegralMomentOfNormalDerivative
+from FIAT.functional import (PointEvaluation, PointDerivative, PointNormalDerivative,
+                             IntegralMoment,
+                             IntegralMomentOfNormalDerivative)
 from FIAT.reference_element import TRIANGLE, ufc_simplex
 from FIAT.quadrature import FacetQuadratureRule
 from FIAT.quadrature_schemes import create_quadrature
@@ -14,40 +16,25 @@ from FIAT.jacobi import eval_jacobi_batch
 
 class ArgyrisDualSet(dual_set.DualSet):
     def __init__(self, ref_el, degree, variant="point"):
-        nodes = []
-        cur = 0
+        if ref_el.get_shape() != TRIANGLE:
+            raise ValueError("Argyris only defined on triangles")
 
         top = ref_el.get_topology()
         verts = ref_el.get_vertices()
         sd = ref_el.get_spatial_dimension()
-
-        if ref_el.get_shape() != TRIANGLE:
-            raise ValueError("Argyris only defined on triangles")
-
         entity_ids = {dim: {entity: [] for entity in sorted(top[dim])} for dim in sorted(top)}
-        pe = functional.PointEvaluation
-        pd = functional.PointDerivative
-        pnd = functional.PointNormalDerivative
+        nodes = []
 
-        # get jet at each vertex
+        # get second order jet at each vertex
+        alphas = [[1, 0], [0, 1], [2, 0], [1, 1], [0, 2]]
         for v in sorted(top[0]):
-            nodes.append(pe(ref_el, verts[v]))
-
-            # first derivatives
-            for i in range(sd):
-                alpha = [0] * sd
-                alpha[i] = 1
-                nodes.append(pd(ref_el, verts[v], alpha))
-
-            # second derivatives
-            alphas = [[2, 0], [1, 1], [0, 2]]
-            for alpha in alphas:
-                nodes.append(pd(ref_el, verts[v], alpha))
-
-            entity_ids[0][v] = list(range(cur, cur + 6))
-            cur += 6
+            cur = len(nodes)
+            nodes.append(PointEvaluation(ref_el, verts[v]))
+            nodes.extend(PointDerivative(ref_el, verts[v], alpha) for alpha in alphas)
+            entity_ids[0][v] = list(range(cur, len(nodes)))
 
         if variant == "integral":
+            # edge dofs
             k = degree - 5
             rline = ufc_simplex(1)
             Q = create_quadrature(rline, degree-1+k)
@@ -55,12 +42,13 @@ class ArgyrisDualSet(dual_set.DualSet):
             phis = eval_jacobi_batch(0, 0, k, 2.0*qpts - 1)
             for e in sorted(top[1]):
                 Q_mapped = FacetQuadratureRule(ref_el, 1, e, Q)
-                scale = Q_mapped.jacobian_determinant()
+                scale = 2 / Q_mapped.jacobian_determinant()
                 cur = len(nodes)
                 nodes.extend(IntegralMomentOfNormalDerivative(ref_el, e, Q, phi) for phi in phis)
-                nodes.extend(IntegralMoment(ref_el, Q_mapped, phi/scale) for phi in phis[:-1])
+                nodes.extend(IntegralMoment(ref_el, Q_mapped, phi * scale) for phi in phis[:-1])
                 entity_ids[1][e].extend(range(cur, len(nodes)))
 
+            # interior dofs
             q = degree - 6
             if q >= 0:
                 Q = create_quadrature(ref_el, degree + q)
@@ -72,32 +60,24 @@ class ArgyrisDualSet(dual_set.DualSet):
                 entity_ids[sd][0] = list(range(cur, len(nodes)))
 
         elif variant == "point":
-            # edge dof
+            # edge dofs
             for e in sorted(top[1]):
+                cur = len(nodes)
                 # normal derivatives at degree - 4 points on each edge
                 ndpts = ref_el.make_points(1, e, degree - 3)
-                ndnds = [pnd(ref_el, e, pt) for pt in ndpts]
-                nodes.extend(ndnds)
-                entity_ids[1][e] = list(range(cur, cur + len(ndpts)))
-                cur += len(ndpts)
+                nodes.extend(PointNormalDerivative(ref_el, e, pt) for pt in ndpts)
 
-                # point value at degree-5 points on each edge
-                if degree > 5:
-                    ptvalpts = ref_el.make_points(1, e, degree - 4)
-                    ptvalnds = [pe(ref_el, pt) for pt in ptvalpts]
-                    nodes.extend(ptvalnds)
-                    entity_ids[1][e] += list(range(cur, cur + len(ptvalpts)))
-                    cur += len(ptvalpts)
+                # point value at degree - 5 points on each edge
+                ptvalpts = ref_el.make_points(1, e, degree - 4)
+                nodes.extend(PointEvaluation(ref_el, pt) for pt in ptvalpts)
+                entity_ids[1][e] = list(range(cur, len(nodes)))
 
-            # internal dof
+            # interior dofs
             if degree > 5:
+                cur = len(nodes)
                 internalpts = ref_el.make_points(2, 0, degree - 3)
-                internalnds = [pe(ref_el, pt) for pt in internalpts]
-                nodes.extend(internalnds)
-                entity_ids[2][0] = list(range(cur, cur + len(internalpts)))
-                cur += len(internalpts)
-            else:
-                entity_ids[2] = {0: []}
+                nodes.extend(PointEvaluation(ref_el, pt) for pt in internalpts)
+                entity_ids[2][0] = list(range(cur, len(nodes)))
         else:
             raise ValueError("Invalid variant for Argyris")
 
