@@ -15,7 +15,7 @@ from FIAT.jacobi import eval_jacobi_batch
 
 
 class ArgyrisDualSet(dual_set.DualSet):
-    def __init__(self, ref_el, degree, variant="point"):
+    def __init__(self, ref_el, degree, variant):
         if ref_el.get_shape() != TRIANGLE:
             raise ValueError("Argyris only defined on triangles")
 
@@ -137,7 +137,9 @@ class QuinticArgyrisDualSet(dual_set.DualSet):
 class Argyris(finite_element.CiarletElement):
     """The Argyris finite element."""
 
-    def __init__(self, ref_el, degree, variant="point"):
+    def __init__(self, ref_el, degree, variant=None):
+        if variant is None:
+            variant = "integral"
         poly_set = polynomial_set.ONPolynomialSet(ref_el, degree)
         dual = ArgyrisDualSet(ref_el, degree, variant=variant)
         super(Argyris, self).__init__(poly_set, dual, degree)
