@@ -86,54 +86,10 @@ class ArgyrisDualSet(dual_set.DualSet):
         super(ArgyrisDualSet, self).__init__(nodes, ref_el, entity_ids)
 
 
-class QuinticArgyrisDualSet(dual_set.DualSet):
-    def __init__(self, ref_el):
-        if ref_el.get_shape() != TRIANGLE:
-            raise ValueError("Argyris only defined on triangles")
-        entity_ids = {}
-        nodes = []
-        cur = 0
-
-        # make nodes by getting points
-        # need to do this dimension-by-dimension, facet-by-facet
-        top = ref_el.get_topology()
-
-        # get second order jet at each vertex
-        verts = ref_el.get_vertices()
-        alphas = [(1, 0), (0, 1), (2, 0), (1, 1), (0, 2)]
-        entity_ids[0] = {}
-        for v in sorted(top[0]):
-            nodes.append(PointEvaluation(ref_el, verts[v]))
-            nodes.extend(PointDerivative(ref_el, verts[v], alpha) for alpha in alphas)
-            entity_ids[0][v] = list(range(cur, cur + 6))
-            cur += 6
-
-        # edge dof -- normal at each edge midpoint
-        entity_ids[1] = {}
-        for e in sorted(top[1]):
-            pt = ref_el.make_points(1, e, 2)[0]
-            nodes.append(PointNormalDerivative(ref_el, e, pt))
-            entity_ids[1][e] = [cur]
-            cur += 1
-
-        entity_ids[2] = {0: []}
-
-        super(QuinticArgyrisDualSet, self).__init__(nodes, ref_el, entity_ids)
-
-
 class Argyris(finite_element.CiarletElement):
     """The Argyris finite element."""
 
-    def __init__(self, ref_el, degree, variant=None):
+    def __init__(self, ref_el, degree=5, variant=None):
         poly_set = polynomial_set.ONPolynomialSet(ref_el, degree, variant="bubble")
         dual = ArgyrisDualSet(ref_el, degree, variant=variant)
         super(Argyris, self).__init__(poly_set, dual, degree)
-
-
-class QuinticArgyris(finite_element.CiarletElement):
-    """The Argyris finite element."""
-
-    def __init__(self, ref_el):
-        poly_set = polynomial_set.ONPolynomialSet(ref_el, 5)
-        dual = QuinticArgyrisDualSet(ref_el)
-        super().__init__(poly_set, dual, 5)
