@@ -11,8 +11,7 @@ from FIAT.functional import (PointEvaluation, PointDerivative, PointNormalDeriva
 from FIAT.reference_element import TRIANGLE, ufc_simplex
 from FIAT.quadrature import FacetQuadratureRule
 from FIAT.quadrature_schemes import create_quadrature
-from FIAT.jacobi import eval_jacobi_batch
-import numpy
+from FIAT.jacobi import eval_jacobi_batch, eval_jacobi_deriv_batch
 
 
 class ArgyrisDualSet(dual_set.DualSet):
@@ -42,15 +41,14 @@ class ArgyrisDualSet(dual_set.DualSet):
             rline = ufc_simplex(1)
             Q = create_quadrature(rline, degree-1+k)
             qpts = Q.get_points()
-            phis = eval_jacobi_batch(0, 0, k, 2.0*qpts - 1)
-            bubbles = numpy.array(phis)
-            bubbles[2:] = (phis[2:] - phis[:-2]) / numpy.arange(3, 2*k, 2)[:, None]
+            phis = eval_jacobi_batch(3, 3, k, 2.0*qpts - 1)
+            dphis = eval_jacobi_deriv_batch(3, 3, k, 2.0*qpts - 1)
             for e in sorted(top[1]):
                 Q_mapped = FacetQuadratureRule(ref_el, 1, e, Q)
                 scale = 2 / Q_mapped.jacobian_determinant()
                 cur = len(nodes)
-                nodes.extend(IntegralMomentOfNormalDerivative(ref_el, e, Q, phi) for phi in bubbles)
-                nodes.extend(IntegralMoment(ref_el, Q_mapped, dphi * scale) for dphi in phis[:-1])
+                nodes.extend(IntegralMomentOfNormalDerivative(ref_el, e, Q, phi) for phi in phis)
+                nodes.extend(IntegralMoment(ref_el, Q_mapped, dphi * scale) for dphi in dphis[1:])
                 entity_ids[1][e].extend(range(cur, len(nodes)))
 
             # interior dofs
