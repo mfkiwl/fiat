@@ -4,7 +4,7 @@
 #
 # SPDX-License-Identifier:    LGPL-3.0-or-later
 
-from FIAT import finite_element, polynomial_set, dual_set, functional
+from FIAT import finite_element, polynomial_set, dual_set
 from FIAT.functional import (PointEvaluation, PointDerivative, PointNormalDerivative,
                              IntegralMoment,
                              IntegralMomentOfNormalDerivative)
@@ -12,21 +12,24 @@ from FIAT.reference_element import TRIANGLE, ufc_simplex
 from FIAT.quadrature import FacetQuadratureRule
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.jacobi import eval_jacobi_batch
+import numpy
 
 
 class ArgyrisDualSet(dual_set.DualSet):
-    def __init__(self, ref_el, degree, variant):
+    def __init__(self, ref_el, degree, variant=None):
+        if variant is None:
+            variant = "integral"
         if ref_el.get_shape() != TRIANGLE:
             raise ValueError("Argyris only defined on triangles")
 
         top = ref_el.get_topology()
-        verts = ref_el.get_vertices()
         sd = ref_el.get_spatial_dimension()
         entity_ids = {dim: {entity: [] for entity in sorted(top[dim])} for dim in sorted(top)}
         nodes = []
 
         # get second order jet at each vertex
-        alphas = [[1, 0], [0, 1], [2, 0], [1, 1], [0, 2]]
+        verts = ref_el.get_vertices()
+        alphas = [(1, 0), (0, 1), (2, 0), (1, 1), (0, 2)]
         for v in sorted(top[0]):
             cur = len(nodes)
             nodes.append(PointEvaluation(ref_el, verts[v]))
@@ -40,12 +43,14 @@ class ArgyrisDualSet(dual_set.DualSet):
             Q = create_quadrature(rline, degree-1+k)
             qpts = Q.get_points()
             phis = eval_jacobi_batch(0, 0, k, 2.0*qpts - 1)
+            bubbles = numpy.array(phis)
+            bubbles[2:] = (phis[2:] - phis[:-2]) / numpy.arange(3, 2*k, 2)[:, None]
             for e in sorted(top[1]):
                 Q_mapped = FacetQuadratureRule(ref_el, 1, e, Q)
                 scale = 2 / Q_mapped.jacobian_determinant()
                 cur = len(nodes)
-                nodes.extend(IntegralMomentOfNormalDerivative(ref_el, e, Q, phi) for phi in phis)
-                nodes.extend(IntegralMoment(ref_el, Q_mapped, phi * scale) for phi in phis[:-1])
+                nodes.extend(IntegralMomentOfNormalDerivative(ref_el, e, Q, phi) for phi in bubbles)
+                nodes.extend(IntegralMoment(ref_el, Q_mapped, dphi * scale) for dphi in phis[:-1])
                 entity_ids[1][e].extend(range(cur, len(nodes)))
 
             # interior dofs
@@ -80,12 +85,13 @@ class ArgyrisDualSet(dual_set.DualSet):
                 entity_ids[2][0] = list(range(cur, len(nodes)))
         else:
             raise ValueError("Invalid variant for Argyris")
-
         super(ArgyrisDualSet, self).__init__(nodes, ref_el, entity_ids)
 
 
 class QuinticArgyrisDualSet(dual_set.DualSet):
     def __init__(self, ref_el):
+        if ref_el.get_shape() != TRIANGLE:
+            raise ValueError("Argyris only defined on triangles")
         entity_ids = {}
         nodes = []
         cur = 0
@@ -93,30 +99,14 @@ class QuinticArgyrisDualSet(dual_set.DualSet):
         # make nodes by getting points
         # need to do this dimension-by-dimension, facet-by-facet
         top = ref_el.get_topology()
+
+        # get second order jet at each vertex
         verts = ref_el.get_vertices()
-        sd = ref_el.get_spatial_dimension()
-        if ref_el.get_shape() != TRIANGLE:
-            raise ValueError("Argyris only defined on triangles")
-
-        pd = functional.PointDerivative
-
-        # get jet at each vertex
-
+        alphas = [(1, 0), (0, 1), (2, 0), (1, 1), (0, 2)]
         entity_ids[0] = {}
         for v in sorted(top[0]):
-            nodes.append(functional.PointEvaluation(ref_el, verts[v]))
-
-            # first derivatives
-            for i in range(sd):
-                alpha = [0] * sd
-                alpha[i] = 1
-                nodes.append(pd(ref_el, verts[v], alpha))
-
-            # second derivatives
-            alphas = [[2, 0], [1, 1], [0, 2]]
-            for alpha in alphas:
-                nodes.append(pd(ref_el, verts[v], alpha))
-
+            nodes.append(PointEvaluation(ref_el, verts[v]))
+            nodes.extend(PointDerivative(ref_el, verts[v], alpha) for alpha in alphas)
             entity_ids[0][v] = list(range(cur, cur + 6))
             cur += 6
 
@@ -124,8 +114,7 @@ class QuinticArgyrisDualSet(dual_set.DualSet):
         entity_ids[1] = {}
         for e in sorted(top[1]):
             pt = ref_el.make_points(1, e, 2)[0]
-            n = functional.PointNormalDerivative(ref_el, e, pt)
-            nodes.append(n)
+            nodes.append(PointNormalDerivative(ref_el, e, pt))
             entity_ids[1][e] = [cur]
             cur += 1
 
@@ -138,8 +127,6 @@ class Argyris(finite_element.CiarletElement):
     """The Argyris finite element."""
 
     def __init__(self, ref_el, degree, variant=None):
-        if variant is None:
-            variant = "integral"
         poly_set = polynomial_set.ONPolynomialSet(ref_el, degree)
         dual = ArgyrisDualSet(ref_el, degree, variant=variant)
         super(Argyris, self).__init__(poly_set, dual, degree)

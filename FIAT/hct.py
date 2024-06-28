@@ -6,6 +6,7 @@ from FIAT.reference_element import TRIANGLE, ufc_simplex
 from FIAT.quadrature import FacetQuadratureRule
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.jacobi import eval_jacobi, eval_jacobi_batch
+import numpy
 
 
 class HCTDualSet(dual_set.DualSet):
@@ -45,11 +46,13 @@ class HCTDualSet(dual_set.DualSet):
                 entity_ids[1][e].extend(range(cur, len(nodes)))
         else:
             phis = eval_jacobi_batch(0, 0, k, 2.0*qpts - 1)
+            bubbles = numpy.array(phis)
+            bubbles[2:] = (phis[2:] - phis[:-2]) / numpy.arange(3, 2*k, 2)[:, None]
             for e in sorted(top[1]):
                 Q_mapped = FacetQuadratureRule(ref_el, 1, e, Q)
                 scale = 2 / Q_mapped.jacobian_determinant()
                 cur = len(nodes)
-                nodes.extend(IntegralMomentOfNormalDerivative(ref_el, e, Q, phi) for phi in phis)
+                nodes.extend(IntegralMomentOfNormalDerivative(ref_el, e, Q, phi) for phi in bubbles)
                 nodes.extend(IntegralMoment(ref_el, Q_mapped, phi * scale) for phi in phis[:-1])
                 entity_ids[1][e].extend(range(cur, len(nodes)))
 
