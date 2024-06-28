@@ -41,8 +41,8 @@ class ArgyrisDualSet(dual_set.DualSet):
             rline = ufc_simplex(1)
             Q = create_quadrature(rline, degree-1+k)
             qpts = Q.get_points()
-            phis = eval_jacobi_batch(3, 3, k, 2.0*qpts - 1)
-            dphis = eval_jacobi_deriv_batch(3, 3, k, 2.0*qpts - 1)
+            phis = eval_jacobi_batch(2, 2, k, 2.0*qpts - 1)
+            dphis = eval_jacobi_deriv_batch(2, 2, k, 2.0*qpts - 1)
             for e in sorted(top[1]):
                 Q_mapped = FacetQuadratureRule(ref_el, 1, e, Q)
                 scale = 2 / Q_mapped.jacobian_determinant()
@@ -125,7 +125,7 @@ class Argyris(finite_element.CiarletElement):
     """The Argyris finite element."""
 
     def __init__(self, ref_el, degree, variant=None):
-        poly_set = polynomial_set.ONPolynomialSet(ref_el, degree)
+        poly_set = polynomial_set.ONPolynomialSet(ref_el, degree, variant="bubble")
         dual = ArgyrisDualSet(ref_el, degree, variant=variant)
         super(Argyris, self).__init__(poly_set, dual, degree)
 
