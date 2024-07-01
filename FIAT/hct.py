@@ -1,3 +1,11 @@
+# Copyright (C) 2024 Pablo D. Brubeck
+#
+# This file is part of FIAT (https://www.fenicsproject.org)
+#
+# SPDX-License-Identifier:    LGPL-3.0-or-later
+#
+# Written by Pablo D. Brubeck (brubeck@protonmail.com), 2024
+
 from FIAT.functional import (PointEvaluation, PointDerivative,
                              IntegralMoment,
                              IntegralMomentOfNormalDerivative)
@@ -68,8 +76,10 @@ class HCTDualSet(dual_set.DualSet):
 
 
 class HsiehCloughTocher(finite_element.CiarletElement):
-    """The HCT finite element."""
-
+    """The HCT macroelement. For degree higher than 3, we implement the
+    super-smooth C^1 space from Grosel and Knez (2022) on a barycentric split,
+    although there the basis functions are positive on an incenter split.
+    """
     def __init__(self, ref_el, degree=3, reduced=False):
         ref_complex = macro.AlfeldSplit(ref_el)
         dual = HCTDualSet(ref_complex, degree, reduced=reduced)
