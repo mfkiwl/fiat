@@ -399,6 +399,7 @@ class CkPolynomialSet(polynomial_set.PolynomialSet):
 
         if vorder > order + 1:
             # Impose C^vorder super-smoothness at interior vertices
+            # C^order automatically gives C^{order+1} at the interior vertex
             verts = ref_el.get_vertices()
             points = [verts[i] for i in ref_el.get_interior_facets(0)]
             jumps = expansion_set.tabulate_jumps(degree, points, order=vorder)
