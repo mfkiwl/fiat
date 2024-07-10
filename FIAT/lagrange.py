@@ -8,8 +8,9 @@
 from FIAT import finite_element, polynomial_set, dual_set, functional
 from FIAT.orientation_utils import make_entity_permutations_simplex
 from FIAT.barycentric_interpolation import LagrangePolynomialSet, get_lagrange_points
-from FIAT.reference_element import LINE
+from FIAT.reference_element import multiindex_equal, make_lattice, LINE
 from FIAT.check_format_variant import parse_lagrange_variant
+import numpy
 
 
 class LagrangeDualSet(dual_set.DualSet):
@@ -17,28 +18,45 @@ class LagrangeDualSet(dual_set.DualSet):
     simplices of any dimension.  Nodes are point evaluation at
     recursively-defined points.
     """
-    def __init__(self, ref_el, degree, point_variant="equispaced"):
+    def __init__(self, ref_el, degree, point_variant="equispaced", lexsort=False):
         entity_ids = {}
-        nodes = []
-        entity_permutations = {}
-
-        # make nodes by getting points
-        # need to do this dimension-by-dimension, facet-by-facet
         top = ref_el.get_topology()
+        if lexsort:
+            # make nodes by getting points on a lattice
+            points = make_lattice(ref_el.get_vertices(), degree, variant=point_variant)
+            nodes = [functional.PointEvaluation(ref_el, x) for x in points]
 
-        cur = 0
+            # map lattice coordinates to node indices
+            sd = ref_el.get_spatial_dimension()
+            alphas = multiindex_equal(sd+1, degree)
+            ids = dict(zip(alphas, range(len(points))))
+
+            # associate entities to node indices
+            ref_vertices = [tuple(int(i == j) for j in range(sd+1)) for i in range(sd+1)]
+            for dim in sorted(top):
+                entity_ids[dim] = {}
+                base_alphas = list(multiindex_equal(dim+1, degree, imin=1))
+                for entity in sorted(top[dim]):
+                    verts = [ref_vertices[i] for i in top[dim][entity]]
+                    alphas = [] if len(base_alphas) == 0 else numpy.dot(base_alphas, verts)
+                    entity_ids[dim][entity] = [ids[tuple(alpha)] for alpha in alphas]
+        else:
+            # make nodes by getting points
+            # need to do this dimension-by-dimension, facet-by-facet
+            nodes = []
+            for dim in sorted(top):
+                entity_ids[dim] = {}
+                for entity in sorted(top[dim]):
+                    cur = len(nodes)
+                    pts_cur = ref_el.make_points(dim, entity, degree, variant=point_variant)
+                    nodes.extend(functional.PointEvaluation(ref_el, x) for x in pts_cur)
+                    entity_ids[dim][entity] = list(range(cur, len(nodes)))
+
+        entity_permutations = {}
         for dim in sorted(top):
-            entity_ids[dim] = {}
             entity_permutations[dim] = {}
             perms = {0: [0]} if dim == 0 else make_entity_permutations_simplex(dim, degree - dim)
             for entity in sorted(top[dim]):
-                pts_cur = ref_el.make_points(dim, entity, degree, variant=point_variant)
-                nodes_cur = [functional.PointEvaluation(ref_el, x)
-                             for x in pts_cur]
-                nnodes_cur = len(nodes_cur)
-                nodes += nodes_cur
-                entity_ids[dim][entity] = list(range(cur, cur + nnodes_cur))
-                cur += nnodes_cur
                 entity_permutations[dim][entity] = perms
 
         super(LagrangeDualSet, self).__init__(nodes, ref_el, entity_ids, entity_permutations)
@@ -58,12 +76,13 @@ class Lagrange(finite_element.CiarletElement):
                            variant='equispaced,Iso(2)' with degree=1 gives the P2:P1 iso element.
                            variant='Alfeld' can be used to obtain a barycentrically refined
                               macroelement for Scott-Vogelius.
+    :arg lexsort: Are we sorting the nodes lexicographically?
     """
-    def __init__(self, ref_el, degree, variant="equispaced"):
+    def __init__(self, ref_el, degree, variant="equispaced", lexsort=False):
         splitting, point_variant = parse_lagrange_variant(variant)
         if splitting is not None:
             ref_el = splitting(ref_el)
-        dual = LagrangeDualSet(ref_el, degree, point_variant=point_variant)
+        dual = LagrangeDualSet(ref_el, degree, point_variant=point_variant, lexsort=lexsort)
         if ref_el.shape == LINE:
             # In 1D we can use the primal basis as the expansion set,
             # avoiding any round-off coming from a basis transformation
