@@ -77,7 +77,7 @@ class HCTDualSet(dual_set.DualSet):
 
 class HsiehCloughTocher(finite_element.CiarletElement):
     """The HCT macroelement. For degree higher than 3, we implement the
-    super-smooth C^1 space from Grosel and Knez (2022) on a barycentric split,
+    super-smooth C^1 space from Groselj and Knez (2022) on a barycentric split,
     although there the basis functions are positive on an incenter split.
     """
     def __init__(self, ref_el, degree=3, reduced=False):

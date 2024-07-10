@@ -404,7 +404,6 @@ class CkPolynomialSet(polynomial_set.PolynomialSet):
             jumps = expansion_set.tabulate_jumps(degree, points, order=vorder)
             for r in range(order+2, vorder+1):
                 dual_mat = numpy.dot(numpy.vstack(jumps[r].T), coeffs.T)
-                print(dual_mat)
                 _, sig, vt = numpy.linalg.svd(dual_mat, full_matrices=True)
                 tol = sig[0] * 1E-10
                 num_sv = len([s for s in sig if abs(s) > tol])
