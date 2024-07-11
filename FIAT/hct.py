@@ -52,8 +52,9 @@ class HCTDualSet(dual_set.DualSet):
                 nodes.append(IntegralMomentOfNormalDerivative(ref_el, e, Q, f_at_qpts))
                 entity_ids[1][e].extend(range(cur, len(nodes)))
         else:
-            phis = eval_jacobi_batch(2, 2, k, 2.0*qpts - 1)
-            dphis = eval_jacobi_deriv_batch(2, 2, k, 2.0*qpts - 1)
+            x = 2.0*qpts - 1
+            phis = eval_jacobi_batch(2, 2, k, x)
+            dphis = eval_jacobi_deriv_batch(2, 2, k, x)
             for e in sorted(top[1]):
                 Q_mapped = FacetQuadratureRule(ref_el, 1, e, Q)
                 scale = 2 / Q_mapped.jacobian_determinant()
