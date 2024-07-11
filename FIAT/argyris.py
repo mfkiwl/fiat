@@ -39,9 +39,9 @@ class ArgyrisDualSet(dual_set.DualSet):
             k = degree - 5
             rline = ufc_simplex(1)
             Q = create_quadrature(rline, interpolant_deg+k-1)
-            qpts = Q.get_points()
-            phis = eval_jacobi_batch(2, 2, k, 2.0*qpts - 1)
-            dphis = eval_jacobi_deriv_batch(2, 2, k, 2.0*qpts - 1)
+            x = 2.0 * Q.get_points() - 1.0
+            phis = eval_jacobi_batch(2, 2, k, x)
+            dphis = eval_jacobi_deriv_batch(2, 2, k, x)
             for e in sorted(top[1]):
                 Q_mapped = FacetQuadratureRule(ref_el, 1, e, Q)
                 scale = 2 / Q_mapped.jacobian_determinant()
