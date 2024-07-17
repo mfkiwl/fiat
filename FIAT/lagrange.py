@@ -19,13 +19,13 @@ class LagrangeDualSet(dual_set.DualSet):
 
     :arg ref_el: The simplicial complex.
     :arg degree: The polynomial degree.
-    :point_variant: The point distribution variant passed on to recursivenodes.
-    :lexsort_entities: A flag to sort entities by lexicographically by coordinate,
-                       if false then entities are sorted first by dimension and then by
-                       entity id. The DOFs are always sorted by the entity ordering
-                       and then lexicographically by coordinate.
+    :arg point_variant: The point distribution variant passed on to recursivenodes.
+    :arg sort_entities: A flag to sort entities by support vertex ids.
+                        If false then entities are sorted first by dimension and then by
+                        entity id. The DOFs are always sorted by the entity ordering
+                        and then lexicographically by lattice multiindex.
     """
-    def __init__(self, ref_el, degree, point_variant="equispaced", lexsort_entities=False):
+    def __init__(self, ref_el, degree, point_variant="equispaced", sort_entities=False):
         nodes = []
         entity_ids = {}
         entity_permutations = {}
@@ -38,8 +38,8 @@ class LagrangeDualSet(dual_set.DualSet):
                 entity_permutations[dim][entity] = perms
 
         entities = [(dim, entity) for dim in sorted(top) for entity in sorted(top[dim])]
-        if lexsort_entities:
-            # sort the entities by their support vertex ids
+        if sort_entities:
+            # sort the entities by support vertex ids
             support = [top[dim][entity] for dim, entity in entities]
             entities = [entity for verts, entity in sorted(zip(support, entities))]
 
@@ -67,16 +67,16 @@ class Lagrange(finite_element.CiarletElement):
                            variant='equispaced,Iso(2)' with degree=1 gives the P2:P1 iso element.
                            variant='Alfeld' can be used to obtain a barycentrically refined
                               macroelement for Scott-Vogelius.
-    :arg lexsort_entities: A flag to sort entities lexicographically by coordinate,
-                           if false then entities are sorted first by dimension and then by
-                           entity id. The DOFs are always sorted by the entity ordering
-                           and then lexicographically by coordinate.
+    :arg sort_entities: A flag to sort entities by support vertex ids.
+                        If false then entities are sorted first by dimension and then by
+                        entity id. The DOFs are always sorted by the entity ordering
+                        and then lexicographically by lattice multiindex.
     """
-    def __init__(self, ref_el, degree, variant="equispaced", lexsort_entities=False):
+    def __init__(self, ref_el, degree, variant="equispaced", sort_entities=False):
         splitting, point_variant = parse_lagrange_variant(variant)
         if splitting is not None:
             ref_el = splitting(ref_el)
-        dual = LagrangeDualSet(ref_el, degree, point_variant=point_variant, lexsort_entities=lexsort_entities)
+        dual = LagrangeDualSet(ref_el, degree, point_variant=point_variant, sort_entities=sort_entities)
         if ref_el.shape == LINE:
             # In 1D we can use the primal basis as the expansion set,
             # avoiding any round-off coming from a basis transformation
