@@ -183,11 +183,19 @@ class DualSet(object):
         return mat
 
     def get_indices(self, restriction_domain, take_closure=True):
-        "Restriction domain can be 'interior', 'vertex', 'edge', 'face' or 'facet'"
+        """Returns the list of dofs with support on a given restriction domain.
+
+        :arg restriction_domain: can be 'interior', 'vertex', 'edge', 'face' or 'facet'
+        :kwarg take_closure: Are we taking the closure of the restriction domain?
+        """
         entity_dofs = self.get_entity_ids()
         if restriction_domain == "interior":
-            # Return dofs from interior
-            return entity_dofs[max(entity_dofs.keys())][0]
+            # Return dofs from interior, never taking the closure
+            indices = []
+            entities = entity_dofs[max(entity_dofs.keys())]
+            for (entity, ids) in sorted_by_key(entities):
+                indices.extend(ids)
+            return indices
 
         # otherwise return dofs with d <= dim
         if restriction_domain == "vertex":
@@ -207,18 +215,15 @@ class DualSet(object):
         indices = []
         for d in range(ldim, dim + 1):
             if is_prodcell:
-                for a in range(d + 1):
-                    b = d - a
-                    try:
-                        entities = entity_dofs[(a, b)]
-                        for (entity, index) in sorted_by_key(entities):
-                            indices += index
-                    except KeyError:
-                        pass
+                for edim in entity_dofs:
+                    if sum(edim) == d:
+                        entities = entity_dofs[edim]
+                        for (entity, ids) in sorted_by_key(entities):
+                            indices.extend(ids)
             else:
                 entities = entity_dofs[d]
-                for (entity, index) in sorted_by_key(entities):
-                    indices += index
+                for (entity, ids) in sorted_by_key(entities):
+                    indices.extend(ids)
         return indices
 
 
