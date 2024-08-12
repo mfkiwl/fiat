@@ -8,8 +8,41 @@ from FIAT.dual_set import DualSet
 from FIAT.finite_element import CiarletElement
 
 
+class RestrictedDualSet(DualSet):
+    """Restrict the given DualSet to the specified list of dofs."""
+
+    def __init__(self, dual, indices):
+        ref_el = dual.get_reference_element()
+        nodes_old = dual.get_nodes()
+        dof_counter = 0
+        entity_ids = {}
+        nodes = []
+        for d, entities in dual.get_entity_ids().items():
+            entity_ids[d] = {}
+            for entity, dofs in entities.items():
+                entity_ids[d][entity] = []
+                for dof in dofs:
+                    if dof not in indices:
+                        continue
+                    entity_ids[d][entity].append(dof_counter)
+                    dof_counter += 1
+                    nodes.append(nodes_old[dof])
+        assert dof_counter == len(indices)
+        self._dual = dual
+        super(RestrictedDualSet, self).__init__(nodes, ref_el, entity_ids)
+
+    def get_indices(self, restriction_domain, take_closure=True):
+        """Return the list of dofs with support on a given restriction domain.
+
+        :arg restriction_domain: can be 'interior', 'vertex', 'edge', 'face' or 'facet'
+        :kwarg take_closure: Are we taking the closure of the restriction domain?
+        """
+        # Call get_indices on the parent class to support multiple restriction domains
+        return type(self._dual).get_indices(self, restriction_domain, take_closure=take_closure)
+
+
 class RestrictedElement(CiarletElement):
-    """Restrict given element to specified list of dofs."""
+    """Restrict the given element to the specified list of dofs."""
 
     def __init__(self, element, indices=None, restriction_domain=None, take_closure=True):
         '''For sake of argument, indices overrides restriction_domain'''
@@ -29,29 +62,11 @@ class RestrictedElement(CiarletElement):
         self._element = element
         self._indices = indices
 
-        # Fetch reference element
-        ref_el = element.get_reference_element()
-
         # Restrict primal set
         poly_set = element.get_nodal_basis().take(indices)
 
         # Restrict dual set
-        dof_counter = 0
-        entity_ids = {}
-        nodes = []
-        nodes_old = element.dual_basis()
-        for d, entities in element.entity_dofs().items():
-            entity_ids[d] = {}
-            for entity, dofs in entities.items():
-                entity_ids[d][entity] = []
-                for dof in dofs:
-                    if dof not in indices:
-                        continue
-                    entity_ids[d][entity].append(dof_counter)
-                    dof_counter += 1
-                    nodes.append(nodes_old[dof])
-        assert dof_counter == len(indices)
-        dual = DualSet(nodes, ref_el, entity_ids)
+        dual = RestrictedDualSet(element.get_dual_set(), indices)
 
         # Restrict mapping
         mapping_old = element.mapping()
