@@ -8,7 +8,9 @@ from FIAT.functional import PointEvaluation
 
 @pytest.fixture
 def cell():
-    return ufc_simplex(2)
+    K = ufc_simplex(2)
+    K.vertices = ((0.0, 0.1), (1.17, -0.09), (0.15, 1.84))
+    return K
 
 
 @pytest.mark.parametrize("reduced", (False, True))

@@ -177,12 +177,6 @@ class Cell(object):
         # Default: only type matters
         return None
 
-    def __eq__(self, other):
-        return type(self) is type(other) and self._key() == other._key()
-
-    def __ne__(self, other):
-        return not self.__eq__(other)
-
     def __hash__(self):
         return hash((type(self), self._key()))
 
@@ -268,21 +262,56 @@ class Cell(object):
     def is_macrocell(self):
         return False
 
+    def get_interior_facets(self, dim):
+        """Return the interior facets this cell is a split and () otherwise."""
+        return ()
+
     def get_parent(self):
         """Return the parent cell if this cell is a split and None otherwise."""
         return None
 
+    def get_parent_complex(self):
+        """Return the parent complex if this cell is a split and None otherwise."""
+        return None
+
+    def is_parent(self, other, strict=False):
+        """Return whether this cell is the parent of the other cell."""
+        parent = other
+        if strict:
+            parent = parent.get_parent_complex()
+        while parent is not None:
+            if self == parent:
+                return True
+            parent = parent.get_parent_complex()
+        return False
+
+    def __eq__(self, other):
+        if self is other:
+            return True
+        A, B = self.get_vertices(), other.get_vertices()
+        if not (len(A) == len(B) and numpy.allclose(A, B)):
+            return False
+        atop = self.get_topology()
+        btop = other.get_topology()
+        for dim in atop:
+            if set(atop[dim].values()) != set(btop[dim].values()):
+                return False
+        return True
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
     def __gt__(self, other):
-        return self.get_parent() == other
+        return other.is_parent(self, strict=True)
 
     def __lt__(self, other):
-        return self == other.get_parent()
+        return self.is_parent(other, strict=True)
 
     def __ge__(self, other):
-        return self > other or self == other
+        return other.is_parent(self, strict=False)
 
     def __le__(self, other):
-        return self < other or self == other
+        return self.is_parent(other, strict=False)
 
 
 class SimplicialComplex(Cell):
@@ -297,7 +326,7 @@ class SimplicialComplex(Cell):
             for entity in topology[dim]:
                 assert len(topology[dim][entity]) == dim + 1
 
-        super(SimplicialComplex, self).__init__(shape, vertices, topology)
+        super().__init__(shape, vertices, topology)
 
     def compute_normal(self, facet_i, cell=None):
         """Returns the unit normal vector to facet i of codimension 1."""
@@ -386,7 +415,7 @@ class SimplicialComplex(Cell):
         of dimension dim.  Returns a (possibly empty) list.
         These tangents are normalized to have unit length."""
         ts = self.compute_tangents(dim, i)
-        ts /= numpy.linalg.norm(ts, axis=0)[None, :]
+        ts /= numpy.linalg.norm(ts, axis=1)[:, None]
         return ts
 
     def compute_edge_tangent(self, edge_i):
@@ -538,6 +567,11 @@ class SimplicialComplex(Cell):
             A *= h[:, None]
         out = numpy.dot(points, A.T)
         return numpy.add(out, b, out=out)
+
+    def compute_bubble(self, points, entity=None):
+        """Returns the lowest-order bubble on an entity evaluated at the given
+        points on the entity."""
+        return numpy.prod(self.compute_barycentric_coordinates(points, entity), axis=1)
 
     def distance_to_point_l1(self, points, entity=None, rescale=False):
         # noqa: D301
@@ -784,7 +818,7 @@ class Point(Simplex):
     def __init__(self):
         verts = ((),)
         topology = {0: {0: (0,)}}
-        super(Point, self).__init__(POINT, verts, topology)
+        super().__init__(POINT, verts, topology)
 
     def construct_subelement(self, dimension):
         """Constructs the reference element of a cell subentity
@@ -804,7 +838,7 @@ class DefaultLine(DefaultSimplex):
         edges = {0: (0, 1)}
         topology = {0: {0: (0,), 1: (1,)},
                     1: edges}
-        super(DefaultLine, self).__init__(LINE, verts, topology)
+        super().__init__(LINE, verts, topology)
 
 
 class UFCInterval(UFCSimplex):
@@ -815,7 +849,7 @@ class UFCInterval(UFCSimplex):
         edges = {0: (0, 1)}
         topology = {0: {0: (0,), 1: (1,)},
                     1: edges}
-        super(UFCInterval, self).__init__(LINE, verts, topology)
+        super().__init__(LINE, verts, topology)
 
 
 class DefaultTriangle(DefaultSimplex):
@@ -830,7 +864,7 @@ class DefaultTriangle(DefaultSimplex):
         faces = {0: (0, 1, 2)}
         topology = {0: {0: (0,), 1: (1,), 2: (2,)},
                     1: edges, 2: faces}
-        super(DefaultTriangle, self).__init__(TRIANGLE, verts, topology)
+        super().__init__(TRIANGLE, verts, topology)
 
 
 class UFCTriangle(UFCSimplex):
@@ -843,7 +877,7 @@ class UFCTriangle(UFCSimplex):
         faces = {0: (0, 1, 2)}
         topology = {0: {0: (0,), 1: (1,), 2: (2,)},
                     1: edges, 2: faces}
-        super(UFCTriangle, self).__init__(TRIANGLE, verts, topology)
+        super().__init__(TRIANGLE, verts, topology)
 
     def compute_normal(self, i):
         "UFC consistent normal"
@@ -863,7 +897,7 @@ class IntrepidTriangle(Simplex):
         faces = {0: (0, 1, 2)}
         topology = {0: {0: (0,), 1: (1,), 2: (2,)},
                     1: edges, 2: faces}
-        super(IntrepidTriangle, self).__init__(TRIANGLE, verts, topology)
+        super().__init__(TRIANGLE, verts, topology)
 
     def get_facet_element(self):
         # I think the UFC interval is equivalent to what the
@@ -894,7 +928,7 @@ class DefaultTetrahedron(DefaultSimplex):
                  3: (0, 1, 2)}
         tets = {0: (0, 1, 2, 3)}
         topology = {0: vs, 1: edges, 2: faces, 3: tets}
-        super(DefaultTetrahedron, self).__init__(TETRAHEDRON, verts, topology)
+        super().__init__(TETRAHEDRON, verts, topology)
 
 
 class IntrepidTetrahedron(Simplex):
@@ -919,7 +953,7 @@ class IntrepidTetrahedron(Simplex):
                  3: (0, 2, 1)}
         tets = {0: (0, 1, 2, 3)}
         topology = {0: vs, 1: edges, 2: faces, 3: tets}
-        super(IntrepidTetrahedron, self).__init__(TETRAHEDRON, verts, topology)
+        super().__init__(TETRAHEDRON, verts, topology)
 
     def get_facet_element(self):
         return IntrepidTriangle()
@@ -947,7 +981,7 @@ class UFCTetrahedron(UFCSimplex):
                  3: (0, 1, 2)}
         tets = {0: (0, 1, 2, 3)}
         topology = {0: vs, 1: edges, 2: faces, 3: tets}
-        super(UFCTetrahedron, self).__init__(TETRAHEDRON, verts, topology)
+        super().__init__(TETRAHEDRON, verts, topology)
 
     def compute_normal(self, i):
         "UFC consistent normals."
@@ -982,7 +1016,7 @@ class TensorProductCell(Cell):
             topology[dim] = dict(enumerate(topology[dim][key]
                                            for key in sorted(topology[dim])))
 
-        super(TensorProductCell, self).__init__(TENSORPRODUCT, vertices, topology)
+        super().__init__(TENSORPRODUCT, vertices, topology)
         self.cells = tuple(cells)
 
     def _key(self):
@@ -1181,7 +1215,7 @@ class UFCQuadrilateral(Cell):
         verts = product.get_vertices()
         topology = flatten_entities(pt)
 
-        super(UFCQuadrilateral, self).__init__(QUADRILATERAL, verts, topology)
+        super().__init__(QUADRILATERAL, verts, topology)
 
         self.product = product
         self.unflattening_map = compute_unflattening_map(pt)
@@ -1284,7 +1318,7 @@ class UFCHexahedron(Cell):
         verts = product.get_vertices()
         topology = flatten_entities(pt)
 
-        super(UFCHexahedron, self).__init__(HEXAHEDRON, verts, topology)
+        super().__init__(HEXAHEDRON, verts, topology)
 
         self.product = product
         self.unflattening_map = compute_unflattening_map(pt)
