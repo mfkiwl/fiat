@@ -262,8 +262,9 @@ texinfo_documents = [
 #texinfo_no_detailmenu = False
 
 
-# Example configuration for intersphinx: refer to the Python standard library.
+# Configuration for intersphinx
 intersphinx_mapping = {
+    'recursivenodes': ('https://tisaac.gitlab.io/recursivenodes/', None),
     'numpy': ('https://numpy.org/doc/stable/', None),
     'python': ('https://docs.python.org/3/', None),
 }
