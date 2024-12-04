@@ -1,23 +1,34 @@
-.. FInAT documentation master file, created by
-   sphinx-quickstart on Thu Aug 14 11:38:06 2014.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
+.. title:: FIAT
 
-Welcome to FInAT's documentation!
-=================================
 
-Contents:
+========================================
+FIAT: FInite element Automatic Tabulator
+========================================
+
+FIAT is a Python package for automatic generation of finite element
+basis functions. It is capable of generating finite element basis
+functions for a wide range of finite element families on simplices
+(lines, triangles and tetrahedra), including the Lagrange elements,
+and the elements of Raviart-Thomas, Brezzi-Douglas-Marini and Nedelec.
+It is also capable of generating tensor-product elements and a number
+more exotic elements, such as the Argyris, Hermite and Morley
+elements.
+
+FIAT is part of the FEniCS Project.
+
+For more information, visit http://www.fenicsproject.org.
+
+
+Documentation
+=============
 
 .. toctree::
-   :maxdepth: 2
+   :titlesonly:
+   :maxdepth: 1
 
+   installation
+   manual
+   releases
+   FIAT
    finat
-
-
-Indices and tables
-==================
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
-
+   gem

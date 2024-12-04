@@ -177,7 +177,7 @@ class Terminal(Node):
 
     @property
     def dtype(self):
-        """dtype of the node.
+        """Data type of the node.
 
         We only need to set dtype (or _dtype) on terminal nodes, and
         other nodes inherit dtype from their children.

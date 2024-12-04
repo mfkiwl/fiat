@@ -95,7 +95,7 @@ class UnknownPointSet(AbstractPointSet):
     shape (D,) and free indices for the points N."""
 
     def __init__(self, points_expr):
-        """Build a PointSingleton from a gem expression for a single point.
+        r"""Build a PointSingleton from a gem expression for a single point.
 
         :arg points_expr: A ``gem.Variable`` expression representing a
             vector of N points in D dimensions. Should have shape (N, D)

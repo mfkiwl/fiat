@@ -225,7 +225,7 @@ def productise(factors, method):
 
 
 def compose_permutations(factors):
-    """For the :class:`TensorProductElement` object composed of factors,
+    r"""For the :class:`TensorProductElement` object composed of factors,
     construct, for each dimension tuple, for each entity, and for each possible
     entity orientation combination, the DoF permutation list.
 
@@ -236,7 +236,8 @@ def compose_permutations(factors):
     For tensor-product elements, one needs to consider two kinds of orientations:
     extrinsic orientations and intrinsic ("material") orientations.
 
-    Example:
+    Example
+    -------
 
     UFCQuadrilateral := UFCInterval x UFCInterval
 
@@ -286,6 +287,7 @@ def compose_permutations(factors):
                   (1, 0, 1): [2, 0, 3, 1],
                   (1, 1, 0): [1, 3, 0, 2],
                   (1, 1, 1): [3, 1, 2, 0]}}}
+
     """
     permutations = {}
     cells = [fe.cell for fe in factors]

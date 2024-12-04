@@ -126,14 +126,14 @@ class FiniteElement(FiniteElementBase):
                  variant=None):
         """Create finite element.
 
-        Args:
-            family: The finite element family
-            cell: The geometric cell
-            degree: The polynomial degree (optional)
-            form_degree: The form degree (FEEC notation, used when field is
-               viewed as k-form)
-            quad_scheme: The quadrature scheme (optional)
-            variant: Hint for the local basis function variant (optional)
+        :arg family: The finite element family
+        :arg cell: The geometric cell
+        :arg degree: The polynomial degree (optional)
+        :arg form_degree: The form degree (FEEC notation, used when field is
+            viewed as k-form)
+        :arg quad_scheme: The quadrature scheme (optional)
+        :arg variant: Hint for the local basis function variant (optional)
+
         """
         # Note: Unfortunately, dolfin sometimes passes None for
         # cell. Until this is fixed, allow it:
