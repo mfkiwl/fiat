@@ -16,6 +16,7 @@
 # an entire set of polynomials)
 
 import numpy
+from itertools import chain
 from FIAT import expansions
 from FIAT.functional import index_iterator
 
@@ -53,7 +54,6 @@ class PolynomialSet(object):
          empty) tuple giving the index for a vector- or tensor-valued
          function.
     """
-
     def __init__(self, ref_el, degree, embedded_degree, expansion_set, coeffs):
         self.ref_el = ref_el
         self.num_members = coeffs.shape[0]
@@ -61,7 +61,6 @@ class PolynomialSet(object):
         self.embedded_degree = embedded_degree
         self.expansion_set = expansion_set
         self.coeffs = coeffs
-        self.dmats = []
 
     def tabulate_new(self, pts):
         return numpy.dot(self.coeffs,
@@ -69,13 +68,8 @@ class PolynomialSet(object):
 
     def tabulate(self, pts, jet_order=0):
         """Returns the values of the polynomial set."""
-        base_vals = self.expansion_set._tabulate_jet(self.embedded_degree, pts, order=jet_order)
-        D = self.ref_el.get_spatial_dimension()
-        result = {}
-        for i in range(jet_order + 1):
-            alphas = mis(D, i)
-            for alpha in alphas:
-                result[alpha] = numpy.dot(self.coeffs, base_vals[alpha])
+        base_vals = self.expansion_set._tabulate(self.embedded_degree, pts, order=jet_order)
+        result = {alpha: numpy.dot(self.coeffs, base_vals[alpha]) for alpha in base_vals}
         return result
 
     def get_expansion_set(self):
@@ -93,10 +87,8 @@ class PolynomialSet(object):
     def get_embedded_degree(self):
         return self.embedded_degree
 
-    def get_dmats(self):
-        if len(self.dmats) == 0:
-            self.dmats = self.expansion_set.get_dmats(self.embedded_degree)
-        return self.dmats
+    def get_dmats(self, cell=0):
+        return self.expansion_set.get_dmats(self.embedded_degree, cell=cell)
 
     def get_reference_element(self):
         return self.ref_el
@@ -117,45 +109,37 @@ class ONPolynomialSet(PolynomialSet):
     """Constructs an orthonormal basis out of expansion set by having an
     identity matrix of coefficients.  Can be used to specify ON bases
     for vector- and tensor-valued sets as well.
-
     """
-
-    def __init__(self, ref_el, degree, shape=tuple()):
-
+    def __init__(self, ref_el, degree, shape=tuple(), **kwargs):
+        expansion_set = expansions.ExpansionSet(ref_el, **kwargs)
         if shape == tuple():
             num_components = 1
         else:
             flat_shape = numpy.ravel(shape)
             num_components = numpy.prod(flat_shape)
-        num_exp_functions = expansions.polynomial_dimension(ref_el, degree)
+        num_exp_functions = expansion_set.get_num_members(degree)
         num_members = num_components * num_exp_functions
         embedded_degree = degree
-        expansion_set = expansions.ExpansionSet(ref_el)
 
         # set up coefficients
         if shape == tuple():
             coeffs = numpy.eye(num_members)
         else:
-            coeffs_shape = (num_members, *shape, num_exp_functions)
-            coeffs = numpy.zeros(coeffs_shape, "d")
-            # use functional's index_iterator function
-            cur_bf = 0
+            coeffs = numpy.zeros((num_members, *shape, num_exp_functions))
+            cur = 0
+            exp_bf = range(num_exp_functions)
             for idx in index_iterator(shape):
-                n = expansions.polynomial_dimension(ref_el, embedded_degree)
-                for exp_bf in range(n):
-                    cur_idx = (cur_bf, *idx, exp_bf)
-                    coeffs[cur_idx] = 1.0
-                    cur_bf += 1
+                cur_bf = range(cur, cur+num_exp_functions)
+                coeffs[(cur_bf, *idx, exp_bf)] = 1.0
+                cur += num_exp_functions
 
-        super(ONPolynomialSet, self).__init__(ref_el, degree, embedded_degree,
-                                              expansion_set, coeffs)
+        super().__init__(ref_el, degree, embedded_degree, expansion_set, coeffs)
 
 
 def project(f, U, Q):
     """Computes the expansion coefficients of f in terms of the members of
     a polynomial set U.  Numerical integration is performed by
     quadrature rule Q.
-
     """
     pts = Q.get_points()
     wts = Q.get_weights()
@@ -175,29 +159,25 @@ def form_matrix_product(mats, alpha):
     return result
 
 
+def spanning_basis(A, nullspace=False, rtol=1e-10):
+    """Construct a basis that spans the rows of A via SVD.
+    """
+    Aflat = A.reshape(A.shape[0], -1)
+    u, sig, vt = numpy.linalg.svd(Aflat, full_matrices=True)
+    atol = rtol * (sig[0] + 1)
+    num_sv = len([s for s in sig if abs(s) > atol])
+    basis = vt[num_sv:] if nullspace else vt[:num_sv]
+    return numpy.reshape(basis, (-1, *A.shape[1:]))
+
+
 def polynomial_set_union_normalized(A, B):
     """Given polynomial sets A and B, constructs a new polynomial set
     whose span is the same as that of span(A) union span(B).  It may
     not contain any of the same members of the set, as we construct a
     span via SVD.
-
     """
-    new_coeffs = numpy.array(list(A.coeffs) + list(B.coeffs))
-    func_shape = new_coeffs.shape[1:]
-    if len(func_shape) == 1:
-        (u, sig, vt) = numpy.linalg.svd(new_coeffs)
-        num_sv = len([s for s in sig if abs(s) > 1.e-10])
-        coeffs = vt[:num_sv]
-    else:
-        new_shape0 = new_coeffs.shape[0]
-        new_shape1 = numpy.prod(func_shape)
-        newshape = (new_shape0, new_shape1)
-        nc = numpy.reshape(new_coeffs, newshape)
-        (u, sig, vt) = numpy.linalg.svd(nc, 1)
-        num_sv = len([s for s in sig if abs(s) > 1.e-10])
-
-        coeffs = numpy.reshape(vt[:num_sv], (num_sv,) + func_shape)
-
+    new_coeffs = numpy.concatenate((A.coeffs, B.coeffs), axis=0)
+    coeffs = spanning_basis(new_coeffs)
     return PolynomialSet(A.get_reference_element(),
                          A.get_degree(),
                          A.get_embedded_degree(),
@@ -208,36 +188,88 @@ def polynomial_set_union_normalized(A, B):
 class ONSymTensorPolynomialSet(PolynomialSet):
     """Constructs an orthonormal basis for symmetric-tensor-valued
     polynomials on a reference element.
-
     """
-
-    def __init__(self, ref_el, degree, size=None):
+    def __init__(self, ref_el, degree, size=None, **kwargs):
+        expansion_set = expansions.ExpansionSet(ref_el, **kwargs)
 
         sd = ref_el.get_spatial_dimension()
         if size is None:
             size = sd
 
         shape = (size, size)
-        num_exp_functions = expansions.polynomial_dimension(ref_el, degree)
+        num_exp_functions = expansion_set.get_num_members(degree)
         num_components = size * (size + 1) // 2
         num_members = num_components * num_exp_functions
         embedded_degree = degree
-        expansion_set = expansions.ExpansionSet(ref_el)
 
         # set up coefficients for symmetric tensors
-        coeffs_shape = (num_members, *shape, num_exp_functions)
-        coeffs = numpy.zeros(coeffs_shape, "d")
-        cur_bf = 0
+        coeffs = numpy.zeros((num_members, *shape, num_exp_functions))
+        cur = 0
+        exp_bf = range(num_exp_functions)
         for i, j in index_iterator(shape):
-            if i == j:
-                for exp_bf in range(num_exp_functions):
-                    coeffs[cur_bf, i, j, exp_bf] = 1.0
-                    cur_bf += 1
-            elif i < j:
-                for exp_bf in range(num_exp_functions):
-                    coeffs[cur_bf, i, j, exp_bf] = 1.0
-                    coeffs[cur_bf, j, i, exp_bf] = 1.0
-                    cur_bf += 1
+            if i > j:
+                continue
+            cur_bf = range(cur, cur+num_exp_functions)
+            coeffs[cur_bf, i, j, exp_bf] = 1.0
+            coeffs[cur_bf, j, i, exp_bf] = 1.0
+            cur += num_exp_functions
 
-        super(ONSymTensorPolynomialSet, self).__init__(ref_el, degree, embedded_degree,
-                                                       expansion_set, coeffs)
+        super().__init__(ref_el, degree, embedded_degree, expansion_set, coeffs)
+
+
+class TracelessTensorPolynomialSet(PolynomialSet):
+    """Constructs an orthonormal basis for traceless-tensor-valued
+    polynomials on a reference element.
+    """
+    def __init__(self, ref_el, degree, size=None, **kwargs):
+        expansion_set = expansions.ExpansionSet(ref_el, **kwargs)
+
+        sd = ref_el.get_spatial_dimension()
+        if size is None:
+            size = sd
+
+        shape = (size, size)
+        num_exp_functions = expansion_set.get_num_members(degree)
+        num_components = size * size - 1
+        num_members = num_components * num_exp_functions
+        embedded_degree = degree
+
+        # set up coefficients for traceless tensors
+        coeffs = numpy.zeros((num_members, *shape, num_exp_functions))
+        cur = 0
+        exp_bf = range(num_exp_functions)
+        for i, j in index_iterator(shape):
+            if i == size-1 and j == size-1:
+                continue
+            cur_bf = range(cur, cur+num_exp_functions)
+            coeffs[cur_bf, i, j, exp_bf] = 1.0
+            if i == j:
+                coeffs[cur_bf, -1, -1, exp_bf] = -1.0
+            cur += num_exp_functions
+
+        super().__init__(ref_el, degree, embedded_degree, expansion_set, coeffs)
+
+
+def make_bubbles(ref_el, degree, codim=0, shape=(), scale="L2 piola"):
+    """Construct a polynomial set with codim bubbles up to the given degree.
+    """
+    poly_set = ONPolynomialSet(ref_el, degree, shape=shape, scale=scale, variant="bubble")
+    entity_ids = expansions.polynomial_entity_ids(ref_el, degree, continuity="C0")
+    sd = ref_el.get_spatial_dimension()
+    dim = sd - codim
+    if dim == 1:
+        # Apply even / odd reordering on edge bubbles
+        indices = []
+        for entity in entity_ids[dim]:
+            ids = entity_ids[dim][entity]
+            indices.extend(ids[::2])
+            indices.extend(ids[1::2])
+    else:
+        indices = list(chain(*entity_ids[dim].values()))
+
+    if shape != ():
+        ncomp = numpy.prod(shape)
+        dimPk = poly_set.get_num_members() // ncomp
+        indices = list((numpy.array(indices)[:, None] + dimPk * numpy.arange(ncomp)[None, :]).flat)
+    poly_set = poly_set.take(indices)
+    return poly_set
