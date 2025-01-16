@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
     <title>finat package &#8212; FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</title>
-    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="_static/classic.css?v=2bf1fcf8" />
     
     <script src="_static/documentation_options.js?v=e952a2db"></script>
@@ -459,10 +459,11 @@ reference element.</p>
 </dl>
 </dd></dl>
 
-<dl class="py attribute">
+<dl class="py property">
 <dt class="sig sig-object py" id="finat.cube.FlattenedDimensions.cell">
-<span class="sig-name descname"><span class="pre">cell</span></span><a class="reference internal" href="_modules/finat/cube.html#FlattenedDimensions.cell"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.cube.FlattenedDimensions.cell" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">cell</span></span><a class="headerlink" href="#finat.cube.FlattenedDimensions.cell" title="Link to this definition">¶</a></dt>
+<dd><p>The reference cell on which the element is defined.</p>
+</dd></dl>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="finat.cube.FlattenedDimensions.complex">
@@ -535,15 +536,33 @@ currently have a FInAT dual basis.</p>
 freedom for the finite element.</p>
 </dd></dl>
 
-<dl class="py attribute">
+<dl class="py property">
 <dt class="sig sig-object py" id="finat.cube.FlattenedDimensions.entity_permutations">
-<span class="sig-name descname"><span class="pre">entity_permutations</span></span><a class="reference internal" href="_modules/finat/cube.html#FlattenedDimensions.entity_permutations"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.cube.FlattenedDimensions.entity_permutations" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">entity_permutations</span></span><a class="headerlink" href="#finat.cube.FlattenedDimensions.entity_permutations" title="Link to this definition">¶</a></dt>
+<dd><p>Returns a nested dictionary that gives, for each dimension,
+for each entity, and for each possible entity orientation, the
+DoF permutation array that maps the entity local DoF ordering
+to the canonical global DoF ordering.</p>
+<p>The entity permutations <cite>dict</cite> for the degree 4 Lagrange finite
+element on the interval, for instance, is given by:</p>
+<div class="highlight-python3 notranslate"><div class="highlight"><pre><span></span><span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="p">[</span><span class="mi">0</span><span class="p">]},</span>
+     <span class="mi">1</span><span class="p">:</span> <span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="p">[</span><span class="mi">0</span><span class="p">]}},</span>
+ <span class="mi">1</span><span class="p">:</span> <span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span>
+         <span class="mi">1</span><span class="p">:</span> <span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">]}}}</span>
+</pre></div>
+</div>
+<p>Note that there are two entities on dimension <code class="docutils literal notranslate"><span class="pre">0</span></code> (vertices),
+each of which has only one possible orientation, while there is
+a single entity on dimension <code class="docutils literal notranslate"><span class="pre">1</span></code> (interval), which has two
+possible orientations representing non-reflected and reflected
+intervals.</p>
+</dd></dl>
 
-<dl class="py attribute">
+<dl class="py property">
 <dt class="sig sig-object py" id="finat.cube.FlattenedDimensions.fiat_equivalent">
-<span class="sig-name descname"><span class="pre">fiat_equivalent</span></span><a class="reference internal" href="_modules/finat/cube.html#FlattenedDimensions.fiat_equivalent"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.cube.FlattenedDimensions.fiat_equivalent" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">fiat_equivalent</span></span><a class="headerlink" href="#finat.cube.FlattenedDimensions.fiat_equivalent" title="Link to this definition">¶</a></dt>
+<dd><p>The FIAT element equivalent to this FInAT element.</p>
+</dd></dl>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="finat.cube.FlattenedDimensions.formdegree">
@@ -906,20 +925,39 @@ currently have a FInAT dual basis.</p>
 freedom for the finite element.</p>
 </dd></dl>
 
-<dl class="py attribute">
+<dl class="py property">
 <dt class="sig sig-object py" id="finat.discontinuous.DiscontinuousElement.entity_permutations">
-<span class="sig-name descname"><span class="pre">entity_permutations</span></span><a class="reference internal" href="_modules/finat/discontinuous.html#DiscontinuousElement.entity_permutations"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.discontinuous.DiscontinuousElement.entity_permutations" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">entity_permutations</span></span><a class="headerlink" href="#finat.discontinuous.DiscontinuousElement.entity_permutations" title="Link to this definition">¶</a></dt>
+<dd><p>Returns a nested dictionary that gives, for each dimension,
+for each entity, and for each possible entity orientation, the
+DoF permutation array that maps the entity local DoF ordering
+to the canonical global DoF ordering.</p>
+<p>The entity permutations <cite>dict</cite> for the degree 4 Lagrange finite
+element on the interval, for instance, is given by:</p>
+<div class="highlight-python3 notranslate"><div class="highlight"><pre><span></span><span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="p">[</span><span class="mi">0</span><span class="p">]},</span>
+     <span class="mi">1</span><span class="p">:</span> <span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="p">[</span><span class="mi">0</span><span class="p">]}},</span>
+ <span class="mi">1</span><span class="p">:</span> <span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span>
+         <span class="mi">1</span><span class="p">:</span> <span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">]}}}</span>
+</pre></div>
+</div>
+<p>Note that there are two entities on dimension <code class="docutils literal notranslate"><span class="pre">0</span></code> (vertices),
+each of which has only one possible orientation, while there is
+a single entity on dimension <code class="docutils literal notranslate"><span class="pre">1</span></code> (interval), which has two
+possible orientations representing non-reflected and reflected
+intervals.</p>
+</dd></dl>
 
-<dl class="py attribute">
+<dl class="py property">
 <dt class="sig sig-object py" id="finat.discontinuous.DiscontinuousElement.fiat_equivalent">
-<span class="sig-name descname"><span class="pre">fiat_equivalent</span></span><a class="reference internal" href="_modules/finat/discontinuous.html#DiscontinuousElement.fiat_equivalent"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.discontinuous.DiscontinuousElement.fiat_equivalent" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">fiat_equivalent</span></span><a class="headerlink" href="#finat.discontinuous.DiscontinuousElement.fiat_equivalent" title="Link to this definition">¶</a></dt>
+<dd><p>The FIAT element equivalent to this FInAT element.</p>
+</dd></dl>
 
-<dl class="py attribute">
+<dl class="py property">
 <dt class="sig sig-object py" id="finat.discontinuous.DiscontinuousElement.formdegree">
-<span class="sig-name descname"><span class="pre">formdegree</span></span><a class="reference internal" href="_modules/finat/discontinuous.html#DiscontinuousElement.formdegree"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.discontinuous.DiscontinuousElement.formdegree" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">formdegree</span></span><a class="headerlink" href="#finat.discontinuous.DiscontinuousElement.formdegree" title="Link to this definition">¶</a></dt>
+<dd><p>Degree of the associated form (FEEC)</p>
+</dd></dl>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="finat.discontinuous.DiscontinuousElement.index_shape">
@@ -1010,7 +1048,7 @@ and returns the converted element.</p>
 
 <dl class="py data">
 <dt class="sig sig-object py" id="finat.element_factory.supported_elements">
-<span class="sig-prename descclassname"><span class="pre">finat.element_factory.</span></span><span class="sig-name descname"><span class="pre">supported_elements</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">{'Alfeld-Sorokina':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.alfeld_sorokina.AlfeldSorokina'&gt;,</span> <span class="pre">'Argyris':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.argyris.Argyris'&gt;,</span> <span class="pre">'Arnold-Qin':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.arnold_qin.ArnoldQin'&gt;,</span> <span class="pre">'Bell':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.bell.Bell'&gt;,</span> <span class="pre">'Bernardi-Raugel':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.bernardi_raugel.BernardiRaugel'&gt;,</span> <span class="pre">'Bernardi-Raugel</span> <span class="pre">Bubble':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.bernardi_raugel.BernardiRaugelBubble'&gt;,</span> <span class="pre">'Bernstein':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.fiat_elements.Bernstein'&gt;,</span> <span class="pre">'Brezzi-Douglas-Fortin-Marini':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.fiat_elements.BrezziDouglasFortinMarini'&gt;,</span> <span class="pre">'Brezzi-Douglas-Marini':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.fiat_elements.BrezziDouglasMarini'&gt;,</span> <span class="pre">'Brezzi-Douglas-Marini</span> <span class="pre">Cube</span> <span class="pre">Edge':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.fiat_elements.BrezziDouglasMariniCubeEdge'&gt;,</span> <span class="pre">'Brezzi-Douglas-Marini</span> <span class="pre">Cube</span> <span class="pre">Face':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.fiat_elements.BrezziDouglasMariniCubeFace'&gt;,</span> <span class="pre">'Bubble':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.fiat_elements.Bubble'&gt;,</span> <span class="pre">'Christiansen-Hu':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.christiansen_hu.ChristiansenHu'&gt;,</span> <span class="pre">'Conforming</span> <span class="pre">Arnold-Winther':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.aw.ArnoldWinther'&gt;,</span> <span class="pre">'Crouzeix-Raviart':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.fiat_elements.CrouzeixRaviart'&gt;,</span> <span class="pre">'DPC':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.fiat_elements.DPC'&gt;,</span> <span class="pre">'DPC</span> <span class="pre">L2':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.fiat_elements.DPC'&gt;,</span> <span class="pre">'DQ':</span> <span class="pre">None,</span> <span class="pre">'DQ</span> <span class="pre">L2':</span> <span class="pre">None,</span> <span class="pre">'Direct</span> <span class="pre">Serendipity':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.direct_serendipity.DirectSerendipity'&gt;,</span> <span class="pre">'Discontinuous</span> <span class="pre">Lagrange':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.fiat_elements.DiscontinuousLagrange'&gt;,</span> <span class="pre">'Discontinuous</span> <span class="pre">Lagrange</span> <span class="pre">L2':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.fiat_elements.DiscontinuousLagrange'&gt;,</span> <span class="pre">'Discontinuous</span> <span class="pre">Raviart-Thomas':</span> <span class="pre">&lt;function</span> <span class="pre">&lt;lambda&gt;&gt;,</span> <span class="pre">'Discontinuous</span> <span class="pre">Taylor':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.fiat_elements.DiscontinuousTaylor'&gt;,</span> <span class="pre">'FacetBubble':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.fiat_elements.FacetBubble'&gt;,</span> <span class="pre">'Gauss-Legendre':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.spectral.GaussLegendre'&gt;,</span> <span class="pre">'Gauss-Legendre</span> <span class="pre">L2':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.spectral.GaussLegendre'&gt;,</span> <span class="pre">'Gauss-Lobatto-Legendre':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.spectral.GaussLobattoLegendre'&gt;,</span> <span class="pre">'Gopalakrishnan-Lederer-Schoberl</span> <span class="pre">1st</span> <span class="pre">kind':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.fiat_elements.GopalakrishnanLedererSchoberlFirstKind'&gt;,</span> <span class="pre">'Gopalakrishnan-Lederer-Schoberl</span> <span class="pre">2nd</span> <span class="pre">kind':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.fiat_elements.GopalakrishnanLedererSchoberlSecondKind'&gt;,</span> <span class="pre">'Guzman-Neilan</span> <span class="pre">1st</span> <span class="pre">kind</span> <span class="pre">H1':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.guzman_neilan.GuzmanNeilanFirstKindH1'&gt;,</span> <span class="pre">'Guzman-Neilan</span> <span class="pre">2nd</span> <span class="pre">kind</span> <span class="pre">H1':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.guzman_neilan.GuzmanNeilanSecondKindH1'&gt;,</span> <span class="pre">'Guzman-Neilan</span> <span class="pre">Bubble':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.guzman_neilan.GuzmanNeilanBubble'&gt;,</span> <span class="pre">'Guzman-Neilan</span> <span class="pre">H1(div)':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.guzman_neilan.GuzmanNeilanH1div'&gt;,</span> <span class="pre">'HDiv</span> <span class="pre">Trace':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.trace.HDivTrace'&gt;,</span> <span class="pre">'Hellan-Herrmann-Johnson':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.fiat_elements.HellanHerrmannJohnson'&gt;,</span> <span class="pre">'Hermite':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.hermite.Hermite'&gt;,</span> <span class="pre">'Hsieh-Clough-Tocher':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.hct.HsiehCloughTocher'&gt;,</span> <span class="pre">'Hu-Zhang':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.hz.HuZhang'&gt;,</span> <span class="pre">'Johnson-Mercier':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.johnson_mercier.JohnsonMercier'&gt;,</span> <span class="pre">'Kong-Mulder-Veldhuizen':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.fiat_elements.KongMulderVeldhuizen'&gt;,</span> <span class="pre">'Lagrange':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.fiat_elements.Lagrange'&gt;,</span> <span class="pre">'Mardal-Tai-Winther':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.mtw.MardalTaiWinther'&gt;,</span> <span class="pre">'Morley':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.morley.Morley'&gt;,</span> <span class="pre">'NCE':</span> <span class="pre">None,</span> <span class="pre">'NCF':</span> <span class="pre">None,</span> <span class="pre">'Nedelec</span> <span class="pre">1st</span> <span class="pre">kind</span> <span class="pre">H(curl)':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.fiat_elements.Nedelec'&gt;,</span> <span class="pre">'Nedelec</span> <span class="pre">2nd</span> <span class="pre">kind</span> <span class="pre">H(curl)':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.fiat_elements.NedelecSecondKind'&gt;,</span> <span class="pre">'Nonconforming</span> <span class="pre">Arnold-Winther':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.aw.ArnoldWintherNC'&gt;,</span> <span class="pre">'Q':</span> <span class="pre">None,</span> <span class="pre">'QuadraticPowellSabin12':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.powell_sabin.QuadraticPowellSabin12'&gt;,</span> <span class="pre">'QuadraticPowellSabin6':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.powell_sabin.QuadraticPowellSabin6'&gt;,</span> <span class="pre">'RTCE':</span> <span class="pre">None,</span> <span class="pre">'RTCF':</span> <span class="pre">None,</span> <span class="pre">'Raviart-Thomas':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.fiat_elements.RaviartThomas'&gt;,</span> <span class="pre">'Real':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.fiat_elements.Real'&gt;,</span> <span class="pre">'Reduced-Arnold-Qin':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.arnold_qin.ReducedArnoldQin'&gt;,</span> <span class="pre">'Reduced-Hsieh-Clough-Tocher':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.hct.ReducedHsiehCloughTocher'&gt;,</span> <span class="pre">'Regge':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.fiat_elements.Regge'&gt;,</span> <span class="pre">'S':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.fiat_elements.Serendipity'&gt;,</span> <span class="pre">'SminusCurl':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.fiat_elements.TrimmedSerendipityCurl'&gt;,</span> <span class="pre">'SminusDiv':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.fiat_elements.TrimmedSerendipityDiv'&gt;,</span> <span class="pre">'SminusE':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.fiat_elements.TrimmedSerendipityEdge'&gt;,</span> <span class="pre">'SminusF':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.fiat_elements.TrimmedSerendipityFace'&gt;}</span></em><a class="headerlink" href="#finat.element_factory.supported_elements" title="Link to this definition">¶</a></dt>
+<span class="sig-prename descclassname"><span class="pre">finat.element_factory.</span></span><span class="sig-name descname"><span class="pre">supported_elements</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">{'Alfeld-Sorokina':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.alfeld_sorokina.AlfeldSorokina'&gt;,</span> <span class="pre">'Argyris':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.argyris.Argyris'&gt;,</span> <span class="pre">'Arnold-Qin':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.arnold_qin.ArnoldQin'&gt;,</span> <span class="pre">'Bell':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.bell.Bell'&gt;,</span> <span class="pre">'Bernardi-Raugel':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.bernardi_raugel.BernardiRaugel'&gt;,</span> <span class="pre">'Bernardi-Raugel</span> <span class="pre">Bubble':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.bernardi_raugel.BernardiRaugelBubble'&gt;,</span> <span class="pre">'Bernstein':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.fiat_elements.Bernstein'&gt;,</span> <span class="pre">'Brezzi-Douglas-Fortin-Marini':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.fiat_elements.BrezziDouglasFortinMarini'&gt;,</span> <span class="pre">'Brezzi-Douglas-Marini':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.fiat_elements.BrezziDouglasMarini'&gt;,</span> <span class="pre">'Brezzi-Douglas-Marini</span> <span class="pre">Cube</span> <span class="pre">Edge':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.fiat_elements.BrezziDouglasMariniCubeEdge'&gt;,</span> <span class="pre">'Brezzi-Douglas-Marini</span> <span class="pre">Cube</span> <span class="pre">Face':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.fiat_elements.BrezziDouglasMariniCubeFace'&gt;,</span> <span class="pre">'Bubble':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.fiat_elements.Bubble'&gt;,</span> <span class="pre">'Christiansen-Hu':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.christiansen_hu.ChristiansenHu'&gt;,</span> <span class="pre">'Conforming</span> <span class="pre">Arnold-Winther':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.aw.ArnoldWinther'&gt;,</span> <span class="pre">'Crouzeix-Raviart':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.fiat_elements.CrouzeixRaviart'&gt;,</span> <span class="pre">'DPC':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.fiat_elements.DPC'&gt;,</span> <span class="pre">'DPC</span> <span class="pre">L2':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.fiat_elements.DPC'&gt;,</span> <span class="pre">'DQ':</span> <span class="pre">None,</span> <span class="pre">'DQ</span> <span class="pre">L2':</span> <span class="pre">None,</span> <span class="pre">'Direct</span> <span class="pre">Serendipity':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.direct_serendipity.DirectSerendipity'&gt;,</span> <span class="pre">'Discontinuous</span> <span class="pre">Lagrange':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.fiat_elements.DiscontinuousLagrange'&gt;,</span> <span class="pre">'Discontinuous</span> <span class="pre">Lagrange</span> <span class="pre">L2':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.fiat_elements.DiscontinuousLagrange'&gt;,</span> <span class="pre">'Discontinuous</span> <span class="pre">Raviart-Thomas':</span> <span class="pre">&lt;function</span> <span class="pre">&lt;lambda&gt;&gt;,</span> <span class="pre">'Discontinuous</span> <span class="pre">Taylor':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.fiat_elements.DiscontinuousTaylor'&gt;,</span> <span class="pre">'FacetBubble':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.fiat_elements.FacetBubble'&gt;,</span> <span class="pre">'Gauss-Legendre':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.spectral.GaussLegendre'&gt;,</span> <span class="pre">'Gauss-Legendre</span> <span class="pre">L2':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.spectral.GaussLegendre'&gt;,</span> <span class="pre">'Gauss-Lobatto-Legendre':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.spectral.GaussLobattoLegendre'&gt;,</span> <span class="pre">'Gopalakrishnan-Lederer-Schoberl</span> <span class="pre">1st</span> <span class="pre">kind':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.fiat_elements.GopalakrishnanLedererSchoberlFirstKind'&gt;,</span> <span class="pre">'Gopalakrishnan-Lederer-Schoberl</span> <span class="pre">2nd</span> <span class="pre">kind':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.fiat_elements.GopalakrishnanLedererSchoberlSecondKind'&gt;,</span> <span class="pre">'Guzman-Neilan</span> <span class="pre">1st</span> <span class="pre">kind</span> <span class="pre">H1':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.guzman_neilan.GuzmanNeilanFirstKindH1'&gt;,</span> <span class="pre">'Guzman-Neilan</span> <span class="pre">2nd</span> <span class="pre">kind</span> <span class="pre">H1':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.guzman_neilan.GuzmanNeilanSecondKindH1'&gt;,</span> <span class="pre">'Guzman-Neilan</span> <span class="pre">Bubble':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.guzman_neilan.GuzmanNeilanBubble'&gt;,</span> <span class="pre">'Guzman-Neilan</span> <span class="pre">H1(div)':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.guzman_neilan.GuzmanNeilanH1div'&gt;,</span> <span class="pre">'HDiv</span> <span class="pre">Trace':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.fiat_elements.HDivTrace'&gt;,</span> <span class="pre">'Hellan-Herrmann-Johnson':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.fiat_elements.HellanHerrmannJohnson'&gt;,</span> <span class="pre">'Hermite':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.hermite.Hermite'&gt;,</span> <span class="pre">'Hsieh-Clough-Tocher':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.hct.HsiehCloughTocher'&gt;,</span> <span class="pre">'Hu-Zhang':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.hz.HuZhang'&gt;,</span> <span class="pre">'Johnson-Mercier':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.johnson_mercier.JohnsonMercier'&gt;,</span> <span class="pre">'Kong-Mulder-Veldhuizen':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.fiat_elements.KongMulderVeldhuizen'&gt;,</span> <span class="pre">'Lagrange':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.fiat_elements.Lagrange'&gt;,</span> <span class="pre">'Mardal-Tai-Winther':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.mtw.MardalTaiWinther'&gt;,</span> <span class="pre">'Morley':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.morley.Morley'&gt;,</span> <span class="pre">'NCE':</span> <span class="pre">None,</span> <span class="pre">'NCF':</span> <span class="pre">None,</span> <span class="pre">'Nedelec</span> <span class="pre">1st</span> <span class="pre">kind</span> <span class="pre">H(curl)':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.fiat_elements.Nedelec'&gt;,</span> <span class="pre">'Nedelec</span> <span class="pre">2nd</span> <span class="pre">kind</span> <span class="pre">H(curl)':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.fiat_elements.NedelecSecondKind'&gt;,</span> <span class="pre">'Nonconforming</span> <span class="pre">Arnold-Winther':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.aw.ArnoldWintherNC'&gt;,</span> <span class="pre">'Q':</span> <span class="pre">None,</span> <span class="pre">'QuadraticPowellSabin12':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.powell_sabin.QuadraticPowellSabin12'&gt;,</span> <span class="pre">'QuadraticPowellSabin6':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.powell_sabin.QuadraticPowellSabin6'&gt;,</span> <span class="pre">'RTCE':</span> <span class="pre">None,</span> <span class="pre">'RTCF':</span> <span class="pre">None,</span> <span class="pre">'Raviart-Thomas':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.fiat_elements.RaviartThomas'&gt;,</span> <span class="pre">'Real':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.fiat_elements.Real'&gt;,</span> <span class="pre">'Reduced-Arnold-Qin':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.arnold_qin.ReducedArnoldQin'&gt;,</span> <span class="pre">'Reduced-Hsieh-Clough-Tocher':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.hct.ReducedHsiehCloughTocher'&gt;,</span> <span class="pre">'Regge':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.fiat_elements.Regge'&gt;,</span> <span class="pre">'S':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.fiat_elements.Serendipity'&gt;,</span> <span class="pre">'SminusCurl':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.fiat_elements.TrimmedSerendipityCurl'&gt;,</span> <span class="pre">'SminusDiv':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.fiat_elements.TrimmedSerendipityDiv'&gt;,</span> <span class="pre">'SminusE':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.fiat_elements.TrimmedSerendipityEdge'&gt;,</span> <span class="pre">'SminusF':</span> <span class="pre">&lt;class</span> <span class="pre">'finat.fiat_elements.TrimmedSerendipityFace'&gt;}</span></em><a class="headerlink" href="#finat.element_factory.supported_elements" title="Link to this definition">¶</a></dt>
 <dd><p>A <a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code></a> mapping UFL element family names to their
 FInAT-equivalent constructors.  If the value is <code class="docutils literal notranslate"><span class="pre">None</span></code>, the UFL
 element is supported, but must be handled specially because it doesn’t
@@ -1042,20 +1080,25 @@ reference element.</p>
 </dl>
 </dd></dl>
 
-<dl class="py attribute">
+<dl class="py property">
 <dt class="sig sig-object py" id="finat.enriched.EnrichedElement.cell">
-<span class="sig-name descname"><span class="pre">cell</span></span><a class="reference internal" href="_modules/finat/enriched.html#EnrichedElement.cell"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.enriched.EnrichedElement.cell" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">cell</span></span><a class="headerlink" href="#finat.enriched.EnrichedElement.cell" title="Link to this definition">¶</a></dt>
+<dd><p>The reference cell on which the element is defined.</p>
+</dd></dl>
 
-<dl class="py attribute">
+<dl class="py property">
 <dt class="sig sig-object py" id="finat.enriched.EnrichedElement.complex">
-<span class="sig-name descname"><span class="pre">complex</span></span><a class="reference internal" href="_modules/finat/enriched.html#EnrichedElement.complex"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.enriched.EnrichedElement.complex" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">complex</span></span><a class="headerlink" href="#finat.enriched.EnrichedElement.complex" title="Link to this definition">¶</a></dt>
+<dd><p>The reference cell complex over which bases are defined.
+Can be different than self.cell in the case of macro elements.</p>
+</dd></dl>
 
-<dl class="py attribute">
+<dl class="py property">
 <dt class="sig sig-object py" id="finat.enriched.EnrichedElement.degree">
-<span class="sig-name descname"><span class="pre">degree</span></span><a class="reference internal" href="_modules/finat/enriched.html#EnrichedElement.degree"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.enriched.EnrichedElement.degree" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">degree</span></span><a class="headerlink" href="#finat.enriched.EnrichedElement.degree" title="Link to this definition">¶</a></dt>
+<dd><p>The degree of the embedding polynomial space.</p>
+<p>In the tensor case this is a tuple.</p>
+</dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="finat.enriched.EnrichedElement.entity_dofs">
@@ -1064,31 +1107,37 @@ reference element.</p>
 freedom for the finite element.</p>
 </dd></dl>
 
-<dl class="py attribute">
+<dl class="py property">
 <dt class="sig sig-object py" id="finat.enriched.EnrichedElement.entity_permutations">
-<span class="sig-name descname"><span class="pre">entity_permutations</span></span><a class="reference internal" href="_modules/finat/enriched.html#EnrichedElement.entity_permutations"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.enriched.EnrichedElement.entity_permutations" title="Link to this definition">¶</a></dt>
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">entity_permutations</span></span><a class="headerlink" href="#finat.enriched.EnrichedElement.entity_permutations" title="Link to this definition">¶</a></dt>
 <dd><p>Return the map of topological entities to the map of
 orientations to permutation lists for the finite element</p>
 </dd></dl>
 
-<dl class="py attribute">
+<dl class="py property">
 <dt class="sig sig-object py" id="finat.enriched.EnrichedElement.fiat_equivalent">
-<span class="sig-name descname"><span class="pre">fiat_equivalent</span></span><a class="reference internal" href="_modules/finat/enriched.html#EnrichedElement.fiat_equivalent"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.enriched.EnrichedElement.fiat_equivalent" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">fiat_equivalent</span></span><a class="headerlink" href="#finat.enriched.EnrichedElement.fiat_equivalent" title="Link to this definition">¶</a></dt>
+<dd><p>The FIAT element equivalent to this FInAT element.</p>
+</dd></dl>
 
-<dl class="py attribute">
+<dl class="py property">
 <dt class="sig sig-object py" id="finat.enriched.EnrichedElement.formdegree">
-<span class="sig-name descname"><span class="pre">formdegree</span></span><a class="reference internal" href="_modules/finat/enriched.html#EnrichedElement.formdegree"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.enriched.EnrichedElement.formdegree" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">formdegree</span></span><a class="headerlink" href="#finat.enriched.EnrichedElement.formdegree" title="Link to this definition">¶</a></dt>
+<dd><p>Degree of the associated form (FEEC)</p>
+</dd></dl>
 
-<dl class="py attribute">
+<dl class="py property">
 <dt class="sig sig-object py" id="finat.enriched.EnrichedElement.index_shape">
-<span class="sig-name descname"><span class="pre">index_shape</span></span><a class="reference internal" href="_modules/finat/enriched.html#EnrichedElement.index_shape"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.enriched.EnrichedElement.index_shape" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">index_shape</span></span><a class="headerlink" href="#finat.enriched.EnrichedElement.index_shape" title="Link to this definition">¶</a></dt>
+<dd><p>A tuple indicating the number of degrees of freedom in the
+element. For example a scalar quadratic Lagrange element on a triangle
+would return (6,) while a vector valued version of the same element
+would return (6, 2)</p>
+</dd></dl>
 
-<dl class="py attribute">
+<dl class="py property">
 <dt class="sig sig-object py" id="finat.enriched.EnrichedElement.is_mixed">
-<span class="sig-name descname"><span class="pre">is_mixed</span></span><a class="reference internal" href="_modules/finat/enriched.html#EnrichedElement.is_mixed"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.enriched.EnrichedElement.is_mixed" title="Link to this definition">¶</a></dt>
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">is_mixed</span></span><a class="headerlink" href="#finat.enriched.EnrichedElement.is_mixed" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py property">
@@ -1123,9 +1172,9 @@ free indices are arbitrary.</p></li>
 <dd><p>Return the dimension of the finite element space.</p>
 </dd></dl>
 
-<dl class="py attribute">
+<dl class="py property">
 <dt class="sig sig-object py" id="finat.enriched.EnrichedElement.value_shape">
-<span class="sig-name descname"><span class="pre">value_shape</span></span><a class="reference internal" href="_modules/finat/enriched.html#EnrichedElement.value_shape"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.enriched.EnrichedElement.value_shape" title="Link to this definition">¶</a></dt>
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">value_shape</span></span><a class="headerlink" href="#finat.enriched.EnrichedElement.value_shape" title="Link to this definition">¶</a></dt>
 <dd><p>A tuple indicating the shape of the element.</p>
 </dd></dl>
 
@@ -1259,7 +1308,7 @@ intervals.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="finat.fiat_elements.CrouzeixRaviart">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">finat.fiat_elements.</span></span><span class="sig-name descname"><span class="pre">CrouzeixRaviart</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cell</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/fiat_elements.html#CrouzeixRaviart"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.fiat_elements.CrouzeixRaviart" title="Link to this definition">¶</a></dt>
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">finat.fiat_elements.</span></span><span class="sig-name descname"><span class="pre">CrouzeixRaviart</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cell</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variant</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/fiat_elements.html#CrouzeixRaviart"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.fiat_elements.CrouzeixRaviart" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#finat.fiat_elements.ScalarFiatElement" title="finat.fiat_elements.ScalarFiatElement"><code class="xref py py-class docutils literal notranslate"><span class="pre">ScalarFiatElement</span></code></a></p>
 </dd></dl>
 
@@ -1487,6 +1536,12 @@ free indices are arbitrary.</p></li>
 <dt class="sig sig-object py" id="finat.fiat_elements.GopalakrishnanLedererSchoberlSecondKind">
 <em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">finat.fiat_elements.</span></span><span class="sig-name descname"><span class="pre">GopalakrishnanLedererSchoberlSecondKind</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cell</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/fiat_elements.html#GopalakrishnanLedererSchoberlSecondKind"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.fiat_elements.GopalakrishnanLedererSchoberlSecondKind" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#finat.fiat_elements.FiatElement" title="finat.fiat_elements.FiatElement"><code class="xref py py-class docutils literal notranslate"><span class="pre">FiatElement</span></code></a></p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="finat.fiat_elements.HDivTrace">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">finat.fiat_elements.</span></span><span class="sig-name descname"><span class="pre">HDivTrace</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cell</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variant</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/fiat_elements.html#HDivTrace"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.fiat_elements.HDivTrace" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#finat.fiat_elements.ScalarFiatElement" title="finat.fiat_elements.ScalarFiatElement"><code class="xref py py-class docutils literal notranslate"><span class="pre">ScalarFiatElement</span></code></a></p>
 </dd></dl>
 
 <dl class="py class">
@@ -2028,10 +2083,11 @@ freedom for the finite element.</p>
 <em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">finat.hdivcurl.</span></span><span class="sig-name descname"><span class="pre">HCurlElement</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">wrappee</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/hdivcurl.html#HCurlElement"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.hdivcurl.HCurlElement" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#finat.hdivcurl.WrapperElementBase" title="finat.hdivcurl.WrapperElementBase"><code class="xref py py-class docutils literal notranslate"><span class="pre">WrapperElementBase</span></code></a></p>
 <p>H(curl) wrapper element for tensor product elements.</p>
-<dl class="py attribute">
+<dl class="py property">
 <dt class="sig sig-object py" id="finat.hdivcurl.HCurlElement.fiat_equivalent">
-<span class="sig-name descname"><span class="pre">fiat_equivalent</span></span><a class="reference internal" href="_modules/finat/hdivcurl.html#HCurlElement.fiat_equivalent"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.hdivcurl.HCurlElement.fiat_equivalent" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">fiat_equivalent</span></span><a class="headerlink" href="#finat.hdivcurl.HCurlElement.fiat_equivalent" title="Link to this definition">¶</a></dt>
+<dd><p>The FIAT element equivalent to this FInAT element.</p>
+</dd></dl>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="finat.hdivcurl.HCurlElement.formdegree">
@@ -2053,10 +2109,11 @@ all basis functions of the finite element.</p>
 <em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">finat.hdivcurl.</span></span><span class="sig-name descname"><span class="pre">HDivElement</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">wrappee</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/hdivcurl.html#HDivElement"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.hdivcurl.HDivElement" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#finat.hdivcurl.WrapperElementBase" title="finat.hdivcurl.WrapperElementBase"><code class="xref py py-class docutils literal notranslate"><span class="pre">WrapperElementBase</span></code></a></p>
 <p>H(div) wrapper element for tensor product elements.</p>
-<dl class="py attribute">
+<dl class="py property">
 <dt class="sig sig-object py" id="finat.hdivcurl.HDivElement.fiat_equivalent">
-<span class="sig-name descname"><span class="pre">fiat_equivalent</span></span><a class="reference internal" href="_modules/finat/hdivcurl.html#HDivElement.fiat_equivalent"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.hdivcurl.HDivElement.fiat_equivalent" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">fiat_equivalent</span></span><a class="headerlink" href="#finat.hdivcurl.HDivElement.fiat_equivalent" title="Link to this definition">¶</a></dt>
+<dd><p>The FIAT element equivalent to this FInAT element.</p>
+</dd></dl>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="finat.hdivcurl.HDivElement.formdegree">
@@ -2858,20 +2915,26 @@ points.</p>
 <dd><p>Approximate numerical equality of point sets</p>
 </dd></dl>
 
-<dl class="py attribute">
+<dl class="py property">
 <dt class="sig sig-object py" id="finat.point_set.PointSet.expression">
-<span class="sig-name descname"><span class="pre">expression</span></span><a class="reference internal" href="_modules/finat/point_set.html#PointSet.expression"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.point_set.PointSet.expression" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">expression</span></span><a class="headerlink" href="#finat.point_set.PointSet.expression" title="Link to this definition">¶</a></dt>
+<dd><p>GEM expression describing the points, with free indices
+<code class="docutils literal notranslate"><span class="pre">self.indices</span></code> and shape (point dimension,).</p>
+</dd></dl>
 
-<dl class="py attribute">
+<dl class="py property">
 <dt class="sig sig-object py" id="finat.point_set.PointSet.indices">
-<span class="sig-name descname"><span class="pre">indices</span></span><a class="reference internal" href="_modules/finat/point_set.html#PointSet.indices"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.point_set.PointSet.indices" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">indices</span></span><a class="headerlink" href="#finat.point_set.PointSet.indices" title="Link to this definition">¶</a></dt>
+<dd><p>GEM indices with matching shape and extent to the structure of the
+point set.</p>
+</dd></dl>
 
-<dl class="py attribute">
+<dl class="py property">
 <dt class="sig sig-object py" id="finat.point_set.PointSet.points">
-<span class="sig-name descname"><span class="pre">points</span></span><a class="reference internal" href="_modules/finat/point_set.html#PointSet.points"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.point_set.PointSet.points" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">points</span></span><a class="headerlink" href="#finat.point_set.PointSet.points" title="Link to this definition">¶</a></dt>
+<dd><p>A flattened numpy array of points or <code class="docutils literal notranslate"><span class="pre">UnknownPointsArray</span></code>
+object with shape (# of points, point dimension).</p>
+</dd></dl>
 
 </dd></dl>
 
@@ -2881,20 +2944,24 @@ points.</p>
 <dd><p>Bases: <a class="reference internal" href="#finat.point_set.AbstractPointSet" title="finat.point_set.AbstractPointSet"><code class="xref py py-class docutils literal notranslate"><span class="pre">AbstractPointSet</span></code></a></p>
 <p>A point set representing a single point.</p>
 <p>These have a <code class="docutils literal notranslate"><span class="pre">gem.Literal</span></code> expression and no indices.</p>
-<dl class="py attribute">
+<dl class="py property">
 <dt class="sig sig-object py" id="finat.point_set.PointSingleton.expression">
-<span class="sig-name descname"><span class="pre">expression</span></span><a class="reference internal" href="_modules/finat/point_set.html#PointSingleton.expression"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.point_set.PointSingleton.expression" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">expression</span></span><a class="headerlink" href="#finat.point_set.PointSingleton.expression" title="Link to this definition">¶</a></dt>
+<dd><p>GEM expression describing the points, with free indices
+<code class="docutils literal notranslate"><span class="pre">self.indices</span></code> and shape (point dimension,).</p>
+</dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="finat.point_set.PointSingleton.indices">
 <span class="sig-name descname"><span class="pre">indices</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">()</span></em><a class="headerlink" href="#finat.point_set.PointSingleton.indices" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
-<dl class="py attribute">
+<dl class="py property">
 <dt class="sig sig-object py" id="finat.point_set.PointSingleton.points">
-<span class="sig-name descname"><span class="pre">points</span></span><a class="reference internal" href="_modules/finat/point_set.html#PointSingleton.points"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.point_set.PointSingleton.points" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">points</span></span><a class="headerlink" href="#finat.point_set.PointSingleton.points" title="Link to this definition">¶</a></dt>
+<dd><p>A flattened numpy array of points or <code class="docutils literal notranslate"><span class="pre">UnknownPointsArray</span></code>
+object with shape (# of points, point dimension).</p>
+</dd></dl>
 
 </dd></dl>
 
@@ -2908,20 +2975,26 @@ points.</p>
 <dd><p>Approximate numerical equality of point sets</p>
 </dd></dl>
 
-<dl class="py attribute">
+<dl class="py property">
 <dt class="sig sig-object py" id="finat.point_set.TensorPointSet.expression">
-<span class="sig-name descname"><span class="pre">expression</span></span><a class="reference internal" href="_modules/finat/point_set.html#TensorPointSet.expression"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.point_set.TensorPointSet.expression" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">expression</span></span><a class="headerlink" href="#finat.point_set.TensorPointSet.expression" title="Link to this definition">¶</a></dt>
+<dd><p>GEM expression describing the points, with free indices
+<code class="docutils literal notranslate"><span class="pre">self.indices</span></code> and shape (point dimension,).</p>
+</dd></dl>
 
-<dl class="py attribute">
+<dl class="py property">
 <dt class="sig sig-object py" id="finat.point_set.TensorPointSet.indices">
-<span class="sig-name descname"><span class="pre">indices</span></span><a class="reference internal" href="_modules/finat/point_set.html#TensorPointSet.indices"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.point_set.TensorPointSet.indices" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">indices</span></span><a class="headerlink" href="#finat.point_set.TensorPointSet.indices" title="Link to this definition">¶</a></dt>
+<dd><p>GEM indices with matching shape and extent to the structure of the
+point set.</p>
+</dd></dl>
 
-<dl class="py attribute">
+<dl class="py property">
 <dt class="sig sig-object py" id="finat.point_set.TensorPointSet.points">
-<span class="sig-name descname"><span class="pre">points</span></span><a class="reference internal" href="_modules/finat/point_set.html#TensorPointSet.points"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.point_set.TensorPointSet.points" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">points</span></span><a class="headerlink" href="#finat.point_set.TensorPointSet.points" title="Link to this definition">¶</a></dt>
+<dd><p>A flattened numpy array of points or <code class="docutils literal notranslate"><span class="pre">UnknownPointsArray</span></code>
+object with shape (# of points, point dimension).</p>
+</dd></dl>
 
 </dd></dl>
 
@@ -2936,20 +3009,26 @@ shape (N, D) where N is the number of points and D is their
 dimension.</p>
 <p>The <code class="docutils literal notranslate"><span class="pre">.expression</span></code> property is a derived <cite>gem.partial_indexed</cite> with
 shape (D,) and free indices for the points N.</p>
-<dl class="py attribute">
+<dl class="py property">
 <dt class="sig sig-object py" id="finat.point_set.UnknownPointSet.expression">
-<span class="sig-name descname"><span class="pre">expression</span></span><a class="reference internal" href="_modules/finat/point_set.html#UnknownPointSet.expression"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.point_set.UnknownPointSet.expression" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">expression</span></span><a class="headerlink" href="#finat.point_set.UnknownPointSet.expression" title="Link to this definition">¶</a></dt>
+<dd><p>GEM expression describing the points, with free indices
+<code class="docutils literal notranslate"><span class="pre">self.indices</span></code> and shape (point dimension,).</p>
+</dd></dl>
 
-<dl class="py attribute">
+<dl class="py property">
 <dt class="sig sig-object py" id="finat.point_set.UnknownPointSet.indices">
-<span class="sig-name descname"><span class="pre">indices</span></span><a class="reference internal" href="_modules/finat/point_set.html#UnknownPointSet.indices"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.point_set.UnknownPointSet.indices" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">indices</span></span><a class="headerlink" href="#finat.point_set.UnknownPointSet.indices" title="Link to this definition">¶</a></dt>
+<dd><p>GEM indices with matching shape and extent to the structure of the
+point set.</p>
+</dd></dl>
 
-<dl class="py attribute">
+<dl class="py property">
 <dt class="sig sig-object py" id="finat.point_set.UnknownPointSet.points">
-<span class="sig-name descname"><span class="pre">points</span></span><a class="reference internal" href="_modules/finat/point_set.html#UnknownPointSet.points"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.point_set.UnknownPointSet.points" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">points</span></span><a class="headerlink" href="#finat.point_set.UnknownPointSet.points" title="Link to this definition">¶</a></dt>
+<dd><p>A flattened numpy array of points or <code class="docutils literal notranslate"><span class="pre">UnknownPointsArray</span></code>
+object with shape (# of points, point dimension).</p>
+</dd></dl>
 
 </dd></dl>
 
@@ -3009,9 +3088,9 @@ time.</p>
 <dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
 <p>Abstract class representing a quadrature rule as point set and a
 corresponding set of weights.</p>
-<dl class="py attribute">
+<dl class="py property">
 <dt class="sig sig-object py" id="finat.quadrature.AbstractQuadratureRule.extrinsic_orientation_permutation_map">
-<span class="sig-name descname"><span class="pre">extrinsic_orientation_permutation_map</span></span><a class="reference internal" href="_modules/finat/quadrature.html#AbstractQuadratureRule.extrinsic_orientation_permutation_map"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.quadrature.AbstractQuadratureRule.extrinsic_orientation_permutation_map" title="Link to this definition">¶</a></dt>
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">extrinsic_orientation_permutation_map</span></span><a class="headerlink" href="#finat.quadrature.AbstractQuadratureRule.extrinsic_orientation_permutation_map" title="Link to this definition">¶</a></dt>
 <dd><p>A map from extrinsic orientations to corresponding axis permutation matrices.</p>
 <section id="notes">
 <h3>Notes<a class="headerlink" href="#notes" title="Link to this heading">¶</a></h3>
@@ -3020,9 +3099,9 @@ eo (extrinsic orientation).</p>
 </section>
 </dd></dl>
 
-<dl class="py attribute">
+<dl class="py property">
 <dt class="sig sig-object py" id="finat.quadrature.AbstractQuadratureRule.intrinsic_orientation_permutation_map_tuple">
-<span class="sig-name descname"><span class="pre">intrinsic_orientation_permutation_map_tuple</span></span><a class="reference internal" href="_modules/finat/quadrature.html#AbstractQuadratureRule.intrinsic_orientation_permutation_map_tuple"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.quadrature.AbstractQuadratureRule.intrinsic_orientation_permutation_map_tuple" title="Link to this definition">¶</a></dt>
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">intrinsic_orientation_permutation_map_tuple</span></span><a class="headerlink" href="#finat.quadrature.AbstractQuadratureRule.intrinsic_orientation_permutation_map_tuple" title="Link to this definition">¶</a></dt>
 <dd><p>A tuple of maps from intrinsic orientations to corresponding point permutations for each reference cell axis.</p>
 <section id="id3">
 <h3>Notes<a class="headerlink" href="#id3" title="Link to this heading">¶</a></h3>
@@ -3051,15 +3130,18 @@ as the point set.</p>
 <em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">finat.quadrature.</span></span><span class="sig-name descname"><span class="pre">QuadratureRule</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">point_set</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">weights</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ref_el</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">io_ornt_map_tuple</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">(None,)</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/quadrature.html#QuadratureRule"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.quadrature.QuadratureRule" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#finat.quadrature.AbstractQuadratureRule" title="finat.quadrature.AbstractQuadratureRule"><code class="xref py py-class docutils literal notranslate"><span class="pre">AbstractQuadratureRule</span></code></a></p>
 <p>Generic quadrature rule with no internal structure.</p>
-<dl class="py attribute">
+<dl class="py property">
 <dt class="sig sig-object py" id="finat.quadrature.QuadratureRule.point_set">
-<span class="sig-name descname"><span class="pre">point_set</span></span><a class="reference internal" href="_modules/finat/quadrature.html#QuadratureRule.point_set"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.quadrature.QuadratureRule.point_set" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">point_set</span></span><a class="headerlink" href="#finat.quadrature.QuadratureRule.point_set" title="Link to this definition">¶</a></dt>
+<dd><p>Point set object representing the quadrature points.</p>
+</dd></dl>
 
-<dl class="py attribute">
+<dl class="py property">
 <dt class="sig sig-object py" id="finat.quadrature.QuadratureRule.weight_expression">
-<span class="sig-name descname"><span class="pre">weight_expression</span></span><a class="reference internal" href="_modules/finat/quadrature.html#QuadratureRule.weight_expression"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.quadrature.QuadratureRule.weight_expression" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">weight_expression</span></span><a class="headerlink" href="#finat.quadrature.QuadratureRule.weight_expression" title="Link to this definition">¶</a></dt>
+<dd><p>GEM expression describing the weights, with the same free indices
+as the point set.</p>
+</dd></dl>
 
 </dd></dl>
 
@@ -3068,15 +3150,18 @@ as the point set.</p>
 <em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">finat.quadrature.</span></span><span class="sig-name descname"><span class="pre">TensorProductQuadratureRule</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">factors</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ref_el</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/quadrature.html#TensorProductQuadratureRule"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.quadrature.TensorProductQuadratureRule" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#finat.quadrature.AbstractQuadratureRule" title="finat.quadrature.AbstractQuadratureRule"><code class="xref py py-class docutils literal notranslate"><span class="pre">AbstractQuadratureRule</span></code></a></p>
 <p>Quadrature rule which is a tensor product of other rules.</p>
-<dl class="py attribute">
+<dl class="py property">
 <dt class="sig sig-object py" id="finat.quadrature.TensorProductQuadratureRule.point_set">
-<span class="sig-name descname"><span class="pre">point_set</span></span><a class="reference internal" href="_modules/finat/quadrature.html#TensorProductQuadratureRule.point_set"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.quadrature.TensorProductQuadratureRule.point_set" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">point_set</span></span><a class="headerlink" href="#finat.quadrature.TensorProductQuadratureRule.point_set" title="Link to this definition">¶</a></dt>
+<dd><p>Point set object representing the quadrature points.</p>
+</dd></dl>
 
-<dl class="py attribute">
+<dl class="py property">
 <dt class="sig sig-object py" id="finat.quadrature.TensorProductQuadratureRule.weight_expression">
-<span class="sig-name descname"><span class="pre">weight_expression</span></span><a class="reference internal" href="_modules/finat/quadrature.html#TensorProductQuadratureRule.weight_expression"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.quadrature.TensorProductQuadratureRule.weight_expression" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">weight_expression</span></span><a class="headerlink" href="#finat.quadrature.TensorProductQuadratureRule.weight_expression" title="Link to this definition">¶</a></dt>
+<dd><p>GEM expression describing the weights, with the same free indices
+as the point set.</p>
+</dd></dl>
 
 </dd></dl>
 
@@ -3124,10 +3209,11 @@ reference element.</p>
 </dl>
 </dd></dl>
 
-<dl class="py attribute">
+<dl class="py property">
 <dt class="sig sig-object py" id="finat.quadrature_element.QuadratureElement.cell">
-<span class="sig-name descname"><span class="pre">cell</span></span><a class="reference internal" href="_modules/finat/quadrature_element.html#QuadratureElement.cell"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.quadrature_element.QuadratureElement.cell" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">cell</span></span><a class="headerlink" href="#finat.quadrature_element.QuadratureElement.cell" title="Link to this definition">¶</a></dt>
+<dd><p>The reference cell on which the element is defined.</p>
+</dd></dl>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="finat.quadrature_element.QuadratureElement.complex">
@@ -3200,10 +3286,11 @@ currently have a FInAT dual basis.</p>
 freedom for the finite element.</p>
 </dd></dl>
 
-<dl class="py attribute">
+<dl class="py property">
 <dt class="sig sig-object py" id="finat.quadrature_element.QuadratureElement.fiat_equivalent">
-<span class="sig-name descname"><span class="pre">fiat_equivalent</span></span><a class="reference internal" href="_modules/finat/quadrature_element.html#QuadratureElement.fiat_equivalent"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.quadrature_element.QuadratureElement.fiat_equivalent" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">fiat_equivalent</span></span><a class="headerlink" href="#finat.quadrature_element.QuadratureElement.fiat_equivalent" title="Link to this definition">¶</a></dt>
+<dd><p>The FIAT element equivalent to this FInAT element.</p>
+</dd></dl>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="finat.quadrature_element.QuadratureElement.formdegree">
@@ -3356,7 +3443,7 @@ nodal.</p>
 <dt class="sig sig-object py">
 <span class="sig-prename descclassname"><span class="pre">finat.restricted.</span></span><span class="sig-name descname"><span class="pre">restrict</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">element</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#finat.tensorfiniteelement.TensorFiniteElement" title="finat.tensorfiniteelement.TensorFiniteElement"><span class="pre">TensorFiniteElement</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">domain</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">take_closure</span></span></em><span class="sig-paren">)</span></dt>
 <dt class="sig sig-object py">
-<span class="sig-prename descclassname"><span class="pre">finat.restricted.</span></span><span class="sig-name descname"><span class="pre">restrict</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">element</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#finat.trace.HDivTrace" title="finat.trace.HDivTrace"><span class="pre">HDivTrace</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">domain</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">take_closure</span></span></em><span class="sig-paren">)</span></dt>
+<span class="sig-prename descclassname"><span class="pre">finat.restricted.</span></span><span class="sig-name descname"><span class="pre">restrict</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">element</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#finat.fiat_elements.HDivTrace" title="finat.fiat_elements.HDivTrace"><span class="pre">HDivTrace</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">domain</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">take_closure</span></span></em><span class="sig-paren">)</span></dt>
 <dd><p>Restrict an element to a given subentity.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
@@ -3461,15 +3548,18 @@ reference element.</p>
 </dl>
 </dd></dl>
 
-<dl class="py attribute">
+<dl class="py property">
 <dt class="sig sig-object py" id="finat.runtime_tabulated.RuntimeTabulated.cell">
-<span class="sig-name descname"><span class="pre">cell</span></span><a class="reference internal" href="_modules/finat/runtime_tabulated.html#RuntimeTabulated.cell"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.runtime_tabulated.RuntimeTabulated.cell" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">cell</span></span><a class="headerlink" href="#finat.runtime_tabulated.RuntimeTabulated.cell" title="Link to this definition">¶</a></dt>
+<dd><p>The reference cell on which the element is defined.</p>
+</dd></dl>
 
-<dl class="py attribute">
+<dl class="py property">
 <dt class="sig sig-object py" id="finat.runtime_tabulated.RuntimeTabulated.degree">
-<span class="sig-name descname"><span class="pre">degree</span></span><a class="reference internal" href="_modules/finat/runtime_tabulated.html#RuntimeTabulated.degree"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.runtime_tabulated.RuntimeTabulated.degree" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">degree</span></span><a class="headerlink" href="#finat.runtime_tabulated.RuntimeTabulated.degree" title="Link to this definition">¶</a></dt>
+<dd><p>The degree of the embedding polynomial space.</p>
+<p>In the tensor case this is a tuple.</p>
+</dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="finat.runtime_tabulated.RuntimeTabulated.entity_dofs">
@@ -3478,10 +3568,11 @@ reference element.</p>
 freedom for the finite element.</p>
 </dd></dl>
 
-<dl class="py attribute">
+<dl class="py property">
 <dt class="sig sig-object py" id="finat.runtime_tabulated.RuntimeTabulated.formdegree">
-<span class="sig-name descname"><span class="pre">formdegree</span></span><a class="reference internal" href="_modules/finat/runtime_tabulated.html#RuntimeTabulated.formdegree"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.runtime_tabulated.RuntimeTabulated.formdegree" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">formdegree</span></span><a class="headerlink" href="#finat.runtime_tabulated.RuntimeTabulated.formdegree" title="Link to this definition">¶</a></dt>
+<dd><p>Degree of the associated form (FEEC)</p>
+</dd></dl>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="finat.runtime_tabulated.RuntimeTabulated.index_shape">
@@ -3851,15 +3942,18 @@ provides physical geometry callbacks (may be None).</p></li>
 </dl>
 </dd></dl>
 
-<dl class="py attribute">
+<dl class="py property">
 <dt class="sig sig-object py" id="finat.tensor_product.TensorProductElement.cell">
-<span class="sig-name descname"><span class="pre">cell</span></span><a class="reference internal" href="_modules/finat/tensor_product.html#TensorProductElement.cell"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.tensor_product.TensorProductElement.cell" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">cell</span></span><a class="headerlink" href="#finat.tensor_product.TensorProductElement.cell" title="Link to this definition">¶</a></dt>
+<dd><p>The reference cell on which the element is defined.</p>
+</dd></dl>
 
-<dl class="py attribute">
+<dl class="py property">
 <dt class="sig sig-object py" id="finat.tensor_product.TensorProductElement.complex">
-<span class="sig-name descname"><span class="pre">complex</span></span><a class="reference internal" href="_modules/finat/tensor_product.html#TensorProductElement.complex"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.tensor_product.TensorProductElement.complex" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">complex</span></span><a class="headerlink" href="#finat.tensor_product.TensorProductElement.complex" title="Link to this definition">¶</a></dt>
+<dd><p>The reference cell complex over which bases are defined.
+Can be different than self.cell in the case of macro elements.</p>
+</dd></dl>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="finat.tensor_product.TensorProductElement.degree">
@@ -3925,20 +4019,39 @@ currently have a FInAT dual basis.</p>
 freedom for the finite element.</p>
 </dd></dl>
 
-<dl class="py attribute">
+<dl class="py property">
 <dt class="sig sig-object py" id="finat.tensor_product.TensorProductElement.entity_permutations">
-<span class="sig-name descname"><span class="pre">entity_permutations</span></span><a class="reference internal" href="_modules/finat/tensor_product.html#TensorProductElement.entity_permutations"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.tensor_product.TensorProductElement.entity_permutations" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">entity_permutations</span></span><a class="headerlink" href="#finat.tensor_product.TensorProductElement.entity_permutations" title="Link to this definition">¶</a></dt>
+<dd><p>Returns a nested dictionary that gives, for each dimension,
+for each entity, and for each possible entity orientation, the
+DoF permutation array that maps the entity local DoF ordering
+to the canonical global DoF ordering.</p>
+<p>The entity permutations <cite>dict</cite> for the degree 4 Lagrange finite
+element on the interval, for instance, is given by:</p>
+<div class="highlight-python3 notranslate"><div class="highlight"><pre><span></span><span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="p">[</span><span class="mi">0</span><span class="p">]},</span>
+     <span class="mi">1</span><span class="p">:</span> <span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="p">[</span><span class="mi">0</span><span class="p">]}},</span>
+ <span class="mi">1</span><span class="p">:</span> <span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span>
+         <span class="mi">1</span><span class="p">:</span> <span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">]}}}</span>
+</pre></div>
+</div>
+<p>Note that there are two entities on dimension <code class="docutils literal notranslate"><span class="pre">0</span></code> (vertices),
+each of which has only one possible orientation, while there is
+a single entity on dimension <code class="docutils literal notranslate"><span class="pre">1</span></code> (interval), which has two
+possible orientations representing non-reflected and reflected
+intervals.</p>
+</dd></dl>
 
-<dl class="py attribute">
+<dl class="py property">
 <dt class="sig sig-object py" id="finat.tensor_product.TensorProductElement.fiat_equivalent">
-<span class="sig-name descname"><span class="pre">fiat_equivalent</span></span><a class="reference internal" href="_modules/finat/tensor_product.html#TensorProductElement.fiat_equivalent"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.tensor_product.TensorProductElement.fiat_equivalent" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">fiat_equivalent</span></span><a class="headerlink" href="#finat.tensor_product.TensorProductElement.fiat_equivalent" title="Link to this definition">¶</a></dt>
+<dd><p>The FIAT element equivalent to this FInAT element.</p>
+</dd></dl>
 
-<dl class="py attribute">
+<dl class="py property">
 <dt class="sig sig-object py" id="finat.tensor_product.TensorProductElement.formdegree">
-<span class="sig-name descname"><span class="pre">formdegree</span></span><a class="reference internal" href="_modules/finat/tensor_product.html#TensorProductElement.formdegree"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.tensor_product.TensorProductElement.formdegree" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">formdegree</span></span><a class="headerlink" href="#finat.tensor_product.TensorProductElement.formdegree" title="Link to this definition">¶</a></dt>
+<dd><p>Degree of the associated form (FEEC)</p>
+</dd></dl>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="finat.tensor_product.TensorProductElement.index_shape">
@@ -3949,10 +4062,12 @@ would return (6,) while a vector valued version of the same element
 would return (6, 2)</p>
 </dd></dl>
 
-<dl class="py attribute">
+<dl class="py property">
 <dt class="sig sig-object py" id="finat.tensor_product.TensorProductElement.mapping">
-<span class="sig-name descname"><span class="pre">mapping</span></span><a class="reference internal" href="_modules/finat/tensor_product.html#TensorProductElement.mapping"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.tensor_product.TensorProductElement.mapping" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">mapping</span></span><a class="headerlink" href="#finat.tensor_product.TensorProductElement.mapping" title="Link to this definition">¶</a></dt>
+<dd><p>Appropriate mapping from the reference cell to a physical cell for
+all basis functions of the finite element.</p>
+</dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="finat.tensor_product.TensorProductElement.point_evaluation">
@@ -4023,8 +4138,8 @@ o (total orientation)     : (2 ** dim) * eo + io</p>
 </dd>
 </dl>
 </div></blockquote>
-<div class="highlight-python3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">FIAT</span>
-<span class="kn">import</span> <span class="nn">finat</span>
+<div class="highlight-python3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">FIAT</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">finat</span>
 
 <span class="n">cell</span> <span class="o">=</span> <span class="n">FIAT</span><span class="o">.</span><span class="n">ufc_cell</span><span class="p">(</span><span class="s2">&quot;interval&quot;</span><span class="p">)</span>
 <span class="n">elem</span> <span class="o">=</span> <span class="n">finat</span><span class="o">.</span><span class="n">DiscontinuousLagrange</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
@@ -4278,15 +4393,6 @@ free indices are arbitrary.</p></li>
 </dd></dl>
 
 </section>
-<section id="module-finat.trace">
-<span id="finat-trace-module"></span><h2>finat.trace module<a class="headerlink" href="#module-finat.trace" title="Link to this heading">¶</a></h2>
-<dl class="py class">
-<dt class="sig sig-object py" id="finat.trace.HDivTrace">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">finat.trace.</span></span><span class="sig-name descname"><span class="pre">HDivTrace</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cell</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/trace.html#HDivTrace"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.trace.HDivTrace" title="Link to this definition">¶</a></dt>
-<dd><p>Bases: <a class="reference internal" href="#finat.fiat_elements.ScalarFiatElement" title="finat.fiat_elements.ScalarFiatElement"><code class="xref py py-class docutils literal notranslate"><span class="pre">ScalarFiatElement</span></code></a></p>
-</dd></dl>
-
-</section>
 <section id="module-finat">
 <span id="module-contents"></span><h2>Module contents<a class="headerlink" href="#module-finat" title="Link to this heading">¶</a></h2>
 </section>
@@ -4490,6 +4596,7 @@ free indices are arbitrary.</p></li>
 </li>
 <li><a class="reference internal" href="#finat.fiat_elements.GopalakrishnanLedererSchoberlFirstKind"><code class="docutils literal notranslate"><span class="pre">GopalakrishnanLedererSchoberlFirstKind</span></code></a></li>
 <li><a class="reference internal" href="#finat.fiat_elements.GopalakrishnanLedererSchoberlSecondKind"><code class="docutils literal notranslate"><span class="pre">GopalakrishnanLedererSchoberlSecondKind</span></code></a></li>
+<li><a class="reference internal" href="#finat.fiat_elements.HDivTrace"><code class="docutils literal notranslate"><span class="pre">HDivTrace</span></code></a></li>
 <li><a class="reference internal" href="#finat.fiat_elements.HellanHerrmannJohnson"><code class="docutils literal notranslate"><span class="pre">HellanHerrmannJohnson</span></code></a></li>
 <li><a class="reference internal" href="#finat.fiat_elements.KongMulderVeldhuizen"><code class="docutils literal notranslate"><span class="pre">KongMulderVeldhuizen</span></code></a></li>
 <li><a class="reference internal" href="#finat.fiat_elements.Lagrange"><code class="docutils literal notranslate"><span class="pre">Lagrange</span></code></a></li>
@@ -4915,10 +5022,6 @@ free indices are arbitrary.</p></li>
 <li><a class="reference internal" href="#finat.tensorfiniteelement.TensorFiniteElement.value_shape"><code class="docutils literal notranslate"><span class="pre">TensorFiniteElement.value_shape</span></code></a></li>
 </ul>
 </li>
-</ul>
-</li>
-<li><a class="reference internal" href="#module-finat.trace">finat.trace module</a><ul>
-<li><a class="reference internal" href="#finat.trace.HDivTrace"><code class="docutils literal notranslate"><span class="pre">HDivTrace</span></code></a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#module-finat">Module contents</a></li>
